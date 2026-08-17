@@ -112,7 +112,6 @@ class Waermepumpe extends IPSModuleStrict
         parent::Create();
 
         // Allgemein
-        $this->RegisterPropertyString('Title', 'Wärmepumpe');
         $this->RegisterPropertyString('HeatingPumpType', 'A2W');
 
         // Primärquelle / Wärmepumpe
@@ -208,8 +207,9 @@ class Waermepumpe extends IPSModuleStrict
 
         $this->RegisterVariableMessages();
 
-        // Bei geänderter Konfiguration die bereits geöffnete HTML-SDK-Darstellung aktualisieren.
-        $this->PushVisualizationState(true);
+        // Strukturänderungen (WP-Typ, Speicher, Heizkreise usw.) benötigen
+        // einen vollständigen Neuaufbau der HTML-SDK-Kachel.
+        $this->ReloadVisualization();
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
@@ -238,23 +238,13 @@ class Waermepumpe extends IPSModuleStrict
                 'caption' => 'Dynamische Wärmepumpengrafik auf Basis der lovelace-heat-pump-card 0.9.0.'
             ],
             [
-                'type'  => 'RowLayout',
-                'items' => [
-                    [
-                        'type'    => 'ValidationTextBox',
-                        'name'    => 'Title',
-                        'caption' => 'Titel'
-                    ],
-                    [
-                        'type'    => 'Select',
-                        'name'    => 'HeatingPumpType',
-                        'caption' => 'Wärmepumpentyp',
-                        'options' => [
-                            ['caption' => 'Luft / Wasser', 'value' => 'A2W'],
-                            ['caption' => 'Wasser / Wasser', 'value' => 'W2W'],
-                            ['caption' => 'Sole / Wasser', 'value' => 'G2W']
-                        ]
-                    ]
+                'type'    => 'Select',
+                'name'    => 'HeatingPumpType',
+                'caption' => 'Wärmepumpentyp',
+                'options' => [
+                    ['caption' => 'Luft / Wasser', 'value' => 'A2W'],
+                    ['caption' => 'Wasser / Wasser', 'value' => 'W2W'],
+                    ['caption' => 'Sole / Wasser', 'value' => 'G2W']
                 ]
             ],
 
@@ -341,7 +331,7 @@ class Waermepumpe extends IPSModuleStrict
         $actions = [
             [
                 'type'    => 'Button',
-                'caption' => 'Visualisierung neu aufbauen',
+                'caption' => 'Grafik neu laden',
                 'onClick' => 'WP_UpdateVisualization($id);'
             ]
         ];
@@ -357,8 +347,18 @@ class Waermepumpe extends IPSModuleStrict
 
     public function UpdateVisualization(): void
     {
-        // Öffentliche Hilfsfunktion für den Button im Konfigurationsformular.
-        $this->PushVisualizationState(true);
+        // Button im Konfigurationsformular: komplette HTML-SDK-Kachel neu laden.
+        $this->ReloadVisualization();
+    }
+
+    private function ReloadVisualization(): void
+    {
+        $this->UpdateVisualizationValue(
+            json_encode(
+                ['type' => 'reload'],
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            )
+        );
     }
 
     private function PushVisualizationState(bool $reloadConfig): void
@@ -559,12 +559,6 @@ class Waermepumpe extends IPSModuleStrict
         // Rückgabe beendet. Die Originaldatei im Modul wird nicht verändert.
         $vendorJs = str_replace('</script>', '<\/script>', $vendorJs);
 
-        $title = htmlspecialchars(
-            $this->ReadPropertyString('Title'),
-            ENT_QUOTES | ENT_SUBSTITUTE,
-            'UTF-8'
-        );
-
         return <<<HTML
 <style>
     html,
@@ -573,22 +567,16 @@ class Waermepumpe extends IPSModuleStrict
         height: 100%;
         margin: 0;
         padding: 0;
-        overflow: auto;
+        overflow: hidden;
         background: transparent;
         font-family: Arial, sans-serif;
     }
 
     #wp-root {
         width: 100%;
-        min-height: 100%;
+        height: 100%;
         box-sizing: border-box;
-    }
-
-    #wp-title {
-        box-sizing: border-box;
-        padding: 8px 10px 4px 10px;
-        font-size: 18px;
-        font-weight: 600;
+        overflow: hidden;
     }
 
     #wp-error {
@@ -604,12 +592,14 @@ class Waermepumpe extends IPSModuleStrict
     }
 
     heat-pump-card,
-    heat-pump-card ha-card,
-    heat-pump-card svg {
+    heat-pump-card ha-card {
         display: block;
         width: 100%;
+        height: 100%;
         max-width: 100%;
+        max-height: 100%;
         box-sizing: border-box;
+        overflow: hidden;
     }
 
     heat-pump-card ha-card {
@@ -619,12 +609,15 @@ class Waermepumpe extends IPSModuleStrict
     }
 
     heat-pump-card svg {
-        height: auto !important;
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: 100%;
+        max-height: 100%;
     }
 </style>
 
 <div id="wp-root">
-    <div id="wp-title">{$title}</div>
     <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
 </div>
@@ -690,6 +683,61 @@ class Waermepumpe extends IPSModuleStrict
             if (!this.content) {
                 throw new Error('SVG konnte nicht in die Card eingefügt werden.');
             }
+
+            // SVG immer in die vorhandene HTML-SDK-Kachel einpassen.
+            this.content.setAttribute('width', '100%');
+            this.content.setAttribute('height', '100%');
+            this.content.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+            // Die Original-SVG enthält Demonstrationswerte. Diese dürfen in
+            // Symcon nicht als echte Messwerte erscheinen, solange keine
+            // entsprechende Variable konfiguriert ist.
+            [
+                '#textOutdoorTemperatureValue',
+                '#textIndoorTemperatureValue',
+                '#textSupplyTemperatureValue',
+                '#textG2WWaterTempIn',
+                '#textG2WWaterTempOut',
+                '#textTankTempHPUp',
+                '#textTankTempHPMiddle',
+                '#textTankTempHPDown',
+                '#textTankTempWWUp',
+                '#textTankTempWWMiddle',
+                '#textTankTempWWDown',
+                '#textSupplyTemperatureHeating',
+                '#textRefluxTemperatureHeating',
+                '#textSupplyTemperatureHeating2',
+                '#textRefluxTemperatureHeating2',
+                '#textSupplyTemperatureHeating3',
+                '#textRefluxTemperatureHeating3',
+                '#textEvaporatorPressure',
+                '#textEvaporatorTemperature',
+                '#textCondenserPressure',
+                '#textCondenserTemperature',
+                '#textExpansionValveOpening',
+                '#textCompressorValue',
+                '#textThermalSolarPanelTemp',
+                '#textThermalSolarFluxTemp',
+                '#textThermalSolarPumpSpeed',
+                '#textValue000',
+                '#textValue001',
+                '#textValue002',
+                '#textValue003',
+                '#textValue004',
+                '#textValue005',
+                '#textValue006',
+                '#textValue007',
+                '#textValue008',
+                '#textValue009',
+                '#textValue010',
+                '#textValue011',
+                '#textValue012'
+            ].forEach((selector) => {
+                const element = this.content.querySelector(selector);
+                if (element) {
+                    element.textContent = '';
+                }
+            });
 
             const details = this.content.querySelector('#linkDetails');
             if (details && typeof this.linkHandling === 'function') {
@@ -793,6 +841,11 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
+        if (data.type === 'reload') {
+            window.location.reload();
+            return;
+        }
+
         if (data.config) {
             currentConfig = data.config;
         }
@@ -813,7 +866,7 @@ HTML;
     private function BuildCardConfig(): array
     {
         return [
-            'title'                        => $this->ReadPropertyString('Title'),
+            'title'                        => '',
             'heatingPumpType'              => $this->ReadPropertyString('HeatingPumpType'),
 
             'temperatureGroundWaterIn'     => $this->EntityName('TemperatureGroundWaterIn'),
