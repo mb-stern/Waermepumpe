@@ -12,7 +12,6 @@ declare(strict_types=1);
 
 class Waermepumpe extends IPSModuleStrict
 {
-    private const WEB_FOLDER = 'Waermepumpe';
 
     private const BINARY_PROPERTIES = [
         'HeatingPumpStatusOnOff',
@@ -207,7 +206,6 @@ class Waermepumpe extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
-        $this->PublishResources();
         $this->RegisterVariableMessages();
 
         // Bei geänderter Konfiguration die bereits geöffnete HTML-SDK-Darstellung aktualisieren.
@@ -225,7 +223,7 @@ class Waermepumpe extends IPSModuleStrict
     {
         if (!$this->ResourcesAvailable()) {
             return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
-                . 'Wärmepumpen-Ressourcen fehlen. Erwartet wird die Originalstruktur: heat-pump/heat-pump-card.js sowie heat-pump/heat-pump-card/heat-pump.svg und de.json.'
+                . 'Wärmepumpen-Ressourcen fehlen. Erwartet wird: heat-pump/heat-pump-card.js sowie heat-pump/heat-pump-card/heat-pump.svg und de.json.'
                 . '</div>';
         }
 
@@ -360,7 +358,6 @@ class Waermepumpe extends IPSModuleStrict
     public function UpdateVisualization(): void
     {
         // Öffentliche Hilfsfunktion für den Button im Konfigurationsformular.
-        $this->PublishResources();
         $this->PushVisualizationState(true);
     }
 
@@ -446,16 +443,8 @@ class Waermepumpe extends IPSModuleStrict
 
     private function ResourcesAvailable(): bool
     {
-        $sourceDirectory = __DIR__ . DIRECTORY_SEPARATOR . 'heat-pump';
-
-        $requiredFiles = [
-            $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js',
-            $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card' . DIRECTORY_SEPARATOR . 'heat-pump.svg',
-            $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card' . DIRECTORY_SEPARATOR . 'de.json'
-        ];
-
-        foreach ($requiredFiles as $fileName) {
-            if (!is_file($fileName)) {
+        foreach ($this->GetResourceFiles() as $fileName) {
+            if (!is_file($fileName) || !is_readable($fileName)) {
                 return false;
             }
         }
@@ -463,83 +452,16 @@ class Waermepumpe extends IPSModuleStrict
         return true;
     }
 
-    private function PublishResources(): bool
+    private function GetResourceFiles(): array
     {
         $sourceDirectory = __DIR__ . DIRECTORY_SEPARATOR . 'heat-pump';
+        $assetDirectory = $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card';
 
-        $sourceCardFile = $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js';
-        $sourceAssetDirectory = $sourceDirectory
-            . DIRECTORY_SEPARATOR
-            . 'heat-pump-card';
-
-        $webfrontRoot = IPS_GetKernelDir()
-            . 'webfront'
-            . DIRECTORY_SEPARATOR
-            . 'user'
-            . DIRECTORY_SEPARATOR
-            . str_replace('/', DIRECTORY_SEPARATOR, self::WEB_FOLDER);
-
-        $webfrontAssetDirectory = $webfrontRoot
-            . DIRECTORY_SEPARATOR
-            . 'heat-pump-card';
-
-        $requiredFiles = [
-            $sourceCardFile,
-            $sourceAssetDirectory . DIRECTORY_SEPARATOR . 'heat-pump.svg',
-            $sourceAssetDirectory . DIRECTORY_SEPARATOR . 'de.json'
+        return [
+            'js'   => $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js',
+            'svg'  => $assetDirectory . DIRECTORY_SEPARATOR . 'heat-pump.svg',
+            'lang' => $assetDirectory . DIRECTORY_SEPARATOR . 'de.json'
         ];
-
-        foreach ($requiredFiles as $fileName) {
-            if (!is_file($fileName)) {
-                $this->LogMessage(
-                    sprintf('Fehlende Ressource: %s', $fileName),
-                    KL_ERROR
-                );
-                return false;
-            }
-        }
-
-        if (
-            !is_dir($webfrontAssetDirectory)
-            && !@mkdir($webfrontAssetDirectory, 0775, true)
-            && !is_dir($webfrontAssetDirectory)
-        ) {
-            $this->LogMessage(
-                'WebFront-Verzeichnis konnte nicht erstellt werden: ' . $webfrontAssetDirectory,
-                KL_ERROR
-            );
-            return false;
-        }
-
-        // Originale dist-Struktur 1:1 veröffentlichen:
-        //
-        // /user/Waermepumpe/
-        // ├── heat-pump-card.js
-        // └── heat-pump-card/
-        //     ├── heat-pump.svg
-        //     └── de.json
-        if (!@copy(
-            $sourceCardFile,
-            $webfrontRoot . DIRECTORY_SEPARATOR . 'heat-pump-card.js'
-        )) {
-            $this->LogMessage('heat-pump-card.js konnte nicht kopiert werden.', KL_ERROR);
-            return false;
-        }
-
-        foreach (['heat-pump.svg', 'de.json'] as $fileName) {
-            if (!@copy(
-                $sourceAssetDirectory . DIRECTORY_SEPARATOR . $fileName,
-                $webfrontAssetDirectory . DIRECTORY_SEPARATOR . $fileName
-            )) {
-                $this->LogMessage(
-                    sprintf('%s konnte nicht kopiert werden.', $fileName),
-                    KL_ERROR
-                );
-                return false;
-            }
-        }
-
-        return true;
     }
 
     private function RegisterVariableMessages(): void
@@ -570,65 +492,115 @@ class Waermepumpe extends IPSModuleStrict
 
     private function BuildVisualizationHtml(): string
     {
+        $files = $this->GetResourceFiles();
+
+        $vendorJs = file_get_contents($files['js']);
+        $svg = file_get_contents($files['svg']);
+        $localizationRaw = file_get_contents($files['lang']);
+
+        if ($vendorJs === false || $svg === false || $localizationRaw === false) {
+            return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
+                . 'Die Wärmepumpen-Ressourcen konnten nicht gelesen werden.'
+                . '</div>';
+        }
+
+        $localization = json_decode($localizationRaw, true);
+        if (!is_array($localization)) {
+            return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
+                . 'de.json der Wärmepumpen-Card enthält kein gültiges JSON.'
+                . '</div>';
+        }
+
         $configJson = json_encode(
             $this->BuildCardConfig(),
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR
+            JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_HEX_TAG
+            | JSON_HEX_AMP
+            | JSON_HEX_APOS
+            | JSON_HEX_QUOT
+            | JSON_THROW_ON_ERROR
         );
 
         $statesJson = json_encode(
             $this->BuildHassStates(),
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR
+            JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_HEX_TAG
+            | JSON_HEX_AMP
+            | JSON_HEX_APOS
+            | JSON_HEX_QUOT
+            | JSON_THROW_ON_ERROR
         );
 
-        $scriptUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card.js';
-        $assetUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card/';
-        $title = htmlspecialchars($this->ReadPropertyString('Title'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $svgJson = json_encode(
+            $svg,
+            JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_HEX_TAG
+            | JSON_HEX_AMP
+            | JSON_HEX_APOS
+            | JSON_HEX_QUOT
+            | JSON_THROW_ON_ERROR
+        );
+
+        $localizationJson = json_encode(
+            $localization,
+            JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_HEX_TAG
+            | JSON_HEX_AMP
+            | JSON_HEX_APOS
+            | JSON_HEX_QUOT
+            | JSON_THROW_ON_ERROR
+        );
+
+        // Verhindert nur, dass ein möglicher String "</script>" die HTML-SDK-
+        // Rückgabe beendet. Die Originaldatei im Modul wird nicht verändert.
+        $vendorJs = str_replace('</script>', '<\/script>', $vendorJs);
+
+        $title = htmlspecialchars(
+            $this->ReadPropertyString('Title'),
+            ENT_QUOTES | ENT_SUBSTITUTE,
+            'UTF-8'
+        );
 
         return <<<HTML
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
 <style>
-    html, body {
+    html,
+    body {
         width: 100%;
-        min-height: 100%;
+        height: 100%;
         margin: 0;
         padding: 0;
+        overflow: auto;
         background: transparent;
         font-family: Arial, sans-serif;
     }
 
     #wp-root {
         width: 100%;
-        min-height: 300px;
+        min-height: 100%;
         box-sizing: border-box;
-        overflow: auto;
     }
 
     #wp-title {
+        box-sizing: border-box;
+        padding: 8px 10px 4px 10px;
         font-size: 18px;
         font-weight: 600;
-        margin: 8px;
     }
 
-    #wp-debug {
-        box-sizing: border-box;
+    #wp-error {
+        display: none;
         margin: 8px;
-        padding: 8px 10px;
-        border: 1px solid rgba(127,127,127,.45);
-        border-radius: 6px;
-        font-size: 12px;
-        line-height: 1.5;
+        padding: 10px;
         white-space: pre-wrap;
-    }
-
-    #wp-debug.ok {
-        border-color: rgba(0,160,80,.7);
-    }
-
-    #wp-debug.error {
-        border-color: rgba(210,50,50,.85);
+        border: 1px solid #c62828;
+        border-radius: 6px;
+        color: #c62828;
+        font-size: 12px;
+        line-height: 1.45;
     }
 
     heat-pump-card,
@@ -643,28 +615,22 @@ class Waermepumpe extends IPSModuleStrict
     heat-pump-card ha-card {
         background: transparent !important;
         box-shadow: none !important;
+        border: 0 !important;
     }
 
     heat-pump-card svg {
         height: auto !important;
     }
 </style>
-</head>
-<body>
+
 <div id="wp-root">
     <div id="wp-title">{$title}</div>
-    <div id="wp-debug">HTML-SDK geladen. Prüfe Ressourcen …</div>
+    <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
 </div>
 
 <script>
-    window.__wpVendorLoaded = false;
-    window.__wpVendorLoadError = false;
-</script>
-<script
-    src="{$scriptUrl}"
-    onload="window.__wpVendorLoaded=true"
-    onerror="window.__wpVendorLoadError=true">
+{$vendorJs}
 </script>
 
 <script>
@@ -672,159 +638,153 @@ class Waermepumpe extends IPSModuleStrict
     let currentConfig = {$configJson};
     let currentStates = {$statesJson};
 
-    const scriptUrl = '{$scriptUrl}';
-    const assetUrl = '{$assetUrl}';
-    const debug = document.getElementById('wp-debug');
+    const embeddedSvg = {$svgJson};
+    const embeddedLocalization = {$localizationJson};
 
-    function show(message, state = '') {
-        debug.textContent = message;
-        debug.className = state;
+    const errorBox = document.getElementById('wp-error');
+
+    const showError = (message) => {
+        if (!errorBox) {
+            return;
+        }
+
+        errorBox.textContent = message;
+        errorBox.style.display = 'block';
+    };
+
+    const clearError = () => {
+        if (!errorBox) {
+            return;
+        }
+
+        errorBox.textContent = '';
+        errorBox.style.display = 'none';
+    };
+
+    const HeatPumpClass = customElements.get('heat-pump-card');
+
+    if (!HeatPumpClass) {
+        showError('heat-pump-card.js wurde injiziert, aber das Custom Element "heat-pump-card" wurde nicht registriert.');
+        return;
     }
 
-    async function checkUrl(url) {
+    /*
+     * Symcon-Adapter:
+     * Die Originaldatei heat-pump-card.js bleibt unangetastet.
+     * Nur die beiden Methoden, die in Home Assistant per XMLHttpRequest
+     * SVG und Sprachdatei nachladen, werden zur Laufzeit auf die bereits
+     * von PHP eingebetteten Ressourcen umgebogen.
+     */
+    HeatPumpClass.prototype.readSvg = function(lang, handleSvg, hass) {
         try {
-            const response = await fetch(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(), {
-                cache: 'no-store'
-            });
-            return {
-                ok: response.ok,
-                status: response.status,
-                statusText: response.statusText
-            };
+            this.innerHTML =
+                '<ha-card>\\n'
+                + embeddedSvg
+                    .replace(/.*--primary-text-color:.*/g, '')
+                    .replace(/ class="rotate"/g, '')
+                    .replace(/display: inline;/g, 'display: none;')
+                + '</ha-card>';
+
+            this.content = this.querySelector('svg');
+
+            if (!this.content) {
+                throw new Error('SVG konnte nicht in die Card eingefügt werden.');
+            }
+
+            const details = this.content.querySelector('#linkDetails');
+            if (details && typeof this.linkHandling === 'function') {
+                details.addEventListener('click', this.linkHandling);
+            }
+
+            const settings = this.content.querySelector('#linkSettings');
+            if (settings && typeof this.linkHandling === 'function') {
+                settings.addEventListener('click', this.linkHandling);
+            }
+
+            this.readLocalization(lang, hass);
         } catch (error) {
-            return {
-                ok: false,
-                status: 0,
-                statusText: String(error)
-            };
-        }
-    }
-
-    async function initializeCard() {
-        const jsCheck = await checkUrl(scriptUrl);
-        const svgCheck = await checkUrl(assetUrl + 'heat-pump.svg');
-        const langCheck = await checkUrl(assetUrl + 'de.json');
-
-        if (!jsCheck.ok || !svgCheck.ok || !langCheck.ok) {
-            show(
-                'Ressourcenfehler:\\n' +
-                'JS: ' + jsCheck.status + ' ' + jsCheck.statusText + '\\n' +
-                'SVG: ' + svgCheck.status + ' ' + svgCheck.statusText + '\\n' +
-                'de.json: ' + langCheck.status + ' ' + langCheck.statusText,
-                'error'
+            showError(
+                'Fehler beim Einfügen der Wärmepumpen-SVG:\\n'
+                + (error && error.stack ? error.stack : String(error))
             );
-            return;
         }
 
-        if (window.__wpVendorLoadError) {
-            show('heat-pump-card.js ist per HTTP erreichbar, konnte aber als <script> nicht geladen werden.', 'error');
-            return;
-        }
+        return embeddedSvg;
+    };
 
-        let tries = 0;
-        while (!customElements.get('heat-pump-card') && tries < 50) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-            tries++;
-        }
-
-        const HeatPumpClass = customElements.get('heat-pump-card');
-
-        if (!HeatPumpClass) {
-            show(
-                'Die Dateien sind erreichbar, aber <heat-pump-card> wurde nicht registriert.\\n' +
-                'Damit liegt der Fehler beim Ausführen von heat-pump-card.js.',
-                'error'
-            );
-            return;
-        }
-
-        // Originaldatei bleibt unverändert; nur ihr öffentlicher Ressourcenpfad
-        // wird zur Laufzeit auf den Symcon-Pfad umgebogen.
-        HeatPumpClass.cardFolder = assetUrl;
-
-        const card = document.getElementById('wp-card');
-
-        if (!card || typeof card.setConfig !== 'function') {
-            show('Custom Element ist registriert, aber setConfig() fehlt.', 'error');
-            return;
-        }
-
+    HeatPumpClass.prototype.readLocalization = function(lang, hass) {
         try {
-            card.setConfig(currentConfig);
-            card.hass = {
-                language: 'de-DE',
-                states: currentStates
-            };
+            HeatPumpClass.localization = embeddedLocalization;
 
-            // SVG wird asynchron via XMLHttpRequest geladen.
-            let svgTries = 0;
-            while (!card.querySelector('svg') && svgTries < 50) {
-                await new Promise(resolve => setTimeout(resolve, 100));
-                svgTries++;
-            }
+            const texts =
+                embeddedLocalization
+                && embeddedLocalization.svgTexts
+                    ? embeddedLocalization.svgTexts
+                    : {};
 
-            if (!card.querySelector('svg')) {
-                show(
-                    'JS, SVG und de.json sind per HTTP erreichbar und die Card ist registriert,\\n' +
-                    'aber die Original-Card hat das SVG nicht in das Element eingefügt.',
-                    'error'
-                );
-                return;
-            }
-
-            show(
-                'OK: HTML-SDK, heat-pump-card.js, heat-pump.svg und de.json wurden geladen.\\n' +
-                'Wärmepumpentyp: ' + (currentConfig.heatingPumpType || 'A2W'),
-                'ok'
-            );
-
-            // Debugbox nach erfolgreichem Start ausblenden.
-            setTimeout(() => {
-                if (debug.className === 'ok') {
-                    debug.style.display = 'none';
+            const setText = (selector, value) => {
+                const element = this.content ? this.content.querySelector(selector) : null;
+                if (element) {
+                    element.innerHTML = value || '';
                 }
-            }, 2000);
+            };
+
+            setText('#textTankWWName', texts.tankWWName);
+            setText('#textTankHPName', texts.tankHPName);
+            setText('#textEvaporator', texts.evaporator);
+            setText('#textCondenser', texts.condenser);
+            setText('#textCompressor', texts.compressor);
+            setText('#textExpansionValve', texts.expansionValve);
+            setText('#textCirculatingPump', texts.circulatingPump);
+            setText('#textSupplyTemperatureLabel', texts.supplyTemperatureLabel);
+
+            this.setConfig(this.config || {});
+            this.setValues(hass || { language: 'de-DE', states: {} });
         } catch (error) {
-            show(
-                'Fehler beim Initialisieren der Original-Card:\\n' +
-                (error && error.stack ? error.stack : String(error)),
-                'error'
+            showError(
+                'Fehler beim Initialisieren der Wärmepumpen-Card:\\n'
+                + (error && error.stack ? error.stack : String(error))
             );
         }
-    }
+    };
 
-    function applyCurrentData() {
+    const applyCardData = () => {
         const card = document.getElementById('wp-card');
-        const HeatPumpClass = customElements.get('heat-pump-card');
 
-        if (!card || !HeatPumpClass) {
+        if (!card) {
+            showError('Das Element <heat-pump-card> wurde im HTML nicht gefunden.');
             return;
         }
 
         try {
-            HeatPumpClass.cardFolder = assetUrl;
+            clearError();
+
             card.setConfig(currentConfig);
             card.hass = {
                 language: 'de-DE',
                 states: currentStates
             };
         } catch (error) {
-            show(
-                'Fehler beim Aktualisieren der Card:\\n' +
-                (error && error.stack ? error.stack : String(error)),
-                'error'
+            showError(
+                'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
+                + (error && error.stack ? error.stack : String(error))
             );
         }
-    }
+    };
 
-    window.handleMessage = function(message) {
+    /*
+     * HTML-SDK: Nachrichten vom PHP-Modul.
+     * GetVisualizationTile() liefert den kompletten Initialzustand.
+     * Danach aktualisiert UpdateVisualizationValue() nur noch die Daten.
+     */
+    window.handleMessage = (message) => {
         let data = message;
 
         if (typeof data === 'string') {
             try {
                 data = JSON.parse(data);
             } catch (error) {
-                show('Ungültige HTML-SDK-Nachricht: ' + String(error), 'error');
+                showError('Ungültige HTML-SDK-Nachricht: ' + String(error));
                 return;
             }
         }
@@ -841,14 +801,12 @@ class Waermepumpe extends IPSModuleStrict
             currentStates = data.states;
         }
 
-        applyCurrentData();
+        applyCardData();
     };
 
-    initializeCard();
+    applyCardData();
 })();
 </script>
-</body>
-</html>
 HTML;
     }
 
