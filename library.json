@@ -1,0 +1,12 @@
+{
+    "id": "{DB43F0BF-5550-99C6-0548-F3C87E9BBE2D}",
+    "author": "Stefan Künzli",
+    "name": "Wärmepumpe",
+    "url": "https://github.com/mb-stern/Waermepumpe",
+    "compatibility": {
+        "version": "8.2"
+    },
+    "version": "1.0",
+    "build": 0,
+    "date": 0
+}

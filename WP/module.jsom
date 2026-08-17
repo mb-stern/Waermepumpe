@@ -1,0 +1,14 @@
+{
+    "id": "{DB43F0BF-5550-99C6-0548-F3C87E9BBE2D}",
+    "name": "Wärmepumpe",
+    "type": 3,
+    "vendor": "",
+    "aliases": [
+        "Wärmepumpe"
+    ],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "ENERGIE",
+    "url": "https://github.com/mb-stern/Waermepumpe/tree/beta"
+}
