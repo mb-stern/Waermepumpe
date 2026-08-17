@@ -581,122 +581,250 @@ class Waermepumpe extends IPSModuleStrict
         );
 
         $scriptUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card.js';
-        $publicFolder = self::WEB_FOLDER . '/heat-pump-card';
+        $assetUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card/';
         $title = htmlspecialchars($this->ReadPropertyString('Title'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         return <<<HTML
-<div id="wp-root" class="wp-root">
-    <div class="wp-title">{$title}</div>
-    <heat-pump-card id="wp-card"></heat-pump-card>
-</div>
-
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
 <style>
     html, body {
+        width: 100%;
+        min-height: 100%;
         margin: 0;
         padding: 0;
         background: transparent;
+        font-family: Arial, sans-serif;
     }
 
-    .wp-root {
+    #wp-root {
         width: 100%;
-        height: 100%;
+        min-height: 300px;
         box-sizing: border-box;
         overflow: auto;
-        font-family: var(--font-family, Arial, sans-serif);
-        color: var(--content-color, inherit);
     }
 
-    .wp-title {
+    #wp-title {
         font-size: 18px;
         font-weight: 600;
         margin: 8px;
     }
 
+    #wp-debug {
+        box-sizing: border-box;
+        margin: 8px;
+        padding: 8px 10px;
+        border: 1px solid rgba(127,127,127,.45);
+        border-radius: 6px;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+    }
+
+    #wp-debug.ok {
+        border-color: rgba(0,160,80,.7);
+    }
+
+    #wp-debug.error {
+        border-color: rgba(210,50,50,.85);
+    }
+
     heat-pump-card,
-    heat-pump-card ha-card {
+    heat-pump-card ha-card,
+    heat-pump-card svg {
         display: block;
         width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+
+    heat-pump-card ha-card {
         background: transparent !important;
         box-shadow: none !important;
     }
 
     heat-pump-card svg {
-        display: block;
-        width: 100% !important;
         height: auto !important;
-        max-width: 100%;
     }
 </style>
+</head>
+<body>
+<div id="wp-root">
+    <div id="wp-title">{$title}</div>
+    <div id="wp-debug">HTML-SDK geladen. Prüfe Ressourcen …</div>
+    <heat-pump-card id="wp-card"></heat-pump-card>
+</div>
 
-<script src="{$scriptUrl}"></script>
+<script>
+    window.__wpVendorLoaded = false;
+    window.__wpVendorLoadError = false;
+</script>
+<script
+    src="{$scriptUrl}"
+    onload="window.__wpVendorLoaded=true"
+    onerror="window.__wpVendorLoadError=true">
+</script>
+
 <script>
 (() => {
     let currentConfig = {$configJson};
     let currentStates = {$statesJson};
 
-    const resourceFolder = '/user/{$publicFolder}/';
+    const scriptUrl = '{$scriptUrl}';
+    const assetUrl = '{$assetUrl}';
+    const debug = document.getElementById('wp-debug');
 
-    const getCard = () => document.getElementById('wp-card');
+    function show(message, state = '') {
+        debug.textContent = message;
+        debug.className = state;
+    }
 
-    const getHeatPumpClass = () => customElements.get('heat-pump-card');
+    async function checkUrl(url) {
+        try {
+            const response = await fetch(url + (url.includes('?') ? '&' : '?') + 'v=' + Date.now(), {
+                cache: 'no-store'
+            });
+            return {
+                ok: response.ok,
+                status: response.status,
+                statusText: response.statusText
+            };
+        } catch (error) {
+            return {
+                ok: false,
+                status: 0,
+                statusText: String(error)
+            };
+        }
+    }
 
-    const configureVendorClass = () => {
-        const HeatPumpClass = getHeatPumpClass();
+    async function initializeCard() {
+        const jsCheck = await checkUrl(scriptUrl);
+        const svgCheck = await checkUrl(assetUrl + 'heat-pump.svg');
+        const langCheck = await checkUrl(assetUrl + 'de.json');
 
-        if (!HeatPumpClass) {
-            return false;
+        if (!jsCheck.ok || !svgCheck.ok || !langCheck.ok) {
+            show(
+                'Ressourcenfehler:\\n' +
+                'JS: ' + jsCheck.status + ' ' + jsCheck.statusText + '\\n' +
+                'SVG: ' + svgCheck.status + ' ' + svgCheck.statusText + '\\n' +
+                'de.json: ' + langCheck.status + ' ' + langCheck.statusText,
+                'error'
+            );
+            return;
         }
 
-        // Die Original-Card bleibt unverändert.
-        // Lediglich ihr öffentlicher Ressourcenpfad wird zur Laufzeit
-        // von HACS auf das von Symcon veröffentlichte Verzeichnis gesetzt.
-        HeatPumpClass.cardFolder = resourceFolder;
+        if (window.__wpVendorLoadError) {
+            show('heat-pump-card.js ist per HTTP erreichbar, konnte aber als <script> nicht geladen werden.', 'error');
+            return;
+        }
 
-        return true;
-    };
+        let tries = 0;
+        while (!customElements.get('heat-pump-card') && tries < 50) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            tries++;
+        }
 
-    const applyCardData = () => {
-        const card = getCard();
+        const HeatPumpClass = customElements.get('heat-pump-card');
 
-        if (!card || !configureVendorClass() || typeof card.setConfig !== 'function') {
-            return false;
+        if (!HeatPumpClass) {
+            show(
+                'Die Dateien sind erreichbar, aber <heat-pump-card> wurde nicht registriert.\\n' +
+                'Damit liegt der Fehler beim Ausführen von heat-pump-card.js.',
+                'error'
+            );
+            return;
+        }
+
+        // Originaldatei bleibt unverändert; nur ihr öffentlicher Ressourcenpfad
+        // wird zur Laufzeit auf den Symcon-Pfad umgebogen.
+        HeatPumpClass.cardFolder = assetUrl;
+
+        const card = document.getElementById('wp-card');
+
+        if (!card || typeof card.setConfig !== 'function') {
+            show('Custom Element ist registriert, aber setConfig() fehlt.', 'error');
+            return;
         }
 
         try {
-            // Reihenfolge ist wichtig:
-            // setConfig speichert zunächst nur die Topologie.
-            // Das Setzen von hass startet beim ersten Mal das Laden von SVG
-            // und Sprachdatei. Danach übernimmt die Original-Card selbst
-            // setConfig() und setValues().
             card.setConfig(currentConfig);
-
             card.hass = {
                 language: 'de-DE',
                 states: currentStates
             };
 
-            return true;
+            // SVG wird asynchron via XMLHttpRequest geladen.
+            let svgTries = 0;
+            while (!card.querySelector('svg') && svgTries < 50) {
+                await new Promise(resolve => setTimeout(resolve, 100));
+                svgTries++;
+            }
+
+            if (!card.querySelector('svg')) {
+                show(
+                    'JS, SVG und de.json sind per HTTP erreichbar und die Card ist registriert,\\n' +
+                    'aber die Original-Card hat das SVG nicht in das Element eingefügt.',
+                    'error'
+                );
+                return;
+            }
+
+            show(
+                'OK: HTML-SDK, heat-pump-card.js, heat-pump.svg und de.json wurden geladen.\\n' +
+                'Wärmepumpentyp: ' + (currentConfig.heatingPumpType || 'A2W'),
+                'ok'
+            );
+
+            // Debugbox nach erfolgreichem Start ausblenden.
+            setTimeout(() => {
+                if (debug.className === 'ok') {
+                    debug.style.display = 'none';
+                }
+            }, 2000);
         } catch (error) {
-            console.error('Wärmepumpen-Card konnte nicht initialisiert werden:', error);
-            return false;
+            show(
+                'Fehler beim Initialisieren der Original-Card:\\n' +
+                (error && error.stack ? error.stack : String(error)),
+                'error'
+            );
         }
-    };
+    }
 
-    const start = () => {
-        if (!applyCardData()) {
-            window.setTimeout(start, 50);
+    function applyCurrentData() {
+        const card = document.getElementById('wp-card');
+        const HeatPumpClass = customElements.get('heat-pump-card');
+
+        if (!card || !HeatPumpClass) {
+            return;
         }
-    };
 
-    // HTML-SDK: Laufende Wert- und Konfigurationsänderungen aus PHP.
-    window.handleMessage = (message) => {
+        try {
+            HeatPumpClass.cardFolder = assetUrl;
+            card.setConfig(currentConfig);
+            card.hass = {
+                language: 'de-DE',
+                states: currentStates
+            };
+        } catch (error) {
+            show(
+                'Fehler beim Aktualisieren der Card:\\n' +
+                (error && error.stack ? error.stack : String(error)),
+                'error'
+            );
+        }
+    }
+
+    window.handleMessage = function(message) {
         let data = message;
 
         if (typeof data === 'string') {
             try {
                 data = JSON.parse(data);
             } catch (error) {
-                console.error('Ungültige HTML-SDK-Nachricht:', error);
+                show('Ungültige HTML-SDK-Nachricht: ' + String(error), 'error');
                 return;
             }
         }
@@ -713,16 +841,14 @@ class Waermepumpe extends IPSModuleStrict
             currentStates = data.states;
         }
 
-        applyCardData();
+        applyCurrentData();
     };
 
-    if (customElements.get('heat-pump-card')) {
-        start();
-    } else {
-        customElements.whenDefined('heat-pump-card').then(start);
-    }
+    initializeCard();
 })();
 </script>
+</body>
+</html>
 HTML;
     }
 
