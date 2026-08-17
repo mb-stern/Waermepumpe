@@ -475,44 +475,42 @@ class Waermepumpe extends IPSModuleStrict
         ];
 
         foreach ($requiredFiles as $fileName) {
-            if (!is_file($sourceDirectory . DIRECTORY_SEPARATOR . $fileName)) {
+            $sourceFile = $sourceDirectory . DIRECTORY_SEPARATOR . $fileName;
+
+            if (!is_file($sourceFile)) {
                 $this->LogMessage(
-                    sprintf('Fehlende Ressource: %s', $sourceDirectory . DIRECTORY_SEPARATOR . $fileName),
+                    sprintf('Fehlende Ressource: %s', $sourceFile),
                     KL_ERROR
                 );
                 return false;
             }
         }
 
-        if (!is_dir($webfrontDirectory) && !@mkdir($webfrontDirectory, 0775, true) && !is_dir($webfrontDirectory)) {
-            $this->LogMessage('WebFront-Verzeichnis konnte nicht erstellt werden: ' . $webfrontDirectory, KL_ERROR);
+        if (
+            !is_dir($webfrontDirectory)
+            && !@mkdir($webfrontDirectory, 0775, true)
+            && !is_dir($webfrontDirectory)
+        ) {
+            $this->LogMessage(
+                'WebFront-Verzeichnis konnte nicht erstellt werden: ' . $webfrontDirectory,
+                KL_ERROR
+            );
             return false;
         }
 
-        // JS wird nur beim Veröffentlichen angepasst.
-        // Die Originaldatei im Modulordner bleibt unverändert.
-        $js = file_get_contents($sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js');
-        if ($js === false) {
-            return false;
-        }
+        // WICHTIG:
+        // Alle Third-Party-Dateien werden 1:1 und unverändert veröffentlicht.
+        // Dadurch kann eine neue Version der lovelace-heat-pump-card einfach
+        // durch Austausch der Dateien im Modulordner übernommen werden.
+        foreach ($requiredFiles as $fileName) {
+            $sourceFile = $sourceDirectory . DIRECTORY_SEPARATOR . $fileName;
+            $targetFile = $webfrontDirectory . DIRECTORY_SEPARATOR . $fileName;
 
-        $publicUrl = '/user/' . self::WEB_FOLDER . '/';
-
-        $js = str_replace(
-            'static cardFolder = "/hacsfiles/lovelace-heat-pump-card/heat-pump-card/";',
-            'static cardFolder = "' . $publicUrl . '";',
-            $js
-        );
-
-        if (file_put_contents($webfrontDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js', $js) === false) {
-            return false;
-        }
-
-        foreach (['heat-pump.svg', 'de.json'] as $fileName) {
-            if (!@copy(
-                $sourceDirectory . DIRECTORY_SEPARATOR . $fileName,
-                $webfrontDirectory . DIRECTORY_SEPARATOR . $fileName
-            )) {
+            if (!@copy($sourceFile, $targetFile)) {
+                $this->LogMessage(
+                    sprintf('Ressource konnte nicht kopiert werden: %s', $fileName),
+                    KL_ERROR
+                );
                 return false;
             }
         }
@@ -559,6 +557,7 @@ class Waermepumpe extends IPSModuleStrict
         );
 
         $scriptUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card.js';
+        $publicFolder = self::WEB_FOLDER;
         $title = htmlspecialchars($this->ReadPropertyString('Title'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         return <<<HTML
@@ -611,20 +610,47 @@ class Waermepumpe extends IPSModuleStrict
     let currentConfig = {$configJson};
     let currentStates = {$statesJson};
 
+    const resourceFolder = '/user/{$publicFolder}/';
+
     const getCard = () => document.getElementById('wp-card');
+
+    const getHeatPumpClass = () => customElements.get('heat-pump-card');
+
+    const configureVendorClass = () => {
+        const HeatPumpClass = getHeatPumpClass();
+
+        if (!HeatPumpClass) {
+            return false;
+        }
+
+        // Die Original-Card bleibt unverändert.
+        // Lediglich ihr öffentlicher Ressourcenpfad wird zur Laufzeit
+        // von HACS auf das von Symcon veröffentlichte Verzeichnis gesetzt.
+        HeatPumpClass.cardFolder = resourceFolder;
+
+        return true;
+    };
 
     const applyCardData = () => {
         const card = getCard();
-        if (!card || typeof card.setConfig !== 'function') {
+
+        if (!card || !configureVendorClass() || typeof card.setConfig !== 'function') {
             return false;
         }
 
         try {
+            // Reihenfolge ist wichtig:
+            // setConfig speichert zunächst nur die Topologie.
+            // Das Setzen von hass startet beim ersten Mal das Laden von SVG
+            // und Sprachdatei. Danach übernimmt die Original-Card selbst
+            // setConfig() und setValues().
             card.setConfig(currentConfig);
+
             card.hass = {
                 language: 'de-DE',
                 states: currentStates
             };
+
             return true;
         } catch (error) {
             console.error('Wärmepumpen-Card konnte nicht initialisiert werden:', error);
@@ -638,7 +664,7 @@ class Waermepumpe extends IPSModuleStrict
         }
     };
 
-    // HTML-SDK: Nachrichten aus dem PHP-Modul empfangen.
+    // HTML-SDK: Laufende Wert- und Konfigurationsänderungen aus PHP.
     window.handleMessage = (message) => {
         let data = message;
 
