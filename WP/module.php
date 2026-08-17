@@ -12,7 +12,7 @@ declare(strict_types=1);
 
 class Waermepumpe extends IPSModuleStrict
 {
-    private const WEB_FOLDER = 'Waermepumpe/heat-pump';
+    private const WEB_FOLDER = 'Waermepumpe';
 
     private const BINARY_PROPERTIES = [
         'HeatingPumpStatusOnOff',
@@ -225,7 +225,7 @@ class Waermepumpe extends IPSModuleStrict
     {
         if (!$this->ResourcesAvailable()) {
             return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
-                . 'Wärmepumpen-Ressourcen fehlen. Erwartet werden heat-pump-card.js, heat-pump.svg und de.json im Ordner heat-pump.'
+                . 'Wärmepumpen-Ressourcen fehlen. Erwartet wird die Originalstruktur: heat-pump/heat-pump-card.js sowie heat-pump/heat-pump-card/heat-pump.svg und de.json.'
                 . '</div>';
         }
 
@@ -448,8 +448,14 @@ class Waermepumpe extends IPSModuleStrict
     {
         $sourceDirectory = __DIR__ . DIRECTORY_SEPARATOR . 'heat-pump';
 
-        foreach (['heat-pump-card.js', 'heat-pump.svg', 'de.json'] as $fileName) {
-            if (!is_file($sourceDirectory . DIRECTORY_SEPARATOR . $fileName)) {
+        $requiredFiles = [
+            $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js',
+            $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card' . DIRECTORY_SEPARATOR . 'heat-pump.svg',
+            $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card' . DIRECTORY_SEPARATOR . 'de.json'
+        ];
+
+        foreach ($requiredFiles as $fileName) {
+            if (!is_file($fileName)) {
                 return false;
             }
         }
@@ -461,25 +467,32 @@ class Waermepumpe extends IPSModuleStrict
     {
         $sourceDirectory = __DIR__ . DIRECTORY_SEPARATOR . 'heat-pump';
 
-        $webfrontDirectory = IPS_GetKernelDir()
+        $sourceCardFile = $sourceDirectory . DIRECTORY_SEPARATOR . 'heat-pump-card.js';
+        $sourceAssetDirectory = $sourceDirectory
+            . DIRECTORY_SEPARATOR
+            . 'heat-pump-card';
+
+        $webfrontRoot = IPS_GetKernelDir()
             . 'webfront'
             . DIRECTORY_SEPARATOR
             . 'user'
             . DIRECTORY_SEPARATOR
             . str_replace('/', DIRECTORY_SEPARATOR, self::WEB_FOLDER);
 
+        $webfrontAssetDirectory = $webfrontRoot
+            . DIRECTORY_SEPARATOR
+            . 'heat-pump-card';
+
         $requiredFiles = [
-            'heat-pump-card.js',
-            'heat-pump.svg',
-            'de.json'
+            $sourceCardFile,
+            $sourceAssetDirectory . DIRECTORY_SEPARATOR . 'heat-pump.svg',
+            $sourceAssetDirectory . DIRECTORY_SEPARATOR . 'de.json'
         ];
 
         foreach ($requiredFiles as $fileName) {
-            $sourceFile = $sourceDirectory . DIRECTORY_SEPARATOR . $fileName;
-
-            if (!is_file($sourceFile)) {
+            if (!is_file($fileName)) {
                 $this->LogMessage(
-                    sprintf('Fehlende Ressource: %s', $sourceFile),
+                    sprintf('Fehlende Ressource: %s', $fileName),
                     KL_ERROR
                 );
                 return false;
@@ -487,28 +500,39 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         if (
-            !is_dir($webfrontDirectory)
-            && !@mkdir($webfrontDirectory, 0775, true)
-            && !is_dir($webfrontDirectory)
+            !is_dir($webfrontAssetDirectory)
+            && !@mkdir($webfrontAssetDirectory, 0775, true)
+            && !is_dir($webfrontAssetDirectory)
         ) {
             $this->LogMessage(
-                'WebFront-Verzeichnis konnte nicht erstellt werden: ' . $webfrontDirectory,
+                'WebFront-Verzeichnis konnte nicht erstellt werden: ' . $webfrontAssetDirectory,
                 KL_ERROR
             );
             return false;
         }
 
-        // WICHTIG:
-        // Alle Third-Party-Dateien werden 1:1 und unverändert veröffentlicht.
-        // Dadurch kann eine neue Version der lovelace-heat-pump-card einfach
-        // durch Austausch der Dateien im Modulordner übernommen werden.
-        foreach ($requiredFiles as $fileName) {
-            $sourceFile = $sourceDirectory . DIRECTORY_SEPARATOR . $fileName;
-            $targetFile = $webfrontDirectory . DIRECTORY_SEPARATOR . $fileName;
+        // Originale dist-Struktur 1:1 veröffentlichen:
+        //
+        // /user/Waermepumpe/
+        // ├── heat-pump-card.js
+        // └── heat-pump-card/
+        //     ├── heat-pump.svg
+        //     └── de.json
+        if (!@copy(
+            $sourceCardFile,
+            $webfrontRoot . DIRECTORY_SEPARATOR . 'heat-pump-card.js'
+        )) {
+            $this->LogMessage('heat-pump-card.js konnte nicht kopiert werden.', KL_ERROR);
+            return false;
+        }
 
-            if (!@copy($sourceFile, $targetFile)) {
+        foreach (['heat-pump.svg', 'de.json'] as $fileName) {
+            if (!@copy(
+                $sourceAssetDirectory . DIRECTORY_SEPARATOR . $fileName,
+                $webfrontAssetDirectory . DIRECTORY_SEPARATOR . $fileName
+            )) {
                 $this->LogMessage(
-                    sprintf('Ressource konnte nicht kopiert werden: %s', $fileName),
+                    sprintf('%s konnte nicht kopiert werden.', $fileName),
                     KL_ERROR
                 );
                 return false;
@@ -557,7 +581,7 @@ class Waermepumpe extends IPSModuleStrict
         );
 
         $scriptUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card.js';
-        $publicFolder = self::WEB_FOLDER;
+        $publicFolder = self::WEB_FOLDER . '/heat-pump-card';
         $title = htmlspecialchars($this->ReadPropertyString('Title'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         return <<<HTML
