@@ -197,11 +197,8 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ThermalSolarPanelTemp', 0);
         $this->RegisterPropertyInteger('ThermalSolarFluxTemp', 0);
 
-        // Visualisierung
-        $created = $this->RegisterVariableString('Visualization', 'Wärmepumpe', '~HTMLBox', 100);
-        if ($created) {
-            $this->SetValue('Visualization', '');
-        }
+        // HTML-SDK Visualisierung
+        $this->SetVisualizationType(INSTANCE_VISUALIZATION_TYPE_HTML);
 
         $this->SetBuffer('RegisteredVariables', '[]');
     }
@@ -210,27 +207,29 @@ class Waermepumpe extends IPSModuleStrict
     {
         parent::ApplyChanges();
 
-        $resourcesReady = $this->PublishResources();
+        $this->PublishResources();
         $this->RegisterVariableMessages();
 
-        if (!$resourcesReady) {
-            $this->SetValue(
-                'Visualization',
-                '<div style="padding:16px;font-family:sans-serif;color:#c62828;">' .
-                'Wärmepumpen-Ressourcen fehlen. Erwartet werden heat-pump-card.js, heat-pump.svg und de.json im Ordner heat-pump.' .
-                '</div>'
-            );
-            return;
-        }
-
-        $this->UpdateVisualization();
+        // Bei geänderter Konfiguration die bereits geöffnete HTML-SDK-Darstellung aktualisieren.
+        $this->PushVisualizationState(true);
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($Message === VM_UPDATE) {
-            $this->UpdateVisualization();
+            $this->PushVisualizationState(false);
         }
+    }
+
+    public function GetVisualizationTile(): string
+    {
+        if (!$this->ResourcesAvailable()) {
+            return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
+                . 'Wärmepumpen-Ressourcen fehlen. Erwartet werden heat-pump-card.js, heat-pump.svg und de.json im Ordner heat-pump.'
+                . '</div>';
+        }
+
+        return $this->BuildVisualizationHtml();
     }
 
     public function GetConfigurationForm(): string
@@ -360,11 +359,29 @@ class Waermepumpe extends IPSModuleStrict
 
     public function UpdateVisualization(): void
     {
-        if (@$this->GetIDForIdent('Visualization') === false) {
-            return;
-        }
+        // Öffentliche Hilfsfunktion für den Button im Konfigurationsformular.
+        $this->PublishResources();
+        $this->PushVisualizationState(true);
+    }
 
-        $this->SetValue('Visualization', $this->BuildVisualizationHtml());
+    private function PushVisualizationState(bool $reloadConfig): void
+    {
+        $payload = [
+            'type'   => $reloadConfig ? 'config' : 'states',
+            'config' => $reloadConfig ? $this->BuildCardConfig() : null,
+            'states' => $this->BuildHassStates()
+        ];
+
+        $this->UpdateVisualizationValue(
+            json_encode(
+                $payload,
+                JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_HEX_TAG
+                | JSON_HEX_AMP
+                | JSON_THROW_ON_ERROR
+            )
+        );
     }
 
     private function HeatingCircuitPanel(int $number): array
@@ -425,6 +442,19 @@ class Waermepumpe extends IPSModuleStrict
             'type'  => 'RowLayout',
             'items' => $items
         ];
+    }
+
+    private function ResourcesAvailable(): bool
+    {
+        $sourceDirectory = __DIR__ . DIRECTORY_SEPARATOR . 'heat-pump';
+
+        foreach (['heat-pump-card.js', 'heat-pump.svg', 'de.json'] as $fileName) {
+            if (!is_file($sourceDirectory . DIRECTORY_SEPARATOR . $fileName)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function PublishResources(): bool
@@ -518,7 +548,137 @@ class Waermepumpe extends IPSModuleStrict
 
     private function BuildVisualizationHtml(): string
     {
-        $config = [
+        $configJson = json_encode(
+            $this->BuildCardConfig(),
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR
+        );
+
+        $statesJson = json_encode(
+            $this->BuildHassStates(),
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_THROW_ON_ERROR
+        );
+
+        $scriptUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card.js';
+        $title = htmlspecialchars($this->ReadPropertyString('Title'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+
+        return <<<HTML
+<div id="wp-root" class="wp-root">
+    <div class="wp-title">{$title}</div>
+    <heat-pump-card id="wp-card"></heat-pump-card>
+</div>
+
+<style>
+    html, body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+    }
+
+    .wp-root {
+        width: 100%;
+        height: 100%;
+        box-sizing: border-box;
+        overflow: auto;
+        font-family: var(--font-family, Arial, sans-serif);
+        color: var(--content-color, inherit);
+    }
+
+    .wp-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin: 8px;
+    }
+
+    heat-pump-card,
+    heat-pump-card ha-card {
+        display: block;
+        width: 100%;
+        background: transparent !important;
+        box-shadow: none !important;
+    }
+
+    heat-pump-card svg {
+        display: block;
+        width: 100% !important;
+        height: auto !important;
+        max-width: 100%;
+    }
+</style>
+
+<script src="{$scriptUrl}"></script>
+<script>
+(() => {
+    let currentConfig = {$configJson};
+    let currentStates = {$statesJson};
+
+    const getCard = () => document.getElementById('wp-card');
+
+    const applyCardData = () => {
+        const card = getCard();
+        if (!card || typeof card.setConfig !== 'function') {
+            return false;
+        }
+
+        try {
+            card.setConfig(currentConfig);
+            card.hass = {
+                language: 'de-DE',
+                states: currentStates
+            };
+            return true;
+        } catch (error) {
+            console.error('Wärmepumpen-Card konnte nicht initialisiert werden:', error);
+            return false;
+        }
+    };
+
+    const start = () => {
+        if (!applyCardData()) {
+            window.setTimeout(start, 50);
+        }
+    };
+
+    // HTML-SDK: Nachrichten aus dem PHP-Modul empfangen.
+    window.handleMessage = (message) => {
+        let data = message;
+
+        if (typeof data === 'string') {
+            try {
+                data = JSON.parse(data);
+            } catch (error) {
+                console.error('Ungültige HTML-SDK-Nachricht:', error);
+                return;
+            }
+        }
+
+        if (!data || typeof data !== 'object') {
+            return;
+        }
+
+        if (data.config) {
+            currentConfig = data.config;
+        }
+
+        if (data.states) {
+            currentStates = data.states;
+        }
+
+        applyCardData();
+    };
+
+    if (customElements.get('heat-pump-card')) {
+        start();
+    } else {
+        customElements.whenDefined('heat-pump-card').then(start);
+    }
+})();
+</script>
+HTML;
+    }
+
+    private function BuildCardConfig(): array
+    {
+        return [
             'title'                        => $this->ReadPropertyString('Title'),
             'heatingPumpType'              => $this->ReadPropertyString('HeatingPumpType'),
 
@@ -555,7 +715,7 @@ class Waermepumpe extends IPSModuleStrict
             'tankTempHPDown'               => $this->EntityName('TankTempHPDown'),
 
             'tankWW'                       => $this->ReadPropertyBoolean('TankWW'),
-            'layeredChargeStorage'          => $this->ReadPropertyBoolean('LayeredChargeStorage'),
+            'layeredChargeStorage'         => $this->ReadPropertyBoolean('LayeredChargeStorage'),
             'tankTempWWUp'                 => $this->EntityName('TankTempWWUp'),
             'tankTempWWMiddle'             => $this->EntityName('TankTempWWMiddle'),
             'tankTempWWDown'               => $this->EntityName('TankTempWWDown'),
@@ -594,7 +754,10 @@ class Waermepumpe extends IPSModuleStrict
             'thermalSolarPanelTemp'         => $this->EntityName('ThermalSolarPanelTemp'),
             'thermalSolarFluxTemp'          => $this->EntityName('ThermalSolarFluxTemp')
         ];
+    }
 
+    private function BuildHassStates(): array
+    {
         $states = [];
 
         foreach (self::VARIABLE_PROPERTIES as $property) {
@@ -610,89 +773,7 @@ class Waermepumpe extends IPSModuleStrict
             $states[$entityName] = $this->BuildHassState($variableId, $isBinary);
         }
 
-        $configJson = json_encode(
-            $config,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
-        );
-
-        $statesJson = json_encode(
-            $states,
-            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
-        );
-
-        $scriptUrl = '/user/' . self::WEB_FOLDER . '/heat-pump-card.js?v=' . time();
-        $title = htmlspecialchars($this->ReadPropertyString('Title'), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-
-        return <<<HTML
-<div id="wp-root-{$this->InstanceID}" class="wp-root">
-    <div class="wp-title">{$title}</div>
-    <heat-pump-card id="wp-card-{$this->InstanceID}"></heat-pump-card>
-</div>
-
-<style>
-    .wp-root {
-        width: 100%;
-        box-sizing: border-box;
-        overflow: hidden;
-        font-family: var(--font-family, Arial, sans-serif);
-        color: var(--content-color, inherit);
-    }
-
-    .wp-title {
-        font-size: 18px;
-        font-weight: 600;
-        margin: 4px 8px 8px 8px;
-    }
-
-    heat-pump-card,
-    heat-pump-card ha-card {
-        display: block;
-        width: 100%;
-        background: transparent !important;
-        box-shadow: none !important;
-    }
-
-    heat-pump-card svg {
-        display: block;
-        width: 100% !important;
-        height: auto !important;
-        max-width: 100%;
-    }
-</style>
-
-<script src="{$scriptUrl}"></script>
-<script>
-(() => {
-    const config = {$configJson};
-    const states = {$statesJson};
-
-    const start = () => {
-        const card = document.getElementById('wp-card-{$this->InstanceID}');
-        if (!card || typeof card.setConfig !== 'function') {
-            window.setTimeout(start, 50);
-            return;
-        }
-
-        try {
-            card.setConfig(config);
-
-            card.hass = {
-                language: 'de-DE',
-                states: states
-            };
-        } catch (error) {
-            console.error('Wärmepumpen-Card konnte nicht initialisiert werden:', error);
-        }
-    };
-
-    if (customElements.get('heat-pump-card')) {
-        start();
-    } else {
-        customElements.whenDefined('heat-pump-card').then(start);
-    }
-})();
-</script>
-HTML;
+        return $states;
     }
 
     private function EntityName(string $property): ?string
