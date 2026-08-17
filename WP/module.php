@@ -198,7 +198,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ThermalSolarFluxTemp', 0);
 
         // HTML-SDK Visualisierung
-        $this->SetVisualizationType(INSTANCE_VISUALIZATION_TYPE_HTML);
+        $this->SetVisualizationType(1);
 
         $this->SetBuffer('RegisteredVariables', '[]');
     }
