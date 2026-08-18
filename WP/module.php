@@ -220,6 +220,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->SetVisualizationType(1);
 
         $this->SetBuffer('RegisteredVariables', '[]');
+        $this->SetBuffer('VisualizationRevision', '0');
     }
 
     public function ApplyChanges(): void
@@ -359,7 +360,7 @@ class Waermepumpe extends IPSModuleStrict
                     ],
                     [
                         'type'    => 'Label',
-                        'caption' => 'Statuswerte mit Komma trennen, z. B. Heizen: 0,6. Symbol: Aus = grau, freigegeben = Originalfarbe, aktuell aktiv = hell/leuchtend. Lüfter-Fallback nur ohne Lüfterdrehzahl.'
+                        'caption' => 'Statuswerte mit Komma trennen, z. B. Heizen: 0,6. Symbol: nicht aktiviert = grau, aktiviert/freigegeben = Layoutfarbe, tatsächlich laufend = Heizen/Warmwasser orange bzw. Kühlen blau. Lüfter-Fallback nur ohne Lüfterdrehzahl.'
                     ],
 
                     [
@@ -462,13 +463,14 @@ class Waermepumpe extends IPSModuleStrict
 
     private function ReloadVisualization(): void
     {
-        // GetVisualizationTile() wird vom HTML-SDK nur initial aufgerufen.
-        // Darum bei ApplyChanges(), Button und VM_UPDATE immer den kompletten
-        // aktuellen Zustand an alle offenen Visualisierungen senden.
+        $revision = (int) $this->GetBuffer('VisualizationRevision') + 1;
+        $this->SetBuffer('VisualizationRevision', (string) $revision);
+
         $this->UpdateVisualizationValue(
             json_encode(
                 [
                     'type'     => 'rebuild',
+                    'revision' => $revision,
                     'config'   => $this->BuildCardConfig(),
                     'states'   => $this->BuildHassStates(),
                     'controls' => $this->BuildControlData()
@@ -699,6 +701,8 @@ class Waermepumpe extends IPSModuleStrict
             | JSON_THROW_ON_ERROR
         );
 
+        $revision = (int) $this->GetBuffer('VisualizationRevision');
+
         $localizationJson = json_encode(
             $localization,
             JSON_UNESCAPED_SLASHES
@@ -830,6 +834,7 @@ class Waermepumpe extends IPSModuleStrict
     let currentConfig = {$configJson};
     let currentStates = {$statesJson};
     let currentControls = {$controlsJson};
+    let currentRevision = {$revision};
 
     const embeddedSvg = {$svgJson};
     const embeddedLocalization = {$localizationJson};
@@ -1171,22 +1176,25 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
+        closeModeMenu();
+
         const oldCard = document.getElementById('wp-card');
+        const newCard = document.createElement('heat-pump-card');
+        newCard.id = 'wp-card';
+
         if (oldCard) {
-            oldCard.remove();
+            oldCard.replaceWith(newCard);
+        } else {
+            const menu = document.getElementById('wp-mode-menu');
+            if (menu) {
+                root.insertBefore(newCard, menu);
+            } else {
+                root.appendChild(newCard);
+            }
         }
 
-        // Wirklich ein neues Custom Element erzeugen. Die Original-Card hält
-        // intern Zustand in content/config; nur innerHTML zu leeren reicht daher
-        // nicht für einen vollständigen Neuaufbau.
-        const card = document.createElement('heat-pump-card');
-        card.id = 'wp-card';
-        root.appendChild(card);
-
-        // Initialisierung erst im nächsten Browser-Zyklus, damit das neue
-        // Custom Element vollständig verbunden ist.
         requestAnimationFrame(() => {
-            applyCardData();
+            window.setTimeout(() => applyCardData(), 0);
         });
     };
 
@@ -1267,26 +1275,49 @@ class Waermepumpe extends IPSModuleStrict
         menu.style.display = 'block';
     };
 
+    const setIconColor = (group, color) => {
+        if (!group) {
+            return;
+        }
+
+        group.querySelectorAll('path, rect, circle, line, polyline, polygon, use').forEach((element) => {
+            const computed = getComputedStyle(element);
+
+            if (computed.fill && computed.fill !== 'none' && computed.fill !== 'rgba(0, 0, 0, 0)') {
+                element.style.setProperty('fill', color, 'important');
+            }
+
+            if (computed.stroke && computed.stroke !== 'none' && computed.stroke !== 'rgba(0, 0, 0, 0)') {
+                element.style.setProperty('stroke', color, 'important');
+            }
+        });
+    };
+
     const applyControlIcons = (card) => {
         if (!card || !card.content) {
             return;
         }
 
+        const enabledColor = resolveLayoutTextColor();
+
         const definitions = [
             {
                 functionName: 'heating',
                 selector: '#gHPStatusHeating',
-                entity: currentConfig.heatingPumpHeatingMode
+                entity: currentConfig.heatingPumpHeatingMode,
+                runningColor: '#ff9500'
             },
             {
                 functionName: 'hotwater',
                 selector: '#gHPStatusWW',
-                entity: currentConfig.heatingPumpHotWaterMode
+                entity: currentConfig.heatingPumpHotWaterMode,
+                runningColor: '#ff9500'
             },
             {
                 functionName: 'cooling',
                 selector: '#gHPStatusCooling',
-                entity: currentConfig.heatingPumpCoolingMode
+                entity: currentConfig.heatingPumpCoolingMode,
+                runningColor: '#0a84ff'
             }
         ];
 
@@ -1298,7 +1329,9 @@ class Waermepumpe extends IPSModuleStrict
             }
 
             const control = currentControls && currentControls[definition.functionName];
-            const active = stateIsOn(definition.entity);
+
+            // Läuft gerade wirklich = zentrale Ist-Statusvariable.
+            const running = stateIsOn(definition.entity);
 
             const hasControl = !!(
                 control
@@ -1307,60 +1340,44 @@ class Waermepumpe extends IPSModuleStrict
                 && control.options.length > 0
             );
 
-            const shouldBeVisible =
+            const visible =
                 hasControl
                 || (currentControls && currentControls.hasOperatingStatus)
-                || active;
+                || running;
 
-            // WICHTIG:
-            // Die Original-Card setzt diese Gruppen abhängig von ihren HA-States
-            // auf display:none. Für Symcon übernehmen wir die Sichtbarkeit selbst.
-            group.style.setProperty(
-                'display',
-                shouldBeVisible ? 'inline' : 'none',
-                'important'
-            );
+            group.style.setProperty('display', visible ? 'inline' : 'none', 'important');
 
-            if (!shouldBeVisible) {
+            if (!visible) {
                 return;
             }
 
-            // Originaldarstellung zurücksetzen, bevor wir den Zustand anwenden.
             group.style.setProperty('visibility', 'visible', 'important');
+            group.style.removeProperty('filter');
+            group.style.setProperty('opacity', '1', 'important');
 
-            /*
-             * Drei Zustände:
-             *   Aus        -> grau/gedimmt
-             *   Freigabe   -> Originaldarstellung
-             *   Aktiv      -> Originaldarstellung hell/leuchtend
-             */
             if (hasControl && !control.enabled) {
+                // Nicht aktiviert / Steuerung = AUS.
+                setIconColor(group, '#777777');
+                group.style.setProperty('opacity', '0.60', 'important');
+            } else if (running) {
+                // Funktion läuft gerade tatsächlich.
+                setIconColor(group, definition.runningColor);
                 group.style.setProperty(
                     'filter',
-                    'grayscale(1) brightness(0.65)',
+                    'brightness(1.15) saturate(1.15)',
                     'important'
                 );
-                group.style.setProperty('opacity', '0.55', 'important');
-            } else if (active) {
-                group.style.setProperty(
-                    'filter',
-                    'brightness(1.7) saturate(1.35) drop-shadow(0 0 5px rgba(255,255,255,0.75))',
-                    'important'
-                );
-                group.style.setProperty('opacity', '1', 'important');
             } else {
-                group.style.removeProperty('filter');
-                group.style.setProperty('opacity', '1', 'important');
+                // Aktiviert/freigegeben, aber momentan nicht laufend.
+                setIconColor(group, enabledColor);
             }
 
-            // Eigenes Symcon-Auswahlmenü.
             if (hasControl) {
                 group.style.setProperty('cursor', 'pointer', 'important');
                 group.style.setProperty('pointer-events', 'all', 'important');
 
                 if (!group.dataset.symconControlBound) {
                     group.dataset.symconControlBound = '1';
-
                     group.addEventListener(
                         'click',
                         (event) => openModeMenu(definition.functionName, event)
@@ -1478,6 +1495,14 @@ class Waermepumpe extends IPSModuleStrict
 
         if (!data || typeof data !== 'object') {
             return;
+        }
+
+        if (typeof data.revision === 'number' && data.revision < currentRevision) {
+            return;
+        }
+
+        if (typeof data.revision === 'number') {
+            currentRevision = data.revision;
         }
 
         if (data.config) {
