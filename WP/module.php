@@ -104,7 +104,13 @@ class Waermepumpe extends IPSModuleStrict
         'ThermalSolarPump',
         'ThermalSolarPumpSpeed',
         'ThermalSolarPanelTemp',
-        'ThermalSolarFluxTemp'
+        'ThermalSolarFluxTemp',
+
+        'OperatingStatusVariable',
+        'HeatingControlVariable',
+        'HotWaterControlVariable',
+        'CoolingControlVariable',
+        'FanSpeed'
     ];
 
     public function Create(): void
@@ -113,6 +119,21 @@ class Waermepumpe extends IPSModuleStrict
 
         // Allgemein
         $this->RegisterPropertyString('HeatingPumpType', 'A2W');
+
+        // Zentrale Status- und Steuerungszuordnung
+        $this->RegisterPropertyInteger('OperatingStatusVariable', 0);
+        $this->RegisterPropertyString('OperatingStatusHeatingValues', '0,6');
+        $this->RegisterPropertyString('OperatingStatusHotWaterValues', '1');
+        $this->RegisterPropertyString('OperatingStatusCoolingValues', '7');
+        $this->RegisterPropertyString('OperatingStatusDefrostValues', '4');
+
+        $this->RegisterPropertyInteger('HeatingControlVariable', 0);
+        $this->RegisterPropertyInteger('HotWaterControlVariable', 0);
+        $this->RegisterPropertyInteger('CoolingControlVariable', 0);
+
+        // Luft/Wasser: Lüfterdrehzahl > 0 hat Vorrang vor dem Status-Fallback.
+        $this->RegisterPropertyInteger('FanSpeed', 0);
+        $this->RegisterPropertyString('FanActiveStatusValues', '0,1,2,4,7');
 
         // Primärquelle / Wärmepumpe
         $this->RegisterPropertyInteger('TemperatureGroundWaterIn', 0);
@@ -221,6 +242,53 @@ class Waermepumpe extends IPSModuleStrict
         }
     }
 
+    public function RequestAction(string $Ident, mixed $Value): void
+    {
+        if ($Ident !== 'SetControlMode') {
+            throw new InvalidArgumentException('Unbekannte Aktion: ' . $Ident);
+        }
+
+        $payload = is_string($Value) ? json_decode($Value, true) : $Value;
+        if (!is_array($payload)) {
+            throw new InvalidArgumentException('Ungültige Steuerungsdaten.');
+        }
+
+        $function = (string) ($payload['function'] ?? '');
+        $value = $payload['value'] ?? null;
+
+        $propertyMap = [
+            'heating'  => 'HeatingControlVariable',
+            'hotwater' => 'HotWaterControlVariable',
+            'cooling'  => 'CoolingControlVariable'
+        ];
+
+        if (!isset($propertyMap[$function])) {
+            throw new InvalidArgumentException('Unbekannte Steuerfunktion.');
+        }
+
+        $variableId = $this->ReadPropertyInteger($propertyMap[$function]);
+        if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
+            throw new RuntimeException('Für diese Funktion ist keine gültige Steuervariable konfiguriert.');
+        }
+
+        $variable = IPS_GetVariable($variableId);
+        $typedValue = $this->CastValueForVariableType($value, (int) $variable['VariableType']);
+
+        $allowedValues = $this->GetProfileAssociationValues($variableId);
+        if ($allowedValues !== [] && !$this->ValueInList($typedValue, $allowedValues)) {
+            throw new InvalidArgumentException('Der gewünschte Modus ist im Variablenprofil nicht definiert.');
+        }
+
+        $actionId = (int) ($variable['VariableCustomAction'] ?: $variable['VariableAction']);
+        if ($actionId > 0) {
+            \RequestAction($variableId, $typedValue);
+        } else {
+            SetValue($variableId, $typedValue);
+        }
+
+        $this->ReloadVisualization();
+    }
+
     public function GetVisualizationTile(): string
     {
         if (!$this->ResourcesAvailable()) {
@@ -270,20 +338,41 @@ class Waermepumpe extends IPSModuleStrict
 
                     [
                         'type'    => 'Label',
+                        'caption' => 'Status und Steuerung'
+                    ],
+                    $this->VariableGrid([
+                        ['caption' => 'Aktiver Betriebszustand', 'description' => 'Eine zentrale Integer-Statusvariable für Heizen, Warmwasser, Kühlen und Abtauen', 'name' => 'OperatingStatusVariable'],
+                        ['caption' => 'Steuerung Heizen', 'description' => 'Integer-Variable mit Variablenprofil; Profil-Assoziationen werden als Auswahlmenü verwendet', 'name' => 'HeatingControlVariable'],
+                        ['caption' => 'Steuerung Warmwasser', 'description' => 'Integer-Variable mit Variablenprofil; Profil-Assoziationen werden als Auswahlmenü verwendet', 'name' => 'HotWaterControlVariable'],
+                        ['caption' => 'Steuerung Kühlen', 'description' => 'Integer-Variable mit Variablenprofil; Profil-Assoziationen werden als Auswahlmenü verwendet', 'name' => 'CoolingControlVariable'],
+                        ['caption' => 'Lüfterdrehzahl', 'description' => 'Optional. Bei > 0 dreht der Lüfter; die Animationsgeschwindigkeit folgt der Drehzahl', 'name' => 'FanSpeed']
+                    ]),
+                    [
+                        'type'  => 'RowLayout',
+                        'items' => [
+                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHeatingValues', 'caption' => 'Statuswerte Heizen'],
+                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHotWaterValues', 'caption' => 'Statuswerte Warmwasser'],
+                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusCoolingValues', 'caption' => 'Statuswerte Kühlen'],
+                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusDefrostValues', 'caption' => 'Statuswerte Abtauen'],
+                            ['type' => 'ValidationTextBox', 'name' => 'FanActiveStatusValues', 'caption' => 'Lüfter-Fallback']
+                        ]
+                    ],
+                    [
+                        'type'    => 'Label',
+                        'caption' => 'Mehrere Statuswerte mit Komma trennen, z. B. Heizen: 0,6. Die Lüfter-Fallbackwerte werden nur verwendet, wenn keine Lüfterdrehzahl zugeordnet ist.'
+                    ],
+
+                    [
+                        'type'    => 'Label',
                         'caption' => 'Betriebszustände und Betriebsarten'
                     ],
                     $this->VariableGrid([
-                        ['caption' => 'Wärmepumpe läuft', 'description' => 'Gesamtstatus der Wärmepumpe', 'name' => 'HpRunning'],
                         ['caption' => 'Verdichter läuft', 'description' => 'Kompressor aktiv/inaktiv', 'name' => 'CompressorRunning'],
                         ['caption' => 'WP Ein/Aus', 'description' => 'Freigabe bzw. Betriebsbereitschaft', 'name' => 'HeatingPumpStatusOnOff'],
-                        ['caption' => 'Heizbetrieb', 'description' => 'Wärmepumpe heizt das Gebäude', 'name' => 'HeatingPumpHeatingMode'],
-                        ['caption' => 'Warmwasserbetrieb', 'description' => 'Wärmepumpe lädt den Warmwasserspeicher', 'name' => 'HeatingPumpHotWaterMode'],
-                        ['caption' => 'Kühlbetrieb', 'description' => 'Wärmepumpe arbeitet im Kühlmodus', 'name' => 'HeatingPumpCoolingMode'],
                         ['caption' => 'Nachtbetrieb', 'description' => 'Nacht-/Absenkbetrieb aktiv', 'name' => 'HeatingPumpNightMode'],
                         ['caption' => 'Energiesparbetrieb', 'description' => 'Eco-/Sparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
                         ['caption' => 'Partybetrieb', 'description' => 'Temporärer Komfortbetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
                         ['caption' => 'Zusatzheizung', 'description' => 'Zusätzlicher Wärmeerzeuger aktiv', 'name' => 'AdditionalHeating'],
-                        ['caption' => 'Abtaubetrieb', 'description' => 'Abtauvorgang des Verdampfers aktiv', 'name' => 'DefrostMode']
                     ]),
 
                     [
@@ -379,9 +468,10 @@ class Waermepumpe extends IPSModuleStrict
         $this->UpdateVisualizationValue(
             json_encode(
                 [
-                    'type'   => 'rebuild',
-                    'config' => $this->BuildCardConfig(),
-                    'states' => $this->BuildHassStates()
+                    'type'     => 'rebuild',
+                    'config'   => $this->BuildCardConfig(),
+                    'states'   => $this->BuildHassStates(),
+                    'controls' => $this->BuildControlData()
                 ],
                 JSON_UNESCAPED_SLASHES
                 | JSON_UNESCAPED_UNICODE
@@ -587,6 +677,17 @@ class Waermepumpe extends IPSModuleStrict
             | JSON_THROW_ON_ERROR
         );
 
+        $controlsJson = json_encode(
+            $this->BuildControlData(),
+            JSON_UNESCAPED_SLASHES
+            | JSON_UNESCAPED_UNICODE
+            | JSON_HEX_TAG
+            | JSON_HEX_AMP
+            | JSON_HEX_APOS
+            | JSON_HEX_QUOT
+            | JSON_THROW_ON_ERROR
+        );
+
         $svgJson = json_encode(
             $svg,
             JSON_UNESCAPED_SLASHES
@@ -674,11 +775,50 @@ class Waermepumpe extends IPSModuleStrict
         max-width: 100%;
         max-height: 100%;
     }
+
+    #wp-mode-menu {
+        position: fixed;
+        z-index: 9999;
+        display: none;
+        min-width: 190px;
+        max-width: 300px;
+        padding: 6px;
+        border-radius: 8px;
+        background: rgba(32, 32, 32, 0.96);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+        color: #ffffff;
+        font: 14px Arial, sans-serif;
+    }
+
+    #wp-mode-menu .wp-mode-title {
+        padding: 6px 8px;
+        font-weight: 600;
+        opacity: .8;
+    }
+
+    #wp-mode-menu button {
+        display: block;
+        width: 100%;
+        margin: 2px 0;
+        padding: 8px 10px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    #wp-mode-menu button:hover,
+    #wp-mode-menu button.active {
+        background: rgba(255,255,255,.14);
+    }
 </style>
 
 <div id="wp-root">
     <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
+    <div id="wp-mode-menu"></div>
 </div>
 
 <script>
@@ -689,6 +829,7 @@ class Waermepumpe extends IPSModuleStrict
 (() => {
     let currentConfig = {$configJson};
     let currentStates = {$statesJson};
+    let currentControls = {$controlsJson};
 
     const embeddedSvg = {$svgJson};
     const embeddedLocalization = {$localizationJson};
@@ -1049,6 +1190,190 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
+    const stateIsOn = (entityName) => {
+        return !!(
+            entityName
+            && currentStates
+            && currentStates[entityName]
+            && String(currentStates[entityName].state).toLowerCase() === 'on'
+        );
+    };
+
+    const setGroupColor = (group, color) => {
+        if (!group) {
+            return;
+        }
+
+        group.querySelectorAll('path, rect, circle, line, polyline, polygon, use').forEach((element) => {
+            const fill = getComputedStyle(element).fill;
+            const stroke = getComputedStyle(element).stroke;
+
+            if (fill && fill !== 'none' && fill !== 'rgba(0, 0, 0, 0)') {
+                element.style.setProperty('fill', color, 'important');
+            }
+            if (stroke && stroke !== 'none' && stroke !== 'rgba(0, 0, 0, 0)') {
+                element.style.setProperty('stroke', color, 'important');
+            }
+        });
+    };
+
+    const closeModeMenu = () => {
+        const menu = document.getElementById('wp-mode-menu');
+        if (menu) {
+            menu.style.display = 'none';
+            menu.innerHTML = '';
+        }
+    };
+
+    const openModeMenu = (functionName, event) => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const control = currentControls && currentControls[functionName];
+        if (!control || !control.configured || !Array.isArray(control.options) || control.options.length === 0) {
+            return;
+        }
+
+        const menu = document.getElementById('wp-mode-menu');
+        if (!menu) {
+            return;
+        }
+
+        const titles = {
+            heating: 'Heizen',
+            hotwater: 'Warmwasser',
+            cooling: 'Kühlen'
+        };
+
+        menu.innerHTML = '';
+
+        const title = document.createElement('div');
+        title.className = 'wp-mode-title';
+        title.textContent = titles[functionName] || functionName;
+        menu.appendChild(title);
+
+        control.options.forEach((option) => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = option.name;
+            if (String(option.value) === String(control.currentValue)) {
+                button.classList.add('active');
+            }
+
+            button.addEventListener('click', (clickEvent) => {
+                clickEvent.preventDefault();
+                clickEvent.stopPropagation();
+
+                requestAction(
+                    'SetControlMode',
+                    JSON.stringify({
+                        function: functionName,
+                        value: option.value
+                    })
+                );
+
+                closeModeMenu();
+            });
+
+            menu.appendChild(button);
+        });
+
+        const x = Math.min(event.clientX + 8, window.innerWidth - 310);
+        const y = Math.min(event.clientY + 8, window.innerHeight - 260);
+        menu.style.left = Math.max(8, x) + 'px';
+        menu.style.top = Math.max(8, y) + 'px';
+        menu.style.display = 'block';
+    };
+
+    const applyControlIcons = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const layoutColor = resolveLayoutTextColor();
+
+        const definitions = [
+            { functionName: 'heating', selector: '#gHPStatusHeating', entity: currentConfig.heatingPumpHeatingMode, activeColor: '#ff3b30' },
+            { functionName: 'hotwater', selector: '#gHPStatusWW', entity: currentConfig.heatingPumpHotWaterMode, activeColor: '#ff9500' },
+            { functionName: 'cooling', selector: '#gHPStatusCooling', entity: currentConfig.heatingPumpCoolingMode, activeColor: '#0a84ff' }
+        ];
+
+        definitions.forEach((definition) => {
+            const group = card.content.querySelector(definition.selector);
+            if (!group) {
+                return;
+            }
+
+            const control = currentControls && currentControls[definition.functionName];
+            const active = stateIsOn(definition.entity);
+
+            if (
+                (currentControls && currentControls.hasOperatingStatus)
+                || (control && control.configured)
+                || active
+            ) {
+                group.style.display = 'inline';
+            }
+
+            let color = '#777777';
+            if (active) {
+                color = definition.activeColor;
+            } else if (control && control.configured && control.enabled) {
+                color = layoutColor;
+            }
+
+            setGroupColor(group, color);
+
+            if (control && control.configured && Array.isArray(control.options) && control.options.length > 0) {
+                group.style.cursor = 'pointer';
+
+                if (!group.dataset.symconControlBound) {
+                    group.dataset.symconControlBound = '1';
+                    group.addEventListener('click', (event) => openModeMenu(definition.functionName, event));
+                }
+            }
+        });
+    };
+
+    const applyFanAnimation = (card) => {
+        if (!card || !card.content || currentConfig.heatingPumpType !== 'A2W') {
+            return;
+        }
+
+        const fan = card.content.querySelector('#pathHPFan');
+        if (!fan) {
+            return;
+        }
+
+        const fanEntity = currentConfig.fanSpeed;
+        let rpm = 0;
+
+        if (fanEntity && currentStates[fanEntity]) {
+            rpm = Number(currentStates[fanEntity].state);
+            if (Number.isNaN(rpm)) {
+                rpm = 0;
+            }
+        }
+
+        if (fanEntity) {
+            if (rpm > 0) {
+                fan.classList.add('rotate');
+                const duration = Math.max(0.35, Math.min(2.5, 1000 / rpm));
+                fan.style.animationDuration = duration.toFixed(2) + 's';
+            } else {
+                fan.classList.remove('rotate');
+                fan.style.animationDuration = '';
+            }
+        }
+    };
+
+    document.addEventListener('click', (event) => {
+        const menu = document.getElementById('wp-mode-menu');
+        if (menu && menu.style.display === 'block' && !menu.contains(event.target)) {
+            closeModeMenu();
+        }
+    });
+
     const applyCardData = () => {
         const card = document.getElementById('wp-card');
 
@@ -1071,6 +1396,8 @@ class Waermepumpe extends IPSModuleStrict
                     applyCoolingVisualization(card);
                     updateRefrigerantValues(card);
                     applyThemeColors(card);
+                    applyControlIcons(card);
+                    applyFanAnimation(card);
                     return;
                 }
 
@@ -1117,6 +1444,10 @@ class Waermepumpe extends IPSModuleStrict
             currentStates = data.states;
         }
 
+        if (data.controls) {
+            currentControls = data.controls;
+        }
+
         if (data.type === 'rebuild') {
             rebuildCard();
             return;
@@ -1154,16 +1485,16 @@ HTML;
             'temperatureGroundWaterOut'    => $this->EntityName('TemperatureGroundWaterOut'),
 
             'heatingPumpStatusOnOff'       => $this->EntityName('HeatingPumpStatusOnOff'),
-            'heatingPumpHotWaterMode'      => $this->EntityName('HeatingPumpHotWaterMode'),
-            'heatingPumpHeatingMode'       => $this->EntityName('HeatingPumpHeatingMode'),
-            'heatingPumpCoolingMode'       => $this->EntityName('HeatingPumpCoolingMode'),
+            'heatingPumpHotWaterMode'      => $this->HasOperatingStatus() ? 'symcon_mode_hotwater' : $this->EntityName('HeatingPumpHotWaterMode'),
+            'heatingPumpHeatingMode'       => $this->HasOperatingStatus() ? 'symcon_mode_heating' : $this->EntityName('HeatingPumpHeatingMode'),
+            'heatingPumpCoolingMode'       => $this->HasOperatingStatus() ? 'symcon_mode_cooling' : $this->EntityName('HeatingPumpCoolingMode'),
             'heatingPumpPartyMode'         => $this->EntityName('HeatingPumpPartyMode'),
             'heatingPumpEnergySaveMode'    => $this->EntityName('HeatingPumpEnergySaveMode'),
             'heatingPumpNightMode'         => $this->EntityName('HeatingPumpNightMode'),
 
             'warning'                      => $this->EntityName('Warning'),
             'error'                        => $this->EntityName('Error'),
-            'defrostMode'                  => $this->EntityName('DefrostMode'),
+            'defrostMode'                  => $this->HasOperatingStatus() ? 'symcon_mode_defrost' : $this->EntityName('DefrostMode'),
             'additionalHeating'            => $this->EntityName('AdditionalHeating'),
 
             'outdoorTemperature'           => $this->EntityName('OutdoorTemperature'),
@@ -1172,7 +1503,8 @@ HTML;
             'ambientTemperatureParty'      => $this->EntityName('AmbientTemperatureParty'),
             'supplyTemperature'            => $this->EntityName('SupplyTemperature'),
 
-            'hpRunning'                    => $this->EntityName('HpRunning'),
+            'hpRunning'                    => ($this->ReadPropertyInteger('FanSpeed') > 0 || $this->HasOperatingStatus()) ? 'symcon_hp_running' : $this->EntityName('HpRunning'),
+            'fanSpeed'                     => $this->EntityName('FanSpeed'),
             'compressorRunning'            => $this->EntityName('CompressorRunning'),
             'circulatingPumpRunning'       => $this->EntityName('CirculatingPumpRunning'),
             'storageChargingPumpRunning'   => $this->EntityName('StorageChargingPumpRunning'),
@@ -1241,7 +1573,174 @@ HTML;
             $states[$entityName] = $this->BuildHassState($variableId, $isBinary);
         }
 
+        if ($this->HasOperatingStatus()) {
+            $statusValue = GetValue($this->ReadPropertyInteger('OperatingStatusVariable'));
+
+            $states['symcon_mode_heating'] = $this->BuildSyntheticBinaryState(
+                $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('OperatingStatusHeatingValues'))
+            );
+            $states['symcon_mode_hotwater'] = $this->BuildSyntheticBinaryState(
+                $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('OperatingStatusHotWaterValues'))
+            );
+            $states['symcon_mode_cooling'] = $this->BuildSyntheticBinaryState(
+                $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('OperatingStatusCoolingValues'))
+            );
+            $states['symcon_mode_defrost'] = $this->BuildSyntheticBinaryState(
+                $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('OperatingStatusDefrostValues'))
+            );
+        }
+
+        $fanSpeedId = $this->ReadPropertyInteger('FanSpeed');
+        if ($fanSpeedId > 0 && IPS_VariableExists($fanSpeedId)) {
+            $states['symcon_hp_running'] = $this->BuildSyntheticBinaryState((float) GetValue($fanSpeedId) > 0.0);
+        } elseif ($this->HasOperatingStatus()) {
+            $statusValue = GetValue($this->ReadPropertyInteger('OperatingStatusVariable'));
+            $states['symcon_hp_running'] = $this->BuildSyntheticBinaryState(
+                $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('FanActiveStatusValues'))
+            );
+        }
+
         return $states;
+    }
+
+    private function HasOperatingStatus(): bool
+    {
+        $variableId = $this->ReadPropertyInteger('OperatingStatusVariable');
+        return $variableId > 0 && IPS_VariableExists($variableId);
+    }
+
+    private function BuildSyntheticBinaryState(bool $value): array
+    {
+        return [
+            'state'      => $value ? 'on' : 'off',
+            'attributes' => []
+        ];
+    }
+
+    private function ValueMatchesCsv(mixed $value, string $csv): bool
+    {
+        $items = array_filter(
+            array_map('trim', explode(',', $csv)),
+            static fn(string $item): bool => $item !== ''
+        );
+
+        foreach ($items as $item) {
+            if (is_numeric($value) && is_numeric($item)) {
+                if ((float) $value === (float) $item) {
+                    return true;
+                }
+            } elseif ((string) $value === $item) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function BuildControlData(): array
+    {
+        return [
+            'hasOperatingStatus' => $this->HasOperatingStatus(),
+            'heating'            => $this->BuildControlInfo('HeatingControlVariable'),
+            'hotwater'           => $this->BuildControlInfo('HotWaterControlVariable'),
+            'cooling'            => $this->BuildControlInfo('CoolingControlVariable')
+        ];
+    }
+
+    private function BuildControlInfo(string $property): array
+    {
+        $variableId = $this->ReadPropertyInteger($property);
+
+        if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
+            return [
+                'configured'   => false,
+                'variableId'   => 0,
+                'currentValue' => null,
+                'enabled'      => false,
+                'options'      => []
+            ];
+        }
+
+        $currentValue = GetValue($variableId);
+        $profileName = $this->GetVariableProfileName($variableId);
+        $options = [];
+        $offValues = [];
+
+        if ($profileName !== '' && IPS_VariableProfileExists($profileName)) {
+            $profile = IPS_GetVariableProfile($profileName);
+
+            foreach (($profile['Associations'] ?? []) as $association) {
+                $associationValue = $association['Value'];
+                $associationName = (string) $association['Name'];
+
+                $options[] = [
+                    'value' => $associationValue,
+                    'name'  => $associationName
+                ];
+
+                if (preg_match('/(^|\s)(aus|off|disabled|deaktiviert)(\s|$)/iu', trim($associationName)) === 1) {
+                    $offValues[] = $associationValue;
+                }
+            }
+        }
+
+        return [
+            'configured'   => true,
+            'variableId'   => $variableId,
+            'currentValue' => $currentValue,
+            'enabled'      => $offValues === [] ? true : !$this->ValueInList($currentValue, $offValues),
+            'options'      => $options
+        ];
+    }
+
+    private function GetProfileAssociationValues(int $variableId): array
+    {
+        $profileName = $this->GetVariableProfileName($variableId);
+        if ($profileName === '' || !IPS_VariableProfileExists($profileName)) {
+            return [];
+        }
+
+        $profile = IPS_GetVariableProfile($profileName);
+
+        return array_map(
+            static fn(array $association): mixed => $association['Value'],
+            $profile['Associations'] ?? []
+        );
+    }
+
+    private function GetVariableProfileName(int $variableId): string
+    {
+        $variable = IPS_GetVariable($variableId);
+
+        return $variable['VariableCustomProfile'] !== ''
+            ? (string) $variable['VariableCustomProfile']
+            : (string) $variable['VariableProfile'];
+    }
+
+    private function ValueInList(mixed $value, array $values): bool
+    {
+        foreach ($values as $candidate) {
+            if (is_numeric($value) && is_numeric($candidate)) {
+                if ((float) $value === (float) $candidate) {
+                    return true;
+                }
+            } elseif ((string) $value === (string) $candidate) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function CastValueForVariableType(mixed $value, int $variableType): mixed
+    {
+        return match ($variableType) {
+            0       => filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? ((int) $value !== 0),
+            1       => (int) $value,
+            2       => (float) $value,
+            3       => (string) $value,
+            default => $value
+        };
     }
 
     private function EntityName(string $property): ?string
