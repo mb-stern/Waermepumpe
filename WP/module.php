@@ -258,40 +258,48 @@ class Waermepumpe extends IPSModuleStrict
                         'type'    => 'Label',
                         'caption' => 'Temperaturen und Wärmequelle'
                     ],
-                    $this->VariableRow('Außentemperatur – Temperatur der Außenluft', 'OutdoorTemperature', 'Vorlauftemperatur WP – Heizwasser am Ausgang der Wärmepumpe', 'SupplyTemperature'),
-                    $this->VariableRow('Quelle Eingang – Temperatur vor Verdampfer (Sole/Wasser)', 'TemperatureGroundWaterIn', 'Quelle Ausgang – Temperatur nach Verdampfer (Sole/Wasser)', 'TemperatureGroundWaterOut'),
-                    $this->VariableRow('Raumtemperatur Normal – Soll-/Referenzwert Normalbetrieb', 'AmbientTemperatureNormal', 'Raumtemperatur Reduziert – Soll-/Referenzwert Absenkbetrieb', 'AmbientTemperatureReduced'),
-                    $this->VariableRow('Raumtemperatur Party – Soll-/Referenzwert Partybetrieb', 'AmbientTemperatureParty', '', ''),
+                    $this->VariableGrid([
+                        ['caption' => 'Außentemperatur', 'description' => 'Temperatur der Außenluft', 'name' => 'OutdoorTemperature'],
+                        ['caption' => 'Vorlauftemperatur WP', 'description' => 'Heizwasser am Ausgang der Wärmepumpe', 'name' => 'SupplyTemperature'],
+                        ['caption' => 'Quelle Eingang', 'description' => 'Temperatur vor Verdampfer (Sole/Wasser)', 'name' => 'TemperatureGroundWaterIn'],
+                        ['caption' => 'Quelle Ausgang', 'description' => 'Temperatur nach Verdampfer (Sole/Wasser)', 'name' => 'TemperatureGroundWaterOut'],
+                        ['caption' => 'Raumtemperatur Normal', 'description' => 'Soll-/Referenzwert Normalbetrieb', 'name' => 'AmbientTemperatureNormal'],
+                        ['caption' => 'Raumtemperatur Reduziert', 'description' => 'Soll-/Referenzwert Absenkbetrieb', 'name' => 'AmbientTemperatureReduced'],
+                        ['caption' => 'Raumtemperatur Party', 'description' => 'Soll-/Referenzwert Partybetrieb', 'name' => 'AmbientTemperatureParty']
+                    ]),
 
                     [
                         'type'    => 'Label',
-                        'caption' => 'Betriebszustände'
+                        'caption' => 'Betriebszustände und Betriebsarten'
                     ],
-                    $this->VariableRow('Wärmepumpe läuft – Gesamtstatus der Wärmepumpe', 'HpRunning', 'Verdichter läuft – Kompressor aktiv/inaktiv', 'CompressorRunning'),
-                    $this->VariableRow('WP Ein/Aus – Freigabe bzw. Betriebsbereitschaft', 'HeatingPumpStatusOnOff', 'Zusatzheizung – elektrischer/zusätzlicher Wärmeerzeuger aktiv', 'AdditionalHeating'),
-                    $this->VariableRow('Abtaubetrieb – Abtauvorgang des Verdampfers aktiv', 'DefrostMode', '', ''),
+                    $this->VariableGrid([
+                        ['caption' => 'Wärmepumpe läuft', 'description' => 'Gesamtstatus der Wärmepumpe', 'name' => 'HpRunning'],
+                        ['caption' => 'Verdichter läuft', 'description' => 'Kompressor aktiv/inaktiv', 'name' => 'CompressorRunning'],
+                        ['caption' => 'WP Ein/Aus', 'description' => 'Freigabe bzw. Betriebsbereitschaft', 'name' => 'HeatingPumpStatusOnOff'],
+                        ['caption' => 'Heizbetrieb', 'description' => 'Wärmepumpe heizt das Gebäude', 'name' => 'HeatingPumpHeatingMode'],
+                        ['caption' => 'Warmwasserbetrieb', 'description' => 'Wärmepumpe lädt den Warmwasserspeicher', 'name' => 'HeatingPumpHotWaterMode'],
+                        ['caption' => 'Kühlbetrieb', 'description' => 'Wärmepumpe arbeitet im Kühlmodus', 'name' => 'HeatingPumpCoolingMode'],
+                        ['caption' => 'Nachtbetrieb', 'description' => 'Nacht-/Absenkbetrieb aktiv', 'name' => 'HeatingPumpNightMode'],
+                        ['caption' => 'Energiesparbetrieb', 'description' => 'Eco-/Sparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
+                        ['caption' => 'Partybetrieb', 'description' => 'Temporärer Komfortbetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
+                        ['caption' => 'Zusatzheizung', 'description' => 'Zusätzlicher Wärmeerzeuger aktiv', 'name' => 'AdditionalHeating'],
+                        ['caption' => 'Abtaubetrieb', 'description' => 'Abtauvorgang des Verdampfers aktiv', 'name' => 'DefrostMode']
+                    ]),
 
                     [
                         'type'    => 'Label',
-                        'caption' => 'Betriebsarten'
+                        'caption' => 'Meldungen und Kältekreis'
                     ],
-                    $this->VariableRow('Heizbetrieb – Wärmepumpe heizt das Gebäude', 'HeatingPumpHeatingMode', 'Warmwasserbetrieb – Wärmepumpe lädt den Warmwasserspeicher', 'HeatingPumpHotWaterMode'),
-                    $this->VariableRow('Kühlbetrieb – Wärmepumpe arbeitet im Kühlmodus', 'HeatingPumpCoolingMode', 'Nachtbetrieb – Nacht-/Absenkbetrieb aktiv', 'HeatingPumpNightMode'),
-                    $this->VariableRow('Energiesparbetrieb – Eco-/Sparbetrieb aktiv', 'HeatingPumpEnergySaveMode', 'Partybetrieb – temporärer Komfortbetrieb aktiv', 'HeatingPumpPartyMode'),
-
-                    [
-                        'type'    => 'Label',
-                        'caption' => 'Meldungen'
-                    ],
-                    $this->VariableRow('Warnung – allgemeiner Warnstatus', 'Warning', 'Fehler – allgemeiner Störungs-/Fehlerstatus', 'Error'),
-
-                    [
-                        'type'    => 'Label',
-                        'caption' => 'Kältekreis'
-                    ],
-                    $this->VariableRow('Niederdruck – Druck auf der Verdampfer-/Sauggasseite', 'EvaporatorPressure', 'Verdampfungstemperatur – Kältemittel-Sättigungstemperatur auf der Niederdruckseite', 'EvaporatorTemperature'),
-                    $this->VariableRow('Hochdruck – Druck auf der Verflüssiger-/Druckgasseite', 'CondenserPressure', 'Kondensationstemperatur – Kältemittel-Sättigungstemperatur auf der Hochdruckseite', 'CondenserTemperature'),
-                    $this->VariableRow('Expansionsventil – Öffnungsgrad des elektronischen Expansionsventils', 'ExpansionValveOpening', 'Verdichterdrehzahl – Drehzahl/Frequenz bzw. Leistungswert des Verdichters', 'CompressorValue')
+                    $this->VariableGrid([
+                        ['caption' => 'Warnung', 'description' => 'Allgemeiner Warnstatus', 'name' => 'Warning'],
+                        ['caption' => 'Fehler', 'description' => 'Allgemeiner Störungs-/Fehlerstatus', 'name' => 'Error'],
+                        ['caption' => 'Niederdruck', 'description' => 'Druck auf der Verdampfer-/Sauggasseite', 'name' => 'EvaporatorPressure'],
+                        ['caption' => 'Verdampfungstemperatur', 'description' => 'Sättigungstemperatur auf der Niederdruckseite', 'name' => 'EvaporatorTemperature'],
+                        ['caption' => 'Hochdruck', 'description' => 'Druck auf der Verflüssiger-/Druckgasseite', 'name' => 'CondenserPressure'],
+                        ['caption' => 'Kondensationstemperatur', 'description' => 'Sättigungstemperatur auf der Hochdruckseite', 'name' => 'CondenserTemperature'],
+                        ['caption' => 'Expansionsventil', 'description' => 'Öffnungsgrad des elektronischen Expansionsventils', 'name' => 'ExpansionValveOpening'],
+                        ['caption' => 'Verdichterdrehzahl', 'description' => 'Drehzahl/Frequenz bzw. Leistungswert des Verdichters', 'name' => 'CompressorValue']
+                    ])
                 ]
             ],
 
@@ -420,7 +428,7 @@ class Waermepumpe extends IPSModuleStrict
 
     private function VariableRow(string $caption1, string $name1, string $caption2, string $name2): array
     {
-        $items = [];
+        $entries = [];
 
         foreach ([[$caption1, $name1], [$caption2, $name2]] as [$caption, $name]) {
             if ($name === '') {
@@ -428,33 +436,62 @@ class Waermepumpe extends IPSModuleStrict
             }
 
             $parts = array_map('trim', explode('–', $caption, 2));
-            $shortCaption = $parts[0];
-            $description = $parts[1] ?? '';
 
-            $entryItems = [];
+            $entries[] = [
+                'caption'     => $parts[0],
+                'description' => $parts[1] ?? '',
+                'name'        => $name
+            ];
+        }
 
-            if ($description !== '') {
-                $entryItems[] = [
-                    'type'    => 'Label',
-                    'caption' => $description
+        return $this->VariableGrid($entries);
+    }
+
+    private function VariableGrid(array $entries): array
+    {
+        $rows = [];
+
+        foreach (array_chunk($entries, 3) as $chunk) {
+            $columns = [];
+
+            foreach ($chunk as $entry) {
+                $items = [
+                    [
+                        'type'    => 'SelectVariable',
+                        'name'    => $entry['name'],
+                        'caption' => $entry['caption']
+                    ]
+                ];
+
+                if ($entry['description'] !== '') {
+                    $items[] = [
+                        'type'    => 'Label',
+                        'caption' => $entry['description']
+                    ];
+                }
+
+                $columns[] = [
+                    'type'  => 'ColumnLayout',
+                    'items' => $items
                 ];
             }
 
-            $entryItems[] = [
-                'type'    => 'SelectVariable',
-                'name'    => $name,
-                'caption' => $shortCaption
-            ];
+            while (count($columns) < 3) {
+                $columns[] = [
+                    'type'  => 'ColumnLayout',
+                    'items' => []
+                ];
+            }
 
-            $items[] = [
-                'type'  => 'ColumnLayout',
-                'items' => $entryItems
+            $rows[] = [
+                'type'  => 'RowLayout',
+                'items' => $columns
             ];
         }
 
         return [
             'type'  => 'ColumnLayout',
-            'items' => $items
+            'items' => $rows
         ];
     }
 
