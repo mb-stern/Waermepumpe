@@ -420,37 +420,41 @@ class Waermepumpe extends IPSModuleStrict
 
     private function VariableRow(string $caption1, string $name1, string $caption2, string $name2): array
     {
-        $columns = [
-            [
-                'type'  => 'ColumnLayout',
-                'width' => '50%',
-                'items' => [
-                    [
-                        'type'    => 'SelectVariable',
-                        'name'    => $name1,
-                        'caption' => $caption1
-                    ]
-                ]
-            ]
-        ];
+        $items = [];
 
-        if ($name2 !== '') {
-            $columns[] = [
+        foreach ([[$caption1, $name1], [$caption2, $name2]] as [$caption, $name]) {
+            if ($name === '') {
+                continue;
+            }
+
+            $parts = array_map('trim', explode('–', $caption, 2));
+            $shortCaption = $parts[0];
+            $description = $parts[1] ?? '';
+
+            $entryItems = [];
+
+            if ($description !== '') {
+                $entryItems[] = [
+                    'type'    => 'Label',
+                    'caption' => $description
+                ];
+            }
+
+            $entryItems[] = [
+                'type'    => 'SelectVariable',
+                'name'    => $name,
+                'caption' => $shortCaption
+            ];
+
+            $items[] = [
                 'type'  => 'ColumnLayout',
-                'width' => '50%',
-                'items' => [
-                    [
-                        'type'    => 'SelectVariable',
-                        'name'    => $name2,
-                        'caption' => $caption2
-                    ]
-                ]
+                'items' => $entryItems
             ];
         }
 
         return [
-            'type'  => 'RowLayout',
-            'items' => $columns
+            'type'  => 'ColumnLayout',
+            'items' => $items
         ];
     }
 
