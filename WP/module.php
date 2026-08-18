@@ -252,40 +252,46 @@ class Waermepumpe extends IPSModuleStrict
 
             [
                 'type'    => 'ExpansionPanel',
-                'caption' => 'Wärmepumpe – Messwerte',
+                'caption' => 'Wärmepumpe',
                 'items'   => [
-                    $this->VariableRow('Außentemperatur', 'OutdoorTemperature', 'Vorlauftemperatur WP', 'SupplyTemperature'),
-                    $this->VariableRow('Quelle Eingang', 'TemperatureGroundWaterIn', 'Quelle Ausgang', 'TemperatureGroundWaterOut'),
-                    $this->VariableRow('Raumtemperatur normal', 'AmbientTemperatureNormal', 'Raumtemperatur reduziert', 'AmbientTemperatureReduced'),
-                    $this->VariableRow('Raumtemperatur Party', 'AmbientTemperatureParty', '', '')
-                ]
-            ],
+                    [
+                        'type'    => 'Label',
+                        'caption' => 'Temperaturen und Wärmequelle'
+                    ],
+                    $this->VariableRow('Außentemperatur – Temperatur der Außenluft', 'OutdoorTemperature', 'Vorlauftemperatur WP – Heizwasser am Ausgang der Wärmepumpe', 'SupplyTemperature'),
+                    $this->VariableRow('Quelle Eingang – Temperatur vor Verdampfer (Sole/Wasser)', 'TemperatureGroundWaterIn', 'Quelle Ausgang – Temperatur nach Verdampfer (Sole/Wasser)', 'TemperatureGroundWaterOut'),
+                    $this->VariableRow('Raumtemperatur Normal – Soll-/Referenzwert Normalbetrieb', 'AmbientTemperatureNormal', 'Raumtemperatur Reduziert – Soll-/Referenzwert Absenkbetrieb', 'AmbientTemperatureReduced'),
+                    $this->VariableRow('Raumtemperatur Party – Soll-/Referenzwert Partybetrieb', 'AmbientTemperatureParty', '', ''),
 
-            [
-                'type'    => 'ExpansionPanel',
-                'caption' => 'Wärmepumpe – Betriebszustände',
-                'items'   => [
-                    $this->VariableRow('Wärmepumpe läuft', 'HpRunning', 'Verdichter läuft', 'CompressorRunning'),
-                    $this->VariableRow('WP Ein/Aus Status', 'HeatingPumpStatusOnOff', 'Zusatzheizung aktiv', 'AdditionalHeating'),
-                    $this->VariableRow('Abtaubetrieb aktiv', 'DefrostMode', '', '')
-                ]
-            ],
+                    [
+                        'type'    => 'Label',
+                        'caption' => 'Betriebszustände'
+                    ],
+                    $this->VariableRow('Wärmepumpe läuft – Gesamtstatus der Wärmepumpe', 'HpRunning', 'Verdichter läuft – Kompressor aktiv/inaktiv', 'CompressorRunning'),
+                    $this->VariableRow('WP Ein/Aus – Freigabe bzw. Betriebsbereitschaft', 'HeatingPumpStatusOnOff', 'Zusatzheizung – elektrischer/zusätzlicher Wärmeerzeuger aktiv', 'AdditionalHeating'),
+                    $this->VariableRow('Abtaubetrieb – Abtauvorgang des Verdampfers aktiv', 'DefrostMode', '', ''),
 
-            [
-                'type'    => 'ExpansionPanel',
-                'caption' => 'Wärmepumpe – Betriebsarten',
-                'items'   => [
-                    $this->VariableRow('Heizbetrieb', 'HeatingPumpHeatingMode', 'Warmwasserbetrieb', 'HeatingPumpHotWaterMode'),
-                    $this->VariableRow('Kühlbetrieb', 'HeatingPumpCoolingMode', 'Nachtbetrieb', 'HeatingPumpNightMode'),
-                    $this->VariableRow('Energiesparbetrieb', 'HeatingPumpEnergySaveMode', 'Partybetrieb', 'HeatingPumpPartyMode')
-                ]
-            ],
+                    [
+                        'type'    => 'Label',
+                        'caption' => 'Betriebsarten'
+                    ],
+                    $this->VariableRow('Heizbetrieb – Wärmepumpe heizt das Gebäude', 'HeatingPumpHeatingMode', 'Warmwasserbetrieb – Wärmepumpe lädt den Warmwasserspeicher', 'HeatingPumpHotWaterMode'),
+                    $this->VariableRow('Kühlbetrieb – Wärmepumpe arbeitet im Kühlmodus', 'HeatingPumpCoolingMode', 'Nachtbetrieb – Nacht-/Absenkbetrieb aktiv', 'HeatingPumpNightMode'),
+                    $this->VariableRow('Energiesparbetrieb – Eco-/Sparbetrieb aktiv', 'HeatingPumpEnergySaveMode', 'Partybetrieb – temporärer Komfortbetrieb aktiv', 'HeatingPumpPartyMode'),
 
-            [
-                'type'    => 'ExpansionPanel',
-                'caption' => 'Wärmepumpe – Meldungen',
-                'items'   => [
-                    $this->VariableRow('Warnung', 'Warning', 'Fehler', 'Error')
+                    [
+                        'type'    => 'Label',
+                        'caption' => 'Meldungen'
+                    ],
+                    $this->VariableRow('Warnung – allgemeiner Warnstatus', 'Warning', 'Fehler – allgemeiner Störungs-/Fehlerstatus', 'Error'),
+
+                    [
+                        'type'    => 'Label',
+                        'caption' => 'Kältekreis'
+                    ],
+                    $this->VariableRow('Niederdruck – Druck auf der Verdampfer-/Sauggasseite', 'EvaporatorPressure', 'Verdampfungstemperatur – Kältemittel-Sättigungstemperatur auf der Niederdruckseite', 'EvaporatorTemperature'),
+                    $this->VariableRow('Hochdruck – Druck auf der Verflüssiger-/Druckgasseite', 'CondenserPressure', 'Kondensationstemperatur – Kältemittel-Sättigungstemperatur auf der Hochdruckseite', 'CondenserTemperature'),
+                    $this->VariableRow('Expansionsventil – Öffnungsgrad des elektronischen Expansionsventils', 'ExpansionValveOpening', 'Verdichterdrehzahl – Drehzahl/Frequenz bzw. Leistungswert des Verdichters', 'CompressorValue')
                 ]
             ],
 
@@ -313,12 +319,12 @@ class Waermepumpe extends IPSModuleStrict
                             ]
                         ]
                     ],
-                    $this->VariableRow('Puffer oben', 'TankTempHPUp', 'Warmwasser oben', 'TankTempWWUp'),
-                    $this->VariableRow('Puffer Mitte', 'TankTempHPMiddle', 'Warmwasser Mitte', 'TankTempWWMiddle'),
-                    $this->VariableRow('Puffer unten', 'TankTempHPDown', 'Warmwasser unten', 'TankTempWWDown'),
-                    $this->VariableRow('Speicherladepumpe', 'StorageChargingPumpRunning', 'Zirkulationspumpe', 'CirculatingPumpRunning'),
-                    $this->VariableRow('WW-/Heizungsventil', 'WWHeatingValve', 'Heizstab Warmwasser', 'HeaterRodWW'),
-                    $this->VariableRow('Heizstab Puffer', 'HeaterRodHP', 'Heizstab Stufe 1', 'HeaterRodLevel1'),
+                    $this->VariableRow('Puffer oben – obere Speichertemperatur', 'TankTempHPUp', 'Warmwasser oben – obere Speichertemperatur', 'TankTempWWUp'),
+                    $this->VariableRow('Puffer Mitte – mittlere Speichertemperatur', 'TankTempHPMiddle', 'Warmwasser Mitte – mittlere Speichertemperatur', 'TankTempWWMiddle'),
+                    $this->VariableRow('Puffer unten – untere Speichertemperatur', 'TankTempHPDown', 'Warmwasser unten – untere Speichertemperatur', 'TankTempWWDown'),
+                    $this->VariableRow('Speicherladepumpe – lädt Puffer/WW-Speicher', 'StorageChargingPumpRunning', 'Zirkulationspumpe – Warmwasserzirkulation aktiv', 'CirculatingPumpRunning'),
+                    $this->VariableRow('Umschaltventil WW/Heizung – Stellung des 3-Wege-Ventils', 'WWHeatingValve', 'Heizstab Warmwasser – elektrischer Heizstab aktiv', 'HeaterRodWW'),
+                    $this->VariableRow('Heizstab Puffer – Zusatzheizung im Heizspeicher', 'HeaterRodHP', 'Heizstab Stufe 1 – erste Leistungsstufe aktiv', 'HeaterRodLevel1'),
                     $this->VariableRow('Heizstab Stufe 2', 'HeaterRodLevel2', '', '')
                 ]
             ],
@@ -327,15 +333,6 @@ class Waermepumpe extends IPSModuleStrict
             $this->HeatingCircuitPanel(2),
             $this->HeatingCircuitPanel(3),
 
-            [
-                'type'    => 'ExpansionPanel',
-                'caption' => 'Kältekreis',
-                'items'   => [
-                    $this->VariableRow('Niederdruck', 'EvaporatorPressure', 'Verdampfungstemperatur', 'EvaporatorTemperature'),
-                    $this->VariableRow('Hochdruck', 'CondenserPressure', 'Kondensationstemperatur', 'CondenserTemperature'),
-                    $this->VariableRow('Expansionsventil Öffnung', 'ExpansionValveOpening', 'Verdichterdrehzahl', 'CompressorValue')
-                ]
-            ],
 
             [
                 'type'    => 'ExpansionPanel',
@@ -346,24 +343,15 @@ class Waermepumpe extends IPSModuleStrict
                         'name'    => 'ThermalSolarAvailable',
                         'caption' => 'Solarthermie anzeigen'
                     ],
-                    $this->VariableRow('Solarpumpe', 'ThermalSolarPump', 'Pumpendrehzahl', 'ThermalSolarPumpSpeed'),
-                    $this->VariableRow('Kollektortemperatur', 'ThermalSolarPanelTemp', 'Solar-Vorlauftemperatur', 'ThermalSolarFluxTemp')
+                    $this->VariableRow('Solarpumpe – Solarthermie-Pumpe aktiv', 'ThermalSolarPump', 'Pumpendrehzahl – Drehzahl/Leistung der Solarpumpe', 'ThermalSolarPumpSpeed'),
+                    $this->VariableRow('Kollektortemperatur – Temperatur am Solarkollektor', 'ThermalSolarPanelTemp', 'Solar-Vorlauftemperatur – Temperatur vom Kollektor zum Speicher', 'ThermalSolarFluxTemp')
                 ]
-            ]
-        ];
-
-        $actions = [
-            [
-                'type'    => 'Button',
-                'caption' => 'Grafik neu laden',
-                'onClick' => 'WP_UpdateVisualization($id);'
             ]
         ];
 
         return json_encode(
             [
-                'elements' => $elements,
-                'actions'  => $actions
+                'elements' => $elements
             ],
             JSON_THROW_ON_ERROR
         );
@@ -415,13 +403,13 @@ class Waermepumpe extends IPSModuleStrict
                     ]
                 ],
                 $this->VariableRow(
-                    'Heizkreispumpe',
+                    'Heizkreispumpe – Pumpe des Heizkreises',
                     'HeatingCircuitPumpRunning' . $suffix,
-                    'Vorlauf',
+                    'Vorlauf – Temperatur zum Heizkreis',
                     'SupplyTemperatureHeating' . $suffix
                 ),
                 $this->VariableRow(
-                    'Rücklauf',
+                    'Rücklauf – Temperatur vom Heizkreis',
                     'RefluxTemperatureHeating' . $suffix,
                     '',
                     ''
