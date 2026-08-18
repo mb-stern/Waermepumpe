@@ -377,10 +377,21 @@ class Waermepumpe extends IPSModuleStrict
 
     private function ReloadVisualization(): void
     {
+        // GetVisualizationTile() liefert nur den Initialzustand.
+        // Bei jedem späteren Refresh senden wir den kompletten aktuellen
+        // Zustand und bauen die Card im Browser vollständig neu auf.
         $this->UpdateVisualizationValue(
             json_encode(
-                ['type' => 'reload'],
-                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                [
+                    'type'   => 'rebuild',
+                    'config' => $this->BuildCardConfig(),
+                    'states' => $this->BuildHassStates()
+                ],
+                JSON_UNESCAPED_SLASHES
+                | JSON_UNESCAPED_UNICODE
+                | JSON_HEX_TAG
+                | JSON_HEX_AMP
+                | JSON_THROW_ON_ERROR
             )
         );
     }
@@ -901,6 +912,104 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
+    const resolveLayoutTextColor = () => {
+        const bodyColor = getComputedStyle(document.body).color;
+
+        if (bodyColor && bodyColor !== 'rgba(0, 0, 0, 0)') {
+            return bodyColor;
+        }
+
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+            ? '#ffffff'
+            : '#000000';
+    };
+
+    const isBlack = (value) => {
+        const normalized = String(value || '')
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '');
+
+        return [
+            'black',
+            '#000',
+            '#000000',
+            'rgb(0,0,0)',
+            'rgba(0,0,0,1)'
+        ].includes(normalized);
+    };
+
+    const applyThemeColors = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+        const textColor = resolveLayoutTextColor();
+
+        // Hintergrund kommt vollständig vom Symcon-Layout.
+        svg.style.setProperty('background', 'transparent', 'important');
+        svg.style.setProperty('background-color', 'transparent', 'important');
+        svg.style.setProperty('--card-background-color', 'transparent');
+        svg.style.setProperty('--primary-text-color', textColor);
+        svg.style.color = textColor;
+
+        // Feste schwarze Text-/Symbolfarben der Original-SVG an das Layout
+        // anpassen. Bei dunklem Layout werden sie weiß, bei hellem schwarz.
+        svg.querySelectorAll('*').forEach((element) => {
+            const fill = element.getAttribute('fill');
+            const stroke = element.getAttribute('stroke');
+
+            if (isBlack(fill)) {
+                element.style.fill = textColor;
+            }
+
+            if (isBlack(stroke)) {
+                element.style.stroke = textColor;
+            }
+
+            const style = element.getAttribute('style');
+            if (style) {
+                const declarations = style.split(';');
+
+                declarations.forEach((declaration) => {
+                    const parts = declaration.split(':');
+                    if (parts.length < 2) {
+                        return;
+                    }
+
+                    const property = parts[0].trim().toLowerCase();
+                    const value = parts.slice(1).join(':').trim();
+
+                    if (property === 'fill' && isBlack(value)) {
+                        element.style.fill = textColor;
+                    }
+
+                    if (property === 'stroke' && isBlack(value)) {
+                        element.style.stroke = textColor;
+                    }
+                });
+            }
+        });
+    };
+
+    const rebuildCard = () => {
+        const card = document.getElementById('wp-card');
+
+        if (!card) {
+            showError('Das Element <heat-pump-card> wurde im HTML nicht gefunden.');
+            return;
+        }
+
+        // Komplett neu initialisieren, nicht nur Werte in das bestehende SVG
+        // schreiben. So reagieren auch alle dynamischen SVG-Gruppen zuverlässig.
+        card.innerHTML = '';
+        card.content = null;
+        card.config = currentConfig;
+
+        applyCardData();
+    };
+
     const applyCardData = () => {
         const card = document.getElementById('wp-card');
 
@@ -920,6 +1029,7 @@ class Waermepumpe extends IPSModuleStrict
 
             applyCoolingVisualization(card);
             updateRefrigerantValues(card);
+            applyThemeColors(card);
         } catch (error) {
             showError(
                 'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
@@ -949,11 +1059,6 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
-        if (data.type === 'reload') {
-            window.location.reload();
-            return;
-        }
-
         if (data.config) {
             currentConfig = data.config;
         }
@@ -962,8 +1067,27 @@ class Waermepumpe extends IPSModuleStrict
             currentStates = data.states;
         }
 
+        if (data.type === 'rebuild') {
+            rebuildCard();
+            return;
+        }
+
         applyCardData();
     };
+
+    if (window.matchMedia) {
+        const scheme = window.matchMedia('(prefers-color-scheme: dark)');
+        const onSchemeChange = () => {
+            const card = document.getElementById('wp-card');
+            applyThemeColors(card);
+        };
+
+        if (typeof scheme.addEventListener === 'function') {
+            scheme.addEventListener('change', onSchemeChange);
+        } else if (typeof scheme.addListener === 'function') {
+            scheme.addListener(onSchemeChange);
+        }
+    }
 
     applyCardData();
 })();
