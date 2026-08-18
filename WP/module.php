@@ -238,7 +238,7 @@ class Waermepumpe extends IPSModuleStrict
         $elements = [
             [
                 'type'    => 'Label',
-                'caption' => 'Anlagenkomponenten werden durch die Konfiguration ein-/ausgeblendet. Messvariablen sind nur für Werte und Zustände erforderlich.'
+                'caption' => 'Die Anlagenstruktur wird von der originalen Heat-Pump-Card dynamisch aus diesen Optionen aufgebaut. Messvariablen liefern nur Werte und Zustände.'
             ],
             [
                 'type'    => 'Select',
@@ -665,6 +665,11 @@ class Waermepumpe extends IPSModuleStrict
             this.innerHTML =
                 '<ha-card>\\n'
                 + embeddedSvg
+                    // heat-pump.svg is an XML file. In HTML-SDK it is inserted
+                    // as inline SVG, so the XML CDATA wrapper around <style>
+                    // must be removed while preserving the original CSS.
+                    .replace(/<!\[CDATA\[/g, '')
+                    .replace(/\]\]>/g, '')
                     .replace(/ class="rotate"/g, '')
                     .replace(/display: inline;/g, 'display: none;')
                 + '</ha-card>';
@@ -680,74 +685,6 @@ class Waermepumpe extends IPSModuleStrict
             this.content.setAttribute('height', '100%');
             this.content.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
-            // Originale SVG-Farbdefinitionen beibehalten. Falls die Umgebung
-            // keine CSS-Variablen auflösen sollte, sichere Fallbacks setzen.
-            if (!this.content.style.getPropertyValue('--primary-text-color')) {
-                this.content.style.setProperty(
-                    '--primary-text-color',
-                    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-                        ? '#ffffff'
-                        : '#000000'
-                );
-            }
-            if (!this.content.style.getPropertyValue('--card-background-color')) {
-                this.content.style.setProperty(
-                    '--card-background-color',
-                    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-                        ? '#000000'
-                        : '#ffffff'
-                );
-            }
-
-            // Die Original-SVG enthält Demonstrationswerte. Diese dürfen in
-            // Symcon nicht als echte Messwerte erscheinen, solange keine
-            // entsprechende Variable konfiguriert ist.
-            [
-                '#textOutdoorTemperatureValue',
-                '#textIndoorTemperatureValue',
-                '#textSupplyTemperatureValue',
-                '#textG2WWaterTempIn',
-                '#textG2WWaterTempOut',
-                '#textTankTempHPUp',
-                '#textTankTempHPMiddle',
-                '#textTankTempHPDown',
-                '#textTankTempWWUp',
-                '#textTankTempWWMiddle',
-                '#textTankTempWWDown',
-                '#textSupplyTemperatureHeating',
-                '#textRefluxTemperatureHeating',
-                '#textSupplyTemperatureHeating2',
-                '#textRefluxTemperatureHeating2',
-                '#textSupplyTemperatureHeating3',
-                '#textRefluxTemperatureHeating3',
-                '#textEvaporatorPressure',
-                '#textEvaporatorTemperature',
-                '#textCondenserPressure',
-                '#textCondenserTemperature',
-                '#textExpansionValveOpening',
-                '#textCompressorValue',
-                '#textThermalSolarPanelTemp',
-                '#textThermalSolarFluxTemp',
-                '#textThermalSolarPumpSpeed',
-                '#textValue000',
-                '#textValue001',
-                '#textValue002',
-                '#textValue003',
-                '#textValue004',
-                '#textValue005',
-                '#textValue006',
-                '#textValue007',
-                '#textValue008',
-                '#textValue009',
-                '#textValue010',
-                '#textValue011',
-                '#textValue012'
-            ].forEach((selector) => {
-                const element = this.content.querySelector(selector);
-                if (element) {
-                    element.textContent = '';
-                }
-            });
 
             const details = this.content.querySelector('#linkDetails');
             if (details && typeof this.linkHandling === 'function') {
@@ -799,64 +736,19 @@ class Waermepumpe extends IPSModuleStrict
             this.setConfig(this.config || {});
             this.setValues(hass || { language: 'de-DE', states: {} });
 
-            // Die äußere Initialisierung erzwingt direkt danach nochmals
-            // die Symcon-Topologie.
+            const refrigerantModel = this.content.querySelector('#gHPModel');
+            if (refrigerantModel) {
+                refrigerantModel.style.display =
+                    (this.config && this.config.showRefrigerantCircuit === false)
+                        ? 'none'
+                        : 'inline';
+            }
         } catch (error) {
             showError(
                 'Fehler beim Initialisieren der Wärmepumpen-Card:\\n'
                 + (error && error.stack ? error.stack : String(error))
             );
         }
-    };
-
-    const applyStructuralVisibility = (card) => {
-        if (!card || !card.content) {
-            return;
-        }
-
-        const svg = card.content;
-
-        const display = (selector, visible) => {
-            const element = svg.querySelector(selector);
-            if (element) {
-                element.style.display = visible ? 'inline' : 'none';
-            }
-        };
-
-        // Wärmepumpentyp: Die gewählte Quelle wird immer dargestellt,
-        // unabhängig davon, ob bereits Messwerte zugeordnet sind.
-        const hpType = currentConfig.heatingPumpType || 'A2W';
-        display('#gHPFan', hpType === 'A2W');
-        display('#gHPW2W', hpType === 'W2W');
-        display('#gHPG2W', hpType === 'G2W');
-
-        // Kältekreis separat schaltbar.
-        display('#gHPModel', currentConfig.showRefrigerantCircuit !== false);
-
-        // Speicher ausschließlich nach Anlagenkonfiguration.
-        display('#gTankHP', currentConfig.tankHP === true);
-        display('#gWW', currentConfig.tankWW === true);
-
-        // Heizkreise ausschließlich nach gewähltem Typ.
-        [
-            [1, currentConfig.heatingCircuitType1],
-            [2, currentConfig.heatingCircuitType2],
-            [3, currentConfig.heatingCircuitType3]
-        ].forEach(([number, type]) => {
-            const enabled = !!type && type !== 'off';
-            display('#gHeaterCircuit' + number, enabled);
-
-            if (enabled) {
-                display('#gHeaterCircuitFloor' + number, type === 'underfloor');
-                display('#radiator' + number, type === 'radiator');
-            }
-        });
-
-        // Solarthermie wird vom Schalter bestimmt, nicht von Sensoren.
-        display(
-            '#gThermalSolar',
-            currentConfig.thermalSolarAvailable === true
-        );
     };
 
     const applyCardData = () => {
@@ -876,9 +768,16 @@ class Waermepumpe extends IPSModuleStrict
                 states: currentStates
             };
 
-            // setConfig()/setValues() der Original-Card zuerst arbeiten lassen,
-            // anschließend die Symcon-Topologie nochmals eindeutig erzwingen.
-            applyStructuralVisibility(card);
+            // Die komplette Anlagen-Topologie übernimmt die originale
+            // setConfig()-Logik der lovelace-heat-pump-card.
+            // Unser zusätzlicher Symcon-Schalter betrifft nur den Kältekreis.
+            if (card.content) {
+                const refrigerantModel = card.content.querySelector('#gHPModel');
+                if (refrigerantModel) {
+                    refrigerantModel.style.display =
+                        currentConfig.showRefrigerantCircuit === false ? 'none' : 'inline';
+                }
+            }
         } catch (error) {
             showError(
                 'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
