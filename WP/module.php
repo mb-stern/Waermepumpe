@@ -207,16 +207,16 @@ class Waermepumpe extends IPSModuleStrict
 
         $this->RegisterVariableMessages();
 
-        // Strukturänderungen (WP-Typ, Speicher, Heizkreise usw.) benötigen
-        // einen vollständigen Neuaufbau der HTML-SDK-Kachel.
+        // Änderungen im Konfigurationsformular sofort an bereits offene
+        // HTML-SDK-Kacheln senden und dort vollständig neu aufbauen.
         $this->ReloadVisualization();
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($Message === VM_UPDATE) {
-            // Gewünscht: Auch bei Wertänderungen die komplette HTML-SDK-Kachel
-            // neu aufbauen, damit Topologie und Anzeige immer synchron sind.
+            // Bei jeder überwachten Variablenänderung vollständigen aktuellen
+            // Zustand senden und die Card in der offenen Kachel neu erzeugen.
             $this->ReloadVisualization();
         }
     }
@@ -377,9 +377,9 @@ class Waermepumpe extends IPSModuleStrict
 
     private function ReloadVisualization(): void
     {
-        // GetVisualizationTile() liefert nur den Initialzustand.
-        // Bei jedem späteren Refresh senden wir den kompletten aktuellen
-        // Zustand und bauen die Card im Browser vollständig neu auf.
+        // GetVisualizationTile() wird vom HTML-SDK nur initial aufgerufen.
+        // Darum bei ApplyChanges(), Button und VM_UPDATE immer den kompletten
+        // aktuellen Zustand an alle offenen Visualisierungen senden.
         $this->UpdateVisualizationValue(
             json_encode(
                 [
@@ -913,15 +913,13 @@ class Waermepumpe extends IPSModuleStrict
     };
 
     const resolveLayoutTextColor = () => {
-        const bodyColor = getComputedStyle(document.body).color;
+        // Im HTML-SDK erbt document.body die Textfarbe des übergeordneten
+        // Symcon-Layouts nicht zuverlässig. Der Farbschemamodus dagegen wird
+        // vom Browser an die Kachel weitergereicht.
+        const dark = window.matchMedia
+            && window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-        if (bodyColor && bodyColor !== 'rgba(0, 0, 0, 0)') {
-            return bodyColor;
-        }
-
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
-            ? '#ffffff'
-            : '#000000';
+        return dark ? '#ffffff' : '#000000';
     };
 
     const isBlack = (value) => {
@@ -947,67 +945,69 @@ class Waermepumpe extends IPSModuleStrict
         const svg = card.content;
         const textColor = resolveLayoutTextColor();
 
-        // Hintergrund kommt vollständig vom Symcon-Layout.
+        // Hintergrund ausschließlich vom Symcon-Layout.
         svg.style.setProperty('background', 'transparent', 'important');
         svg.style.setProperty('background-color', 'transparent', 'important');
         svg.style.setProperty('--card-background-color', 'transparent');
         svg.style.setProperty('--primary-text-color', textColor);
-        svg.style.color = textColor;
+        svg.style.setProperty('color', textColor);
 
-        // Feste schwarze Text-/Symbolfarben der Original-SVG an das Layout
-        // anpassen. Bei dunklem Layout werden sie weiß, bei hellem schwarz.
+        // Text grundsätzlich an den Layoutmodus koppeln.
+        svg.querySelectorAll('text, tspan').forEach((element) => {
+            element.style.setProperty('fill', textColor, 'important');
+            element.style.setProperty('color', textColor, 'important');
+        });
+
+        // Schwarze Linien/Symbole der Original-SVG im Dark Mode weiß machen.
+        // Im Light Mode bleiben sie schwarz.
         svg.querySelectorAll('*').forEach((element) => {
-            const fill = element.getAttribute('fill');
-            const stroke = element.getAttribute('stroke');
+            const computed = getComputedStyle(element);
+
+            const fill =
+                element.getAttribute('fill')
+                || element.style.fill
+                || computed.fill;
+
+            const stroke =
+                element.getAttribute('stroke')
+                || element.style.stroke
+                || computed.stroke;
 
             if (isBlack(fill)) {
-                element.style.fill = textColor;
+                element.style.setProperty('fill', textColor, 'important');
             }
 
             if (isBlack(stroke)) {
-                element.style.stroke = textColor;
-            }
-
-            const style = element.getAttribute('style');
-            if (style) {
-                const declarations = style.split(';');
-
-                declarations.forEach((declaration) => {
-                    const parts = declaration.split(':');
-                    if (parts.length < 2) {
-                        return;
-                    }
-
-                    const property = parts[0].trim().toLowerCase();
-                    const value = parts.slice(1).join(':').trim();
-
-                    if (property === 'fill' && isBlack(value)) {
-                        element.style.fill = textColor;
-                    }
-
-                    if (property === 'stroke' && isBlack(value)) {
-                        element.style.stroke = textColor;
-                    }
-                });
+                element.style.setProperty('stroke', textColor, 'important');
             }
         });
     };
 
     const rebuildCard = () => {
-        const card = document.getElementById('wp-card');
+        const root = document.getElementById('wp-root');
 
-        if (!card) {
-            showError('Das Element <heat-pump-card> wurde im HTML nicht gefunden.');
+        if (!root) {
+            showError('Der Wärmepumpen-Container wurde im HTML nicht gefunden.');
             return;
         }
 
-        // Komplett neu initialisieren, nicht nur Werte in das bestehende SVG
-        // schreiben. So reagieren auch alle dynamischen SVG-Gruppen zuverlässig.
-        card.innerHTML = '';
-        card.content = null;
-        card.config = currentConfig;
+        const oldCard = document.getElementById('wp-card');
+        if (oldCard) {
+            oldCard.remove();
+        }
 
-        applyCardData();
+        // Wirklich ein neues Custom Element erzeugen. Die Original-Card hält
+        // intern Zustand in content/config; nur innerHTML zu leeren reicht daher
+        // nicht für einen vollständigen Neuaufbau.
+        const card = document.createElement('heat-pump-card');
+        card.id = 'wp-card';
+        root.appendChild(card);
+
+        // Initialisierung erst im nächsten Browser-Zyklus, damit das neue
+        // Custom Element vollständig verbunden ist.
+        requestAnimationFrame(() => {
+            applyCardData();
+        });
     };
 
     const applyCardData = () => {
@@ -1027,9 +1027,20 @@ class Waermepumpe extends IPSModuleStrict
                 states: currentStates
             };
 
-            applyCoolingVisualization(card);
-            updateRefrigerantValues(card);
-            applyThemeColors(card);
+            const finalizeSvg = (attempt = 0) => {
+                if (card.content) {
+                    applyCoolingVisualization(card);
+                    updateRefrigerantValues(card);
+                    applyThemeColors(card);
+                    return;
+                }
+
+                if (attempt < 40) {
+                    window.setTimeout(() => finalizeSvg(attempt + 1), 25);
+                }
+            };
+
+            finalizeSvg();
         } catch (error) {
             showError(
                 'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
@@ -1078,8 +1089,7 @@ class Waermepumpe extends IPSModuleStrict
     if (window.matchMedia) {
         const scheme = window.matchMedia('(prefers-color-scheme: dark)');
         const onSchemeChange = () => {
-            const card = document.getElementById('wp-card');
-            applyThemeColors(card);
+            rebuildCard();
         };
 
         if (typeof scheme.addEventListener === 'function') {
