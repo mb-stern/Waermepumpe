@@ -359,7 +359,7 @@ class Waermepumpe extends IPSModuleStrict
                     ],
                     [
                         'type'    => 'Label',
-                        'caption' => 'Mehrere Statuswerte mit Komma trennen, z. B. Heizen: 0,6. Die Lüfter-Fallbackwerte werden nur verwendet, wenn keine Lüfterdrehzahl zugeordnet ist.'
+                        'caption' => 'Statuswerte mit Komma trennen, z. B. Heizen: 0,6. Symbol: Aus = grau, freigegeben = Originalfarbe, aktuell aktiv = hell/leuchtend. Lüfter-Fallback nur ohne Lüfterdrehzahl.'
                     ],
 
                     [
@@ -1199,24 +1199,6 @@ class Waermepumpe extends IPSModuleStrict
         );
     };
 
-    const setGroupColor = (group, color) => {
-        if (!group) {
-            return;
-        }
-
-        group.querySelectorAll('path, rect, circle, line, polyline, polygon, use').forEach((element) => {
-            const fill = getComputedStyle(element).fill;
-            const stroke = getComputedStyle(element).stroke;
-
-            if (fill && fill !== 'none' && fill !== 'rgba(0, 0, 0, 0)') {
-                element.style.setProperty('fill', color, 'important');
-            }
-            if (stroke && stroke !== 'none' && stroke !== 'rgba(0, 0, 0, 0)') {
-                element.style.setProperty('stroke', color, 'important');
-            }
-        });
-    };
-
     const closeModeMenu = () => {
         const menu = document.getElementById('wp-mode-menu');
         if (menu) {
@@ -1290,12 +1272,22 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
-        const layoutColor = resolveLayoutTextColor();
-
         const definitions = [
-            { functionName: 'heating', selector: '#gHPStatusHeating', entity: currentConfig.heatingPumpHeatingMode, activeColor: '#ff3b30' },
-            { functionName: 'hotwater', selector: '#gHPStatusWW', entity: currentConfig.heatingPumpHotWaterMode, activeColor: '#ff9500' },
-            { functionName: 'cooling', selector: '#gHPStatusCooling', entity: currentConfig.heatingPumpCoolingMode, activeColor: '#0a84ff' }
+            {
+                functionName: 'heating',
+                selector: '#gHPStatusHeating',
+                entity: currentConfig.heatingPumpHeatingMode
+            },
+            {
+                functionName: 'hotwater',
+                selector: '#gHPStatusWW',
+                entity: currentConfig.heatingPumpHotWaterMode
+            },
+            {
+                functionName: 'cooling',
+                selector: '#gHPStatusCooling',
+                entity: currentConfig.heatingPumpCoolingMode
+            }
         ];
 
         definitions.forEach((definition) => {
@@ -1307,6 +1299,7 @@ class Waermepumpe extends IPSModuleStrict
             const control = currentControls && currentControls[definition.functionName];
             const active = stateIsOn(definition.entity);
 
+            // Sobald Status oder Steuerung vorhanden ist, Symbol sichtbar halten.
             if (
                 (currentControls && currentControls.hasOperatingStatus)
                 || (control && control.configured)
@@ -1315,22 +1308,52 @@ class Waermepumpe extends IPSModuleStrict
                 group.style.display = 'inline';
             }
 
-            let color = '#777777';
-            if (active) {
-                color = definition.activeColor;
-            } else if (control && control.configured && control.enabled) {
-                color = layoutColor;
+            /*
+             * Drei Zustände:
+             *
+             * 1. Steuerung = Aus:
+             *    grau und deutlich gedimmt
+             *
+             * 2. Steuerung freigegeben, Funktion läuft gerade nicht:
+             *    Originalfarben der lovelace-heat-pump-card unverändert
+             *
+             * 3. Zentrale Statusvariable meldet Funktion aktiv:
+             *    gleiche Originalfarben, aber heller/leuchtend
+             *
+             * Damit bleiben die vom Autor vorgesehenen Symbolfarben erhalten.
+             */
+            if (control && control.configured && !control.enabled) {
+                group.style.setProperty('filter', 'grayscale(1) brightness(0.65)', 'important');
+                group.style.setProperty('opacity', '0.55', 'important');
+            } else if (active) {
+                group.style.setProperty(
+                    'filter',
+                    'brightness(1.65) saturate(1.35) drop-shadow(0 0 4px rgba(255,255,255,0.65))',
+                    'important'
+                );
+                group.style.setProperty('opacity', '1', 'important');
+            } else {
+                group.style.removeProperty('filter');
+                group.style.setProperty('opacity', '1', 'important');
             }
 
-            setGroupColor(group, color);
-
-            if (control && control.configured && Array.isArray(control.options) && control.options.length > 0) {
+            if (
+                control
+                && control.configured
+                && Array.isArray(control.options)
+                && control.options.length > 0
+            ) {
                 group.style.cursor = 'pointer';
 
                 if (!group.dataset.symconControlBound) {
                     group.dataset.symconControlBound = '1';
-                    group.addEventListener('click', (event) => openModeMenu(definition.functionName, event));
+                    group.addEventListener(
+                        'click',
+                        (event) => openModeMenu(definition.functionName, event)
+                    );
                 }
+            } else {
+                group.style.cursor = 'default';
             }
         });
     };
