@@ -766,13 +766,8 @@ class Waermepumpe extends IPSModuleStrict
             this.setConfig(this.config || {});
             this.setValues(hass || { language: 'de-DE', states: {} });
 
-            const refrigerantModel = this.content.querySelector('#gHPModel');
-            if (refrigerantModel) {
-                refrigerantModel.style.display =
-                    (this.config && this.config.showRefrigerantCircuit === false)
-                        ? 'none'
-                        : 'inline';
-            }
+            // Die eigentliche Symcon-Zuordnung wird direkt nach der
+            // Initialisierung nochmals durch applyCardData() gesetzt.
         } catch (error) {
             showError(
                 'Fehler beim Initialisieren der Wärmepumpen-Card:\\n'
@@ -854,6 +849,58 @@ class Waermepumpe extends IPSModuleStrict
         svg.dataset.operatingMode = cooling ? 'cooling' : 'heating';
     };
 
+    const formatStateForSvg = (entityName) => {
+        if (!entityName || !currentStates || !currentStates[entityName]) {
+            return '';
+        }
+
+        const item = currentStates[entityName];
+        const raw = item.state;
+
+        if (raw === null || raw === undefined || raw === '') {
+            return '';
+        }
+
+        const numeric = Number(raw);
+        const unit =
+            item.attributes && item.attributes.unit_of_measurement
+                ? String(item.attributes.unit_of_measurement).trim()
+                : '';
+
+        if (!Number.isNaN(numeric)) {
+            const value = new Intl.NumberFormat('de-CH', {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1
+            }).format(numeric);
+
+            return unit ? value + ' ' + unit : value;
+        }
+
+        return unit ? String(raw) + ' ' + unit : String(raw);
+    };
+
+    const updateRefrigerantValues = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const values = [
+            ['#textEvaporatorPressure', currentConfig.evaporatorPressure],
+            ['#textEvaporatorTemperature', currentConfig.evaporatorTemperature],
+            ['#textCondenserPressure', currentConfig.condenserPressure],
+            ['#textCondenserTemperature', currentConfig.condenserTemperature],
+            ['#textExpansionValveOpening', currentConfig.expansionValveOpening],
+            ['#textCompressorValue', currentConfig.compressorValue]
+        ];
+
+        values.forEach(([selector, entityName]) => {
+            const element = card.content.querySelector(selector);
+            if (element) {
+                element.textContent = formatStateForSvg(entityName);
+            }
+        });
+    };
+
     const applyCardData = () => {
         const card = document.getElementById('wp-card');
 
@@ -872,17 +919,7 @@ class Waermepumpe extends IPSModuleStrict
             };
 
             applyCoolingVisualization(card);
-
-            // Die komplette Anlagen-Topologie übernimmt die originale
-            // setConfig()-Logik der lovelace-heat-pump-card.
-            // Unser zusätzlicher Symcon-Schalter betrifft nur den Kältekreis.
-            if (card.content) {
-                const refrigerantModel = card.content.querySelector('#gHPModel');
-                if (refrigerantModel) {
-                    refrigerantModel.style.display =
-                        currentConfig.showRefrigerantCircuit === false ? 'none' : 'inline';
-                }
-            }
+            updateRefrigerantValues(card);
         } catch (error) {
             showError(
                 'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
