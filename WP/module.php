@@ -543,6 +543,10 @@ class Waermepumpe extends IPSModuleStrict
             | JSON_THROW_ON_ERROR
         );
 
+        // Die SVG-CSS-Variablen der Original-Card werden bewusst NICHT entfernt.
+        // Ohne --primary-text-color / --card-background-color würden große Teile
+        // der Grafik in der Symcon-Dunkelansicht schwarz auf dunkel erscheinen.
+        //
         // Verhindert nur, dass ein möglicher String "</script>" die HTML-SDK-
         // Rückgabe beendet. Die Originaldatei im Modul wird nicht verändert.
         $vendorJs = str_replace('</script>', '<\/script>', $vendorJs);
@@ -661,7 +665,6 @@ class Waermepumpe extends IPSModuleStrict
             this.innerHTML =
                 '<ha-card>\\n'
                 + embeddedSvg
-                    .replace(/.*--primary-text-color:.*/g, '')
                     .replace(/ class="rotate"/g, '')
                     .replace(/display: inline;/g, 'display: none;')
                 + '</ha-card>';
@@ -676,6 +679,25 @@ class Waermepumpe extends IPSModuleStrict
             this.content.setAttribute('width', '100%');
             this.content.setAttribute('height', '100%');
             this.content.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+
+            // Originale SVG-Farbdefinitionen beibehalten. Falls die Umgebung
+            // keine CSS-Variablen auflösen sollte, sichere Fallbacks setzen.
+            if (!this.content.style.getPropertyValue('--primary-text-color')) {
+                this.content.style.setProperty(
+                    '--primary-text-color',
+                    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                        ? '#ffffff'
+                        : '#000000'
+                );
+            }
+            if (!this.content.style.getPropertyValue('--card-background-color')) {
+                this.content.style.setProperty(
+                    '--card-background-color',
+                    window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                        ? '#000000'
+                        : '#ffffff'
+                );
+            }
 
             // Die Original-SVG enthält Demonstrationswerte. Diese dürfen in
             // Symcon nicht als echte Messwerte erscheinen, solange keine
