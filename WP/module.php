@@ -784,9 +784,9 @@ class Waermepumpe extends IPSModuleStrict
         max-width: 300px;
         padding: 6px;
         border-radius: 8px;
-        background: rgba(32, 32, 32, 0.96);
+        background: color-mix(in srgb, Canvas 94%, transparent);
         box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-        color: #ffffff;
+        color: CanvasText;
         font: 14px Arial, sans-serif;
     }
 
@@ -1293,42 +1293,58 @@ class Waermepumpe extends IPSModuleStrict
         definitions.forEach((definition) => {
             const group = card.content.querySelector(definition.selector);
             if (!group) {
+                console.warn('Statussymbol nicht gefunden:', definition.selector);
                 return;
             }
 
             const control = currentControls && currentControls[definition.functionName];
             const active = stateIsOn(definition.entity);
 
-            // Sobald Status oder Steuerung vorhanden ist, Symbol sichtbar halten.
-            if (
-                (currentControls && currentControls.hasOperatingStatus)
-                || (control && control.configured)
-                || active
-            ) {
-                group.style.display = 'inline';
+            const hasControl = !!(
+                control
+                && control.configured
+                && Array.isArray(control.options)
+                && control.options.length > 0
+            );
+
+            const shouldBeVisible =
+                hasControl
+                || (currentControls && currentControls.hasOperatingStatus)
+                || active;
+
+            // WICHTIG:
+            // Die Original-Card setzt diese Gruppen abhängig von ihren HA-States
+            // auf display:none. Für Symcon übernehmen wir die Sichtbarkeit selbst.
+            group.style.setProperty(
+                'display',
+                shouldBeVisible ? 'inline' : 'none',
+                'important'
+            );
+
+            if (!shouldBeVisible) {
+                return;
             }
+
+            // Originaldarstellung zurücksetzen, bevor wir den Zustand anwenden.
+            group.style.setProperty('visibility', 'visible', 'important');
 
             /*
              * Drei Zustände:
-             *
-             * 1. Steuerung = Aus:
-             *    grau und deutlich gedimmt
-             *
-             * 2. Steuerung freigegeben, Funktion läuft gerade nicht:
-             *    Originalfarben der lovelace-heat-pump-card unverändert
-             *
-             * 3. Zentrale Statusvariable meldet Funktion aktiv:
-             *    gleiche Originalfarben, aber heller/leuchtend
-             *
-             * Damit bleiben die vom Autor vorgesehenen Symbolfarben erhalten.
+             *   Aus        -> grau/gedimmt
+             *   Freigabe   -> Originaldarstellung
+             *   Aktiv      -> Originaldarstellung hell/leuchtend
              */
-            if (control && control.configured && !control.enabled) {
-                group.style.setProperty('filter', 'grayscale(1) brightness(0.65)', 'important');
+            if (hasControl && !control.enabled) {
+                group.style.setProperty(
+                    'filter',
+                    'grayscale(1) brightness(0.65)',
+                    'important'
+                );
                 group.style.setProperty('opacity', '0.55', 'important');
             } else if (active) {
                 group.style.setProperty(
                     'filter',
-                    'brightness(1.65) saturate(1.35) drop-shadow(0 0 4px rgba(255,255,255,0.65))',
+                    'brightness(1.7) saturate(1.35) drop-shadow(0 0 5px rgba(255,255,255,0.75))',
                     'important'
                 );
                 group.style.setProperty('opacity', '1', 'important');
@@ -1337,23 +1353,21 @@ class Waermepumpe extends IPSModuleStrict
                 group.style.setProperty('opacity', '1', 'important');
             }
 
-            if (
-                control
-                && control.configured
-                && Array.isArray(control.options)
-                && control.options.length > 0
-            ) {
-                group.style.cursor = 'pointer';
+            // Eigenes Symcon-Auswahlmenü.
+            if (hasControl) {
+                group.style.setProperty('cursor', 'pointer', 'important');
+                group.style.setProperty('pointer-events', 'all', 'important');
 
                 if (!group.dataset.symconControlBound) {
                     group.dataset.symconControlBound = '1';
+
                     group.addEventListener(
                         'click',
                         (event) => openModeMenu(definition.functionName, event)
                     );
                 }
             } else {
-                group.style.cursor = 'default';
+                group.style.setProperty('cursor', 'default', 'important');
             }
         });
     };
@@ -1421,6 +1435,13 @@ class Waermepumpe extends IPSModuleStrict
                     applyThemeColors(card);
                     applyControlIcons(card);
                     applyFanAnimation(card);
+
+                    // Die Original-Card kann im selben Render-Zyklus die
+                    // Statusgruppen nochmals ausblenden. Deshalb Sichtbarkeit
+                    // kurz danach nochmals durchsetzen.
+                    window.setTimeout(() => applyControlIcons(card), 60);
+                    window.setTimeout(() => applyControlIcons(card), 180);
+
                     return;
                 }
 
