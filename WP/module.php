@@ -174,7 +174,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('RefluxTemperatureHeating3', 0);
 
         // Kältekreis
-        $this->RegisterPropertyBoolean('ShowRefrigerantCircuit', true);
         $this->RegisterPropertyInteger('EvaporatorPressure', 0);
         $this->RegisterPropertyInteger('EvaporatorTemperature', 0);
         $this->RegisterPropertyInteger('CondenserPressure', 0);
@@ -308,13 +307,8 @@ class Waermepumpe extends IPSModuleStrict
 
             [
                 'type'    => 'ExpansionPanel',
-                'caption' => 'Kältekreis',
+                'caption' => 'Kältekreis (immer vorhanden)',
                 'items'   => [
-                    [
-                        'type'    => 'CheckBox',
-                        'name'    => 'ShowRefrigerantCircuit',
-                        'caption' => 'Kältekreis anzeigen'
-                    ],
                     $this->VariableRow('Verdampferdruck', 'EvaporatorPressure', 'Verdampfertemperatur', 'EvaporatorTemperature'),
                     $this->VariableRow('Verflüssigerdruck', 'CondenserPressure', 'Verflüssigertemperatur', 'CondenserTemperature'),
                     $this->VariableRow('Expansionsventil Öffnung', 'ExpansionValveOpening', 'Verdichterwert', 'CompressorValue')
@@ -560,7 +554,8 @@ class Waermepumpe extends IPSModuleStrict
         margin: 0;
         padding: 0;
         overflow: hidden;
-        background: transparent;
+        background: transparent !important;
+        color: inherit;
         font-family: Arial, sans-serif;
     }
 
@@ -685,6 +680,19 @@ class Waermepumpe extends IPSModuleStrict
             this.content.setAttribute('height', '100%');
             this.content.setAttribute('preserveAspectRatio', 'xMidYMid meet');
 
+            // Der Hintergrund gehört dem Symcon-Layout, nicht der Fremd-Card.
+            // Inline-Styles übersteuern die im Original-SVG fest eingetragenen
+            // weißen/schwarzen Hintergründe, ohne die Originaldatei zu ändern.
+            this.content.style.setProperty('background', 'transparent', 'important');
+            this.content.style.setProperty('background-color', 'transparent', 'important');
+            this.content.style.setProperty('--card-background-color', 'transparent');
+
+            // Text-/Linienfarbe möglichst aus dem aktuellen Layout übernehmen.
+            const layoutTextColor = getComputedStyle(document.body).color;
+            if (layoutTextColor) {
+                this.content.style.setProperty('--primary-text-color', layoutTextColor);
+            }
+
 
             const details = this.content.querySelector('#linkDetails');
             if (details && typeof this.linkHandling === 'function') {
@@ -751,6 +759,79 @@ class Waermepumpe extends IPSModuleStrict
         }
     };
 
+    const isEntityOn = (entityName) => {
+        if (!entityName || !currentStates || !currentStates[entityName]) {
+            return false;
+        }
+
+        const value = String(currentStates[entityName].state ?? '').trim().toLowerCase();
+        return ['1', 'true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value);
+    };
+
+    const setStroke = (svg, selector, value) => {
+        const element = svg.querySelector(selector);
+        if (element) {
+            element.style.stroke = value;
+        }
+    };
+
+    const applyCoolingVisualization = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+        const cooling = isEntityOn(currentConfig.heatingPumpCoolingMode);
+
+        /*
+         * Die Original-Card 0.9.0 blendet im Kühlbetrieb lediglich
+         * #gHPStatusCooling ein. Für Symcon drehen wir zusätzlich auf der
+         * Heiz-/Gebäudeseite Vorlauf und Rücklauf farblich um:
+         *
+         * Heizen:  Vorlauf rot, Rücklauf blau
+         * Kühlen:  Vorlauf blau, Rücklauf rot
+         *
+         * Warmwasser/Solarthermie bleiben unverändert.
+         */
+        const supplyColor = cooling ? '#0000ff' : '#ff0000';
+        const returnColor = cooling ? '#ff0000' : '#0000ff';
+
+        [
+            '#pathPipeToBuffer',
+            '#pathPipeToHeatingCircuitPump',
+            '#pathPipeToHeatingCircuitPump2',
+            '#pathPipeToHeatingCircuitPump3',
+            '#pathPipeBufferToHeating'
+        ].forEach((selector) => setStroke(svg, selector, supplyColor));
+
+        [
+            '#pathPipeFromBuffer',
+            '#pathPipeToHP',
+            '#pathPipeToHP2',
+            '#pathPipeHeatingToBuffer'
+        ].forEach((selector) => setStroke(svg, selector, returnColor));
+
+        // Heizkreis-Farbverläufe ebenfalls umdrehen.
+        [
+            ['#stopCircuit1', '#stopCircuit2'],
+            ['#stopCircuit3', '#stopCircuit4'],
+            ['#stopCircuit5', '#stopCircuit6']
+        ].forEach(([hotStopSelector, coldStopSelector]) => {
+            const hotStop = svg.querySelector(hotStopSelector);
+            const coldStop = svg.querySelector(coldStopSelector);
+
+            if (hotStop) {
+                hotStop.style.stopColor = cooling ? '#34109f' : '#a00f0f';
+            }
+            if (coldStop) {
+                coldStop.style.stopColor = cooling ? '#a00f0f' : '#34109f';
+            }
+        });
+
+        // Kennzeichnung am Root für spätere CSS-/Animations-Erweiterungen.
+        svg.dataset.operatingMode = cooling ? 'cooling' : 'heating';
+    };
+
     const applyCardData = () => {
         const card = document.getElementById('wp-card');
 
@@ -767,6 +848,8 @@ class Waermepumpe extends IPSModuleStrict
                 language: 'de-DE',
                 states: currentStates
             };
+
+            applyCoolingVisualization(card);
 
             // Die komplette Anlagen-Topologie übernimmt die originale
             // setConfig()-Logik der lovelace-heat-pump-card.
@@ -887,8 +970,6 @@ HTML;
             'heatingCircuitPumpRunning3'    => $this->EntityName('HeatingCircuitPumpRunning3'),
             'supplyTemperatureHeating3'     => $this->EntityName('SupplyTemperatureHeating3'),
             'refluxTemperatureHeating3'     => $this->EntityName('RefluxTemperatureHeating3'),
-
-            'showRefrigerantCircuit'          => $this->ReadPropertyBoolean('ShowRefrigerantCircuit'),
 
             'evaporatorPressure'            => $this->EntityName('EvaporatorPressure'),
             'evaporatorTemperature'         => $this->EntityName('EvaporatorTemperature'),
