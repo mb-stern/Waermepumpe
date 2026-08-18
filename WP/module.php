@@ -813,9 +813,13 @@ class Waermepumpe extends IPSModuleStrict
         cursor: pointer;
     }
 
-    #wp-mode-menu button:hover,
+    #wp-mode-menu button:hover {
+        background: rgba(127,127,127,.16);
+    }
+
     #wp-mode-menu button.active {
-        background: rgba(255,255,255,.14);
+        background: rgba(127,127,127,.34);
+        font-weight: 600;
     }
 </style>
 
@@ -1301,12 +1305,29 @@ class Waermepumpe extends IPSModuleStrict
         title.textContent = titles[functionName] || functionName;
         menu.appendChild(title);
 
+        const valuesEqual = (left, right) => {
+            const leftNumber = Number(left);
+            const rightNumber = Number(right);
+
+            if (!Number.isNaN(leftNumber) && !Number.isNaN(rightNumber)) {
+                return leftNumber === rightNumber;
+            }
+
+            return String(left) === String(right);
+        };
+
         control.options.forEach((option) => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.textContent = option.name;
-            if (String(option.value) === String(control.currentValue)) {
+
+            const selected = valuesEqual(option.value, control.currentValue);
+
+            button.textContent = (selected ? '✓ ' : '   ') + option.name;
+            button.dataset.value = String(option.value);
+
+            if (selected) {
                 button.classList.add('active');
+                button.setAttribute('aria-current', 'true');
             }
 
             button.addEventListener('click', (clickEvent) => {
