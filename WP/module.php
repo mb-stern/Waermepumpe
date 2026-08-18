@@ -252,18 +252,40 @@ class Waermepumpe extends IPSModuleStrict
 
             [
                 'type'    => 'ExpansionPanel',
-                'caption' => 'Wärmepumpe und Betriebszustände',
+                'caption' => 'Wärmepumpe – Messwerte',
                 'items'   => [
                     $this->VariableRow('Außentemperatur', 'OutdoorTemperature', 'Vorlauftemperatur WP', 'SupplyTemperature'),
                     $this->VariableRow('Quelle Eingang', 'TemperatureGroundWaterIn', 'Quelle Ausgang', 'TemperatureGroundWaterOut'),
+                    $this->VariableRow('Raumtemperatur normal', 'AmbientTemperatureNormal', 'Raumtemperatur reduziert', 'AmbientTemperatureReduced'),
+                    $this->VariableRow('Raumtemperatur Party', 'AmbientTemperatureParty', '', '')
+                ]
+            ],
+
+            [
+                'type'    => 'ExpansionPanel',
+                'caption' => 'Wärmepumpe – Betriebszustände',
+                'items'   => [
                     $this->VariableRow('Wärmepumpe läuft', 'HpRunning', 'Verdichter läuft', 'CompressorRunning'),
-                    $this->VariableRow('WP Ein/Aus', 'HeatingPumpStatusOnOff', 'Heizbetrieb', 'HeatingPumpHeatingMode'),
-                    $this->VariableRow('Warmwasserbetrieb', 'HeatingPumpHotWaterMode', 'Kühlbetrieb', 'HeatingPumpCoolingMode'),
-                    $this->VariableRow('Nachtbetrieb', 'HeatingPumpNightMode', 'Energiesparbetrieb', 'HeatingPumpEnergySaveMode'),
-                    $this->VariableRow('Partybetrieb', 'HeatingPumpPartyMode', 'Zusatzheizung', 'AdditionalHeating'),
-                    $this->VariableRow('Warnung', 'Warning', 'Fehler', 'Error'),
-                    $this->VariableRow('Abtaubetrieb', 'DefrostMode', 'Raumtemperatur normal', 'AmbientTemperatureNormal'),
-                    $this->VariableRow('Raumtemperatur reduziert', 'AmbientTemperatureReduced', 'Raumtemperatur Party', 'AmbientTemperatureParty')
+                    $this->VariableRow('WP Ein/Aus Status', 'HeatingPumpStatusOnOff', 'Zusatzheizung aktiv', 'AdditionalHeating'),
+                    $this->VariableRow('Abtaubetrieb aktiv', 'DefrostMode', '', '')
+                ]
+            ],
+
+            [
+                'type'    => 'ExpansionPanel',
+                'caption' => 'Wärmepumpe – Betriebsarten',
+                'items'   => [
+                    $this->VariableRow('Heizbetrieb', 'HeatingPumpHeatingMode', 'Warmwasserbetrieb', 'HeatingPumpHotWaterMode'),
+                    $this->VariableRow('Kühlbetrieb', 'HeatingPumpCoolingMode', 'Nachtbetrieb', 'HeatingPumpNightMode'),
+                    $this->VariableRow('Energiesparbetrieb', 'HeatingPumpEnergySaveMode', 'Partybetrieb', 'HeatingPumpPartyMode')
+                ]
+            ],
+
+            [
+                'type'    => 'ExpansionPanel',
+                'caption' => 'Wärmepumpe – Meldungen',
+                'items'   => [
+                    $this->VariableRow('Warnung', 'Warning', 'Fehler', 'Error')
                 ]
             ],
 
@@ -307,11 +329,11 @@ class Waermepumpe extends IPSModuleStrict
 
             [
                 'type'    => 'ExpansionPanel',
-                'caption' => 'Kältekreis (immer vorhanden)',
+                'caption' => 'Kältekreis',
                 'items'   => [
-                    $this->VariableRow('Verdampferdruck', 'EvaporatorPressure', 'Verdampfertemperatur', 'EvaporatorTemperature'),
-                    $this->VariableRow('Verflüssigerdruck', 'CondenserPressure', 'Verflüssigertemperatur', 'CondenserTemperature'),
-                    $this->VariableRow('Expansionsventil Öffnung', 'ExpansionValveOpening', 'Verdichterwert', 'CompressorValue')
+                    $this->VariableRow('Niederdruck', 'EvaporatorPressure', 'Verdampfungstemperatur', 'EvaporatorTemperature'),
+                    $this->VariableRow('Hochdruck', 'CondenserPressure', 'Kondensationstemperatur', 'CondenserTemperature'),
+                    $this->VariableRow('Expansionsventil Öffnung', 'ExpansionValveOpening', 'Verdichterdrehzahl', 'CompressorValue')
                 ]
             ],
 
