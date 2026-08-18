@@ -994,54 +994,113 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         const svg = card.content;
-        const cooling = isEntityOn(currentConfig.heatingPumpCoolingMode);
+        const cooling = stateIsOn(currentConfig.heatingPumpCoolingMode);
 
         /*
-         * Die Original-Card 0.9.0 blendet im Kühlbetrieb lediglich
-         * #gHPStatusCooling ein. Für Symcon drehen wir zusätzlich auf der
-         * Heiz-/Gebäudeseite Vorlauf und Rücklauf farblich um:
+         * WICHTIG:
+         * Verdampfer/Kondensator und ihre Messwerte bleiben unverändert.
+         * Die Original-Card kennt keine hydraulische Umschaltung im Kühlbetrieb.
          *
-         * Heizen:  Vorlauf rot, Rücklauf blau
-         * Kühlen:  Vorlauf blau, Rücklauf rot
+         * Wir ändern deshalb ausschließlich die Gebäudeseite:
          *
-         * Warmwasser/Solarthermie bleiben unverändert.
+         * Heizen:
+         *   Vorlauf  = warm / rot
+         *   Rücklauf = kalt / blau
+         *
+         * Kühlen:
+         *   Vorlauf  = kalt / blau
+         *   Rücklauf = wärmer / rot
          */
-        const supplyColor = cooling ? '#0000ff' : '#ff0000';
-        const returnColor = cooling ? '#ff0000' : '#0000ff';
+        const supplyColor = cooling ? '#0a84ff' : '#ff3b30';
+        const returnColor = cooling ? '#ff3b30' : '#0a84ff';
 
+        const setStrokeColor = (selector, color) => {
+            const element = svg.querySelector(selector);
+            if (element) {
+                element.style.setProperty('stroke', color, 'important');
+            }
+        };
+
+        const setFillColor = (selector, color) => {
+            const element = svg.querySelector(selector);
+            if (element) {
+                element.style.setProperty('fill', color, 'important');
+            }
+        };
+
+        // Heizwasserseite / Puffer / Heizkreise.
+        // Selektoren, die in einer bestimmten Topologie nicht existieren,
+        // werden einfach übersprungen.
         [
             '#pathPipeToBuffer',
             '#pathPipeToHeatingCircuitPump',
             '#pathPipeToHeatingCircuitPump2',
             '#pathPipeToHeatingCircuitPump3',
-            '#pathPipeBufferToHeating'
-        ].forEach((selector) => setStroke(svg, selector, supplyColor));
+            '#pathPipeBufferToHeating',
+            '#pathPipeTankHPToHeating',
+            '#pathPipeHeatingSupply',
+            '#pathPipeHeatingSupply2',
+            '#pathPipeHeatingSupply3'
+        ].forEach((selector) => setStrokeColor(selector, supplyColor));
 
         [
             '#pathPipeFromBuffer',
             '#pathPipeToHP',
             '#pathPipeToHP2',
-            '#pathPipeHeatingToBuffer'
-        ].forEach((selector) => setStroke(svg, selector, returnColor));
+            '#pathPipeHeatingToBuffer',
+            '#pathPipeHeatingReturn',
+            '#pathPipeHeatingReturn2',
+            '#pathPipeHeatingReturn3'
+        ].forEach((selector) => setStrokeColor(selector, returnColor));
 
-        // Heizkreis-Farbverläufe ebenfalls umdrehen.
-        [
+        // Falls die Heizkreise ihre Farben über SVG-Verläufe beziehen,
+        // diese im Kühlbetrieb ebenfalls umkehren.
+        const gradientPairs = [
             ['#stopCircuit1', '#stopCircuit2'],
             ['#stopCircuit3', '#stopCircuit4'],
             ['#stopCircuit5', '#stopCircuit6']
-        ].forEach(([hotStopSelector, coldStopSelector]) => {
-            const hotStop = svg.querySelector(hotStopSelector);
-            const coldStop = svg.querySelector(coldStopSelector);
+        ];
 
-            if (hotStop) {
-                hotStop.style.stopColor = cooling ? '#34109f' : '#a00f0f';
+        gradientPairs.forEach(([supplyStopSelector, returnStopSelector]) => {
+            const supplyStop = svg.querySelector(supplyStopSelector);
+            const returnStop = svg.querySelector(returnStopSelector);
+
+            if (supplyStop) {
+                supplyStop.style.setProperty('stop-color', supplyColor, 'important');
             }
-            if (coldStop) {
-                coldStop.style.stopColor = cooling ? '#a00f0f' : '#34109f';
+
+            if (returnStop) {
+                returnStop.style.setProperty('stop-color', returnColor, 'important');
             }
         });
 
-        // Kennzeichnung am Root für spätere CSS-/Animations-Erweiterungen.
+        // Heizkreis-Symbole optional leicht an den Modus anpassen, ohne
+        // die originale Geometrie/Topologie zu verändern.
+        if (cooling) {
+            [
+                '#gHeaterCircuit1',
+                '#gHeaterCircuit2',
+                '#gHeaterCircuit3'
+            ].forEach((selector) => {
+                const group = svg.querySelector(selector);
+                if (group) {
+                    group.dataset.symconCooling = '1';
+                }
+            });
+        } else {
+            [
+                '#gHeaterCircuit1',
+                '#gHeaterCircuit2',
+                '#gHeaterCircuit3'
+            ].forEach((selector) => {
+                const group = svg.querySelector(selector);
+                if (group) {
+                    delete group.dataset.symconCooling;
+                }
+            });
+        }
+
+        // Nur als interner Marker für spätere Erweiterungen.
         svg.dataset.operatingMode = cooling ? 'cooling' : 'heating';
     };
 
