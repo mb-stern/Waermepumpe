@@ -174,6 +174,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('RefluxTemperatureHeating3', 0);
 
         // Kältekreis
+        $this->RegisterPropertyBoolean('ShowRefrigerantCircuit', true);
         $this->RegisterPropertyInteger('EvaporatorPressure', 0);
         $this->RegisterPropertyInteger('EvaporatorTemperature', 0);
         $this->RegisterPropertyInteger('CondenserPressure', 0);
@@ -215,7 +216,9 @@ class Waermepumpe extends IPSModuleStrict
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
         if ($Message === VM_UPDATE) {
-            $this->PushVisualizationState(false);
+            // Gewünscht: Auch bei Wertänderungen die komplette HTML-SDK-Kachel
+            // neu aufbauen, damit Topologie und Anzeige immer synchron sind.
+            $this->ReloadVisualization();
         }
     }
 
@@ -235,7 +238,7 @@ class Waermepumpe extends IPSModuleStrict
         $elements = [
             [
                 'type'    => 'Label',
-                'caption' => 'Dynamische Wärmepumpengrafik auf Basis der lovelace-heat-pump-card 0.9.0.'
+                'caption' => 'Anlagenkomponenten werden durch die Konfiguration ein-/ausgeblendet. Messvariablen sind nur für Werte und Zustände erforderlich.'
             ],
             [
                 'type'    => 'Select',
@@ -307,6 +310,11 @@ class Waermepumpe extends IPSModuleStrict
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Kältekreis',
                 'items'   => [
+                    [
+                        'type'    => 'CheckBox',
+                        'name'    => 'ShowRefrigerantCircuit',
+                        'caption' => 'Kältekreis anzeigen'
+                    ],
                     $this->VariableRow('Verdampferdruck', 'EvaporatorPressure', 'Verdampfertemperatur', 'EvaporatorTemperature'),
                     $this->VariableRow('Verflüssigerdruck', 'CondenserPressure', 'Verflüssigertemperatur', 'CondenserTemperature'),
                     $this->VariableRow('Expansionsventil Öffnung', 'ExpansionValveOpening', 'Verdichterwert', 'CompressorValue')
@@ -357,26 +365,6 @@ class Waermepumpe extends IPSModuleStrict
             json_encode(
                 ['type' => 'reload'],
                 JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
-            )
-        );
-    }
-
-    private function PushVisualizationState(bool $reloadConfig): void
-    {
-        $payload = [
-            'type'   => $reloadConfig ? 'config' : 'states',
-            'config' => $reloadConfig ? $this->BuildCardConfig() : null,
-            'states' => $this->BuildHassStates()
-        ];
-
-        $this->UpdateVisualizationValue(
-            json_encode(
-                $payload,
-                JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_HEX_TAG
-                | JSON_HEX_AMP
-                | JSON_THROW_ON_ERROR
             )
         );
     }
@@ -788,12 +776,65 @@ class Waermepumpe extends IPSModuleStrict
 
             this.setConfig(this.config || {});
             this.setValues(hass || { language: 'de-DE', states: {} });
+
+            // Die äußere Initialisierung erzwingt direkt danach nochmals
+            // die Symcon-Topologie.
         } catch (error) {
             showError(
                 'Fehler beim Initialisieren der Wärmepumpen-Card:\\n'
                 + (error && error.stack ? error.stack : String(error))
             );
         }
+    };
+
+    const applyStructuralVisibility = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        const display = (selector, visible) => {
+            const element = svg.querySelector(selector);
+            if (element) {
+                element.style.display = visible ? 'inline' : 'none';
+            }
+        };
+
+        // Wärmepumpentyp: Die gewählte Quelle wird immer dargestellt,
+        // unabhängig davon, ob bereits Messwerte zugeordnet sind.
+        const hpType = currentConfig.heatingPumpType || 'A2W';
+        display('#gHPFan', hpType === 'A2W');
+        display('#gHPW2W', hpType === 'W2W');
+        display('#gHPG2W', hpType === 'G2W');
+
+        // Kältekreis separat schaltbar.
+        display('#gHPModel', currentConfig.showRefrigerantCircuit !== false);
+
+        // Speicher ausschließlich nach Anlagenkonfiguration.
+        display('#gTankHP', currentConfig.tankHP === true);
+        display('#gWW', currentConfig.tankWW === true);
+
+        // Heizkreise ausschließlich nach gewähltem Typ.
+        [
+            [1, currentConfig.heatingCircuitType1],
+            [2, currentConfig.heatingCircuitType2],
+            [3, currentConfig.heatingCircuitType3]
+        ].forEach(([number, type]) => {
+            const enabled = !!type && type !== 'off';
+            display('#gHeaterCircuit' + number, enabled);
+
+            if (enabled) {
+                display('#gHeaterCircuitFloor' + number, type === 'underfloor');
+                display('#radiator' + number, type === 'radiator');
+            }
+        });
+
+        // Solarthermie wird vom Schalter bestimmt, nicht von Sensoren.
+        display(
+            '#gThermalSolar',
+            currentConfig.thermalSolarAvailable === true
+        );
     };
 
     const applyCardData = () => {
@@ -812,6 +853,10 @@ class Waermepumpe extends IPSModuleStrict
                 language: 'de-DE',
                 states: currentStates
             };
+
+            // setConfig()/setValues() der Original-Card zuerst arbeiten lassen,
+            // anschließend die Symcon-Topologie nochmals eindeutig erzwingen.
+            applyStructuralVisibility(card);
         } catch (error) {
             showError(
                 'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
@@ -921,6 +966,8 @@ HTML;
             'heatingCircuitPumpRunning3'    => $this->EntityName('HeatingCircuitPumpRunning3'),
             'supplyTemperatureHeating3'     => $this->EntityName('SupplyTemperatureHeating3'),
             'refluxTemperatureHeating3'     => $this->EntityName('RefluxTemperatureHeating3'),
+
+            'showRefrigerantCircuit'          => $this->ReadPropertyBoolean('ShowRefrigerantCircuit'),
 
             'evaporatorPressure'            => $this->EntityName('EvaporatorPressure'),
             'evaporatorTemperature'         => $this->EntityName('EvaporatorTemperature'),
