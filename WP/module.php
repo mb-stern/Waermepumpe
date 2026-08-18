@@ -220,7 +220,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->SetVisualizationType(1);
 
         $this->SetBuffer('RegisteredVariables', '[]');
-        $this->SetBuffer('VisualizationRevision', '0');
     }
 
     public function ApplyChanges(): void
@@ -229,17 +228,23 @@ class Waermepumpe extends IPSModuleStrict
 
         $this->RegisterVariableMessages();
 
-        // Änderungen im Konfigurationsformular sofort an bereits offene
-        // HTML-SDK-Kacheln senden und dort vollständig neu aufbauen.
-        $this->ReloadVisualization();
+        // Wie im Energiefluss-Modul: Nach ApplyChanges die komplette
+        // HTML-SDK-Seite im Browser neu laden.
+        if (IPS_GetKernelRunlevel() === KR_READY) {
+            $this->ReloadHtml();
+        }
     }
 
     public function MessageSink(int $TimeStamp, int $SenderID, int $Message, array $Data): void
     {
-        if ($Message === VM_UPDATE) {
-            // Bei jeder überwachten Variablenänderung vollständigen aktuellen
-            // Zustand senden und die Card in der offenen Kachel neu erzeugen.
-            $this->ReloadVisualization();
+        try {
+            if ($Message === VM_UPDATE && IPS_GetKernelRunlevel() === KR_READY) {
+                // Fremd-Custom-Element komplett neu laden. Das entspricht dem
+                // bewährten ReloadHtml-Muster des Energiefluss-Moduls.
+                $this->ReloadHtml();
+            }
+        } catch (Throwable $e) {
+            $this->LogMessage('MessageSink: ' . $e->getMessage(), KL_ERROR);
         }
     }
 
@@ -287,7 +292,7 @@ class Waermepumpe extends IPSModuleStrict
             SetValue($variableId, $typedValue);
         }
 
-        $this->ReloadVisualization();
+        $this->ReloadHtml();
     }
 
     public function GetVisualizationTile(): string
@@ -457,29 +462,15 @@ class Waermepumpe extends IPSModuleStrict
 
     public function UpdateVisualization(): void
     {
-        // Button im Konfigurationsformular: komplette HTML-SDK-Kachel neu laden.
-        $this->ReloadVisualization();
+        $this->ReloadHtml();
     }
 
-    private function ReloadVisualization(): void
+    public function ReloadHtml(): void
     {
-        $revision = (int) $this->GetBuffer('VisualizationRevision') + 1;
-        $this->SetBuffer('VisualizationRevision', (string) $revision);
-
         $this->UpdateVisualizationValue(
             json_encode(
-                [
-                    'type'     => 'rebuild',
-                    'revision' => $revision,
-                    'config'   => $this->BuildCardConfig(),
-                    'states'   => $this->BuildHassStates(),
-                    'controls' => $this->BuildControlData()
-                ],
-                JSON_UNESCAPED_SLASHES
-                | JSON_UNESCAPED_UNICODE
-                | JSON_HEX_TAG
-                | JSON_HEX_AMP
-                | JSON_THROW_ON_ERROR
+                ['command' => 'reloadHtml'],
+                JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
             )
         );
     }
@@ -657,6 +648,15 @@ class Waermepumpe extends IPSModuleStrict
                 . '</div>';
         }
 
+        // Fachlich korrekte deutsche Bezeichnung. Die Original-de.json bleibt
+        // unangetastet und kann bei einem Update einfach ersetzt werden.
+        if (isset($localization['svgTexts']) && is_array($localization['svgTexts'])) {
+            $localization['svgTexts']['expansionValve'] = 'Expansionsventil';
+        }
+        if (isset($localization['editor']) && is_array($localization['editor'])) {
+            $localization['editor']['expansionValveOpening'] = 'Öffnung Expansionsventil';
+        }
+
         $configJson = json_encode(
             $this->BuildCardConfig(),
             JSON_UNESCAPED_SLASHES
@@ -700,8 +700,6 @@ class Waermepumpe extends IPSModuleStrict
             | JSON_HEX_QUOT
             | JSON_THROW_ON_ERROR
         );
-
-        $revision = (int) $this->GetBuffer('VisualizationRevision');
 
         $localizationJson = json_encode(
             $localization,
@@ -838,7 +836,6 @@ class Waermepumpe extends IPSModuleStrict
     let currentConfig = {$configJson};
     let currentStates = {$statesJson};
     let currentControls = {$controlsJson};
-    let currentRevision = {$revision};
 
     const embeddedSvg = {$svgJson};
     const embeddedLocalization = {$localizationJson};
@@ -1577,12 +1574,9 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
-        if (typeof data.revision === 'number' && data.revision < currentRevision) {
+        if (data.command === 'reloadHtml') {
+            window.location.reload();
             return;
-        }
-
-        if (typeof data.revision === 'number') {
-            currentRevision = data.revision;
         }
 
         if (data.config) {
