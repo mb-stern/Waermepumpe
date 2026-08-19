@@ -989,6 +989,116 @@ class Waermepumpe extends IPSModuleStrict
         }
     };
 
+    const applyRefrigerantFlowDirection = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+        const model = svg.querySelector('#gHPModel');
+
+        if (!model) {
+            return;
+        }
+
+        // Vorhandenes Symcon-Overlay entfernen, damit ein Reload/Neuaufbau
+        // keine doppelten Pfeile erzeugt.
+        const oldOverlay = svg.querySelector('#symconRefrigerantFlow');
+        if (oldOverlay) {
+            oldOverlay.remove();
+        }
+
+        const ns = 'http://www.w3.org/2000/svg';
+        const overlay = document.createElementNS(ns, 'g');
+        overlay.setAttribute('id', 'symconRefrigerantFlow');
+        overlay.setAttribute('pointer-events', 'none');
+
+        // Den tatsächlichen Bereich des Kältekreis-Modells verwenden.
+        const box = model.getBBox();
+        const cx = box.x + box.width / 2;
+        const cy = box.y + box.height / 2;
+
+        // Etwas innerhalb des äußeren Kreises bleiben, damit die Pfeile
+        // weder Text noch Rahmen überdecken.
+        const rx = box.width * 0.39;
+        const ry = box.height * 0.39;
+
+        const cooling = stateIsOn(currentConfig.heatingPumpCoolingMode);
+
+        /*
+         * Heizbetrieb:
+         * Verdampfer (links) -> Verdichter (oben) -> Verflüssiger (rechts)
+         * -> Expansionsventil (unten) -> Verdampfer
+         *
+         * Kühlbetrieb:
+         * gleiche grafische Elemente, aber Flussrichtung umgekehrt.
+         */
+        const direction = cooling ? -1 : 1;
+        const flowColor = cooling ? '#0a84ff' : '#ff9500';
+
+        const defs = document.createElementNS(ns, 'defs');
+        const markerEl = document.createElementNS(ns, 'marker');
+        markerEl.setAttribute('id', 'symconRefrigerantArrow');
+        markerEl.setAttribute('markerWidth', '7');
+        markerEl.setAttribute('markerHeight', '7');
+        markerEl.setAttribute('refX', '5.7');
+        markerEl.setAttribute('refY', '3.5');
+        markerEl.setAttribute('orient', 'auto');
+        markerEl.setAttribute('markerUnits', 'strokeWidth');
+
+        const arrowPath = document.createElementNS(ns, 'path');
+        arrowPath.setAttribute('d', 'M0,0 L7,3.5 L0,7 z');
+        arrowPath.setAttribute('fill', flowColor);
+        markerEl.appendChild(arrowPath);
+        defs.appendChild(markerEl);
+        overlay.appendChild(defs);
+
+        const point = (angleDeg) => {
+            const a = angleDeg * Math.PI / 180;
+            return {
+                x: cx + Math.cos(a) * rx,
+                y: cy + Math.sin(a) * ry
+            };
+        };
+
+        // Vier kurze Tangentialsegmente statt eines neuen kompletten Kreises.
+        // Dadurch bleibt die Originalgrafik unverändert sichtbar.
+        const centers = [-90, 0, 90, 180];
+
+        centers.forEach((centerAngle) => {
+            const span = 18;
+            const startAngle = centerAngle - span * direction;
+            const endAngle = centerAngle + span * direction;
+            const p1 = point(startAngle);
+            const p2 = point(endAngle);
+
+            const path = document.createElementNS(ns, 'path');
+
+            // Kurzer elliptischer Bogen; sweep hängt von der Betriebsrichtung ab.
+            const sweep = direction > 0 ? 1 : 0;
+            path.setAttribute(
+                'd',
+                `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} ` +
+                `A ${rx.toFixed(2)} ${ry.toFixed(2)} 0 0 ${sweep} ` +
+                `${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
+            );
+            path.setAttribute('fill', 'none');
+            path.setAttribute('stroke', flowColor);
+            path.setAttribute('stroke-width', '2.2');
+            path.setAttribute('stroke-linecap', 'round');
+            path.setAttribute('marker-end', 'url(#symconRefrigerantArrow)');
+            path.setAttribute('opacity', '0.95');
+
+            overlay.appendChild(path);
+        });
+
+        // Overlay direkt nach der Modellgruppe einfügen, damit die Pfeile
+        // sichtbar sind, aber der Rest der SVG-Struktur unangetastet bleibt.
+        if (model.parentNode) {
+            model.parentNode.insertBefore(overlay, model.nextSibling);
+        }
+    };
+
     const applyCoolingVisualization = (card) => {
         if (!card || !card.content) {
             return;
@@ -1527,6 +1637,7 @@ class Waermepumpe extends IPSModuleStrict
                     applyCoolingVisualization(card);
                     updateRefrigerantValues(card);
                     applyThemeColors(card);
+                    applyRefrigerantFlowDirection(card);
                     applyControlIcons(card);
                     applyFanAnimation(card);
 
