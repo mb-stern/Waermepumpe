@@ -1078,9 +1078,10 @@ class Waermepumpe extends IPSModuleStrict
             const sweep = direction > 0 ? 1 : 0;
             path.setAttribute(
                 'd',
-                `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} ` +
-                `A ${rx.toFixed(2)} ${ry.toFixed(2)} 0 0 ${sweep} ` +
-                `${p2.x.toFixed(2)} ${p2.y.toFixed(2)}`
+                'M ' + p1.x.toFixed(2) + ' ' + p1.y.toFixed(2)
+                + ' A ' + rx.toFixed(2) + ' ' + ry.toFixed(2)
+                + ' 0 0 ' + sweep + ' '
+                + p2.x.toFixed(2) + ' ' + p2.y.toFixed(2)
             );
             path.setAttribute('fill', 'none');
             path.setAttribute('stroke', flowColor);
