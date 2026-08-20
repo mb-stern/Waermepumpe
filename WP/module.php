@@ -1107,14 +1107,6 @@ class Waermepumpe extends IPSModuleStrict
                 return 0;
             };
 
-            /*
-             * Kandidaten zuerst nur sammeln. Danach werden verschachtelte
-             * Kandidaten entfernt. Sonst würde z.B. eine <g>-Gruppe UND
-             * deren enthaltene <path>-Elemente verschoben und der Offset
-             * dadurch mehrfach angewendet.
-             */
-            const candidates = [];
-
             Array.from(svg.querySelectorAll('path, rect, circle, ellipse, polygon, polyline, use, g'))
                 .forEach((element) => {
                     if (isProtected(element)) {
@@ -1150,6 +1142,10 @@ class Waermepumpe extends IPSModuleStrict
                         return;
                     }
 
+                    /*
+                     * Keine Gruppe verschieben, wenn sie Text enthält.
+                     * Damit bleiben Beschriftung und Messwerte exakt an Ort.
+                     */
                     if (
                         String(element.tagName || '').toLowerCase() === 'g'
                         && element.querySelector('text, tspan')
@@ -1157,62 +1153,20 @@ class Waermepumpe extends IPSModuleStrict
                         return;
                     }
 
-                    candidates.push({
-                        element,
-                        side,
-                        box,
-                        area: box.width * box.height
-                    });
-                });
-
-            /*
-             * Nur die äußersten passenden Elemente bewegen.
-             * Ist ein Kandidat bereits Kind eines anderen Kandidaten auf
-             * derselben Seite, wird er NICHT zusätzlich verschoben.
-             */
-            const roots = candidates.filter((candidate) => {
-                let parent = candidate.element.parentElement;
-
-                while (parent && parent !== svg) {
-                    const parentCandidate = candidates.find(
-                        (item) =>
-                            item.side === candidate.side
-                            && item.element === parent
-                    );
-
-                    if (parentCandidate) {
-                        return false;
+                    if (element.dataset.symconOriginalTransform === undefined) {
+                        element.dataset.symconOriginalTransform =
+                            element.getAttribute('transform') || '';
                     }
 
-                    parent = parent.parentElement;
-                }
+                    const original = element.dataset.symconOriginalTransform;
+                    const offset = side < 0 ? deltaX : -deltaX;
 
-                return true;
-            });
-
-            /*
-             * Falls durch die SVG-Struktur mehrere unabhängige Kleinteile
-             * übrig bleiben, werden sie jeweils genau einmal verschoben.
-             * Der Offset entspricht exakt dem Abstand der beiden ursprünglichen
-             * Wärmetauscher-Seiten.
-             */
-            roots.forEach((candidate) => {
-                const element = candidate.element;
-
-                if (element.dataset.symconOriginalTransform === undefined) {
-                    element.dataset.symconOriginalTransform =
-                        element.getAttribute('transform') || '';
-                }
-
-                const original = element.dataset.symconOriginalTransform;
-                const offset = candidate.side < 0 ? deltaX : -deltaX;
-
-                element.setAttribute(
-                    'transform',
-                    'translate(' + offset + ' 0)'
-                    + (original ? ' ' + original : '')
-                );
-            });
+                    element.setAttribute(
+                        'transform',
+                        'translate(' + offset + ' 0)'
+                        + (original ? ' ' + original : '')
+                    );
+                });
 
             svg.dataset.symconHeatExchangerGraphicsSwapped = '1';
         };
