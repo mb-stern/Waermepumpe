@@ -1550,25 +1550,80 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         const fanEntity = currentConfig.fanSpeed;
+
+        if (!fanEntity || !currentStates[fanEntity]) {
+            fan.classList.remove('rotate');
+            fan.style.animationDuration = '';
+            return;
+        }
+
+        const rawState = currentStates[fanEntity].state;
+        const normalized = String(rawState ?? '').trim().toLowerCase();
+
         let rpm = 0;
 
-        if (fanEntity && currentStates[fanEntity]) {
-            rpm = Number(currentStates[fanEntity].state);
+        /*
+         * Bool-Unterstützung:
+         * true/on/ein/aktiv = mittlere Lüfterleistung, entspricht ca. 250 U/min.
+         * false/off/aus     = Lüfter steht.
+         */
+        if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(normalized)) {
+            rpm = 250;
+        } else if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(normalized)) {
+            rpm = 0;
+        } else {
+            rpm = Number(rawState);
+
             if (Number.isNaN(rpm)) {
                 rpm = 0;
             }
         }
 
-        if (fanEntity) {
-            if (rpm > 0) {
-                fan.classList.add('rotate');
-                const duration = Math.max(0.35, Math.min(2.5, 1000 / rpm));
-                fan.style.animationDuration = duration.toFixed(2) + 's';
-            } else {
-                fan.classList.remove('rotate');
-                fan.style.animationDuration = '';
+        if (rpm <= 0) {
+            fan.classList.remove('rotate');
+            fan.style.animationDuration = '';
+            return;
+        }
+
+        /*
+         * Optische Kennlinie für reale 0–500 U/min.
+         *
+         * Ziel:
+         *   ca. 100 U/min -> 2.5 s/Umdrehung
+         *   ca. 200 U/min -> 1.8 s/Umdrehung
+         *   ca. 300 U/min -> 1.2 s/Umdrehung
+         *   ca. 400 U/min -> 0.8 s/Umdrehung
+         *   ca. 500 U/min -> 0.5 s/Umdrehung
+         *
+         * Zwischenwerte werden stufenlos interpoliert.
+         * Werte über 500 U/min werden auf die schnellste Darstellung begrenzt.
+         */
+        const clampedRpm = Math.max(0, Math.min(500, rpm));
+
+        const points = [
+            [0,   3.0],
+            [100, 2.5],
+            [200, 1.8],
+            [300, 1.2],
+            [400, 0.8],
+            [500, 0.5]
+        ];
+
+        let duration = 3.0;
+
+        for (let i = 0; i < points.length - 1; i++) {
+            const [rpm1, duration1] = points[i];
+            const [rpm2, duration2] = points[i + 1];
+
+            if (clampedRpm >= rpm1 && clampedRpm <= rpm2) {
+                const factor = (clampedRpm - rpm1) / (rpm2 - rpm1);
+                duration = duration1 + (duration2 - duration1) * factor;
+                break;
             }
         }
+
+        fan.classList.add('rotate');
+        fan.style.animationDuration = duration.toFixed(2) + 's';
     };
 
     document.addEventListener('click', (event) => {
