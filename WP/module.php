@@ -998,6 +998,207 @@ class Waermepumpe extends IPSModuleStrict
         setText('#textCondenserPressure', evaporatorPressure);
         setText('#textCondenserTemperature', evaporatorTemperature);
 
+        /*
+         * Nur die beiden Wärmetauscher-SYMBOLE tauschen.
+         *
+         * Keine geometrische Bereichssuche mehr und keine Verschiebung von
+         * Leitungen, Verdichter oder sonstigen SVG-Elementen.
+         *
+         * Wir suchen je Seite genau eine kompakte, textfreie Grafikgruppe,
+         * die räumlich am nächsten bei der jeweiligen Wärmetauscher-
+         * Beschriftung liegt. Danach werden deren echte Mittelpunkte exakt
+         * gegeneinander getauscht.
+         */
+        const swapHeatExchangerSymbols = () => {
+            if (svg.dataset.symconHeatExchangerSymbolsSwapped === '1') {
+                return;
+            }
+
+            const evaporatorText = svg.querySelector('#textEvaporator');
+            const condenserText = svg.querySelector('#textCondenser');
+
+            if (!evaporatorText || !condenserText) {
+                return;
+            }
+
+            const centerOf = (element) => {
+                const box = element.getBBox();
+                return {
+                    x: box.x + box.width / 2,
+                    y: box.y + box.height / 2,
+                    width: box.width,
+                    height: box.height
+                };
+            };
+
+            const evaporatorAnchor = centerOf(evaporatorText);
+            const condenserAnchor = centerOf(condenserText);
+
+            const compressorPath = svg.querySelector('#pathCompressor');
+            const compressorGroup = compressorPath
+                ? compressorPath.closest('g')
+                : null;
+
+            const protectedTextIds = [
+                'textEvaporator',
+                'textEvaporatorPressure',
+                'textEvaporatorTemperature',
+                'textCondenser',
+                'textCondenserPressure',
+                'textCondenserTemperature',
+                'textCompressor',
+                'textCompressorValue',
+                'textExpansionValve',
+                'textExpansionValveOpening'
+            ];
+
+            const containsProtectedText = (group) => {
+                return protectedTextIds.some((id) => group.querySelector('#' + id));
+            };
+
+            const containsCompressor = (group) => {
+                return !!(
+                    group.querySelector('#pathCompressor')
+                    || (compressorGroup && (group === compressorGroup || group.contains(compressorGroup)))
+                );
+            };
+
+            const findNearestSymbolGroup = (anchor, wantedSide) => {
+                const groups = Array.from(svg.querySelectorAll('g'));
+                const candidates = [];
+
+                groups.forEach((group) => {
+                    if (
+                        containsProtectedText(group)
+                        || containsCompressor(group)
+                        || group.querySelector('text, tspan')
+                    ) {
+                        return;
+                    }
+
+                    let box;
+                    try {
+                        box = group.getBBox();
+                    } catch (error) {
+                        return;
+                    }
+
+                    if (
+                        !box
+                        || box.width < 8
+                        || box.height < 8
+                        || box.width > 120
+                        || box.height > 120
+                    ) {
+                        return;
+                    }
+
+                    const cx = box.x + box.width / 2;
+                    const cy = box.y + box.height / 2;
+
+                    // Verdampfer links, Verflüssiger rechts:
+                    if (wantedSide < 0 && cx >= evaporatorAnchor.x + 80) {
+                        return;
+                    }
+                    if (wantedSide > 0 && cx <= condenserAnchor.x - 80) {
+                        return;
+                    }
+
+                    const dx = cx - anchor.x;
+                    const dy = cy - anchor.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+
+                    // Nur wirklich nahe beim zugehörigen Beschriftungsblock.
+                    if (distance > 170) {
+                        return;
+                    }
+
+                    candidates.push({
+                        group,
+                        cx,
+                        cy,
+                        distance,
+                        area: box.width * box.height
+                    });
+                });
+
+                if (candidates.length === 0) {
+                    return null;
+                }
+
+                /*
+                 * Erst Nähe, bei fast gleicher Nähe die größere Gruppe.
+                 * Damit wird eher das komplette Symbol statt eines kleinen
+                 * Unterelements gewählt.
+                 */
+                candidates.sort((a, b) => {
+                    const distanceDifference = a.distance - b.distance;
+                    if (Math.abs(distanceDifference) > 12) {
+                        return distanceDifference;
+                    }
+                    return b.area - a.area;
+                });
+
+                let selected = candidates[0];
+
+                /*
+                 * Falls die gewählte Gruppe noch in einer ebenfalls kompakten,
+                 * textfreien Kandidatengruppe steckt, die nur wenig größer ist,
+                 * die äußere Gruppe verwenden. So bleibt das Symbol vollständig.
+                 */
+                let parent = selected.group.parentElement;
+                while (parent && parent !== svg) {
+                    const parentCandidate = candidates.find((item) => item.group === parent);
+                    if (!parentCandidate) {
+                        break;
+                    }
+
+                    selected = parentCandidate;
+                    parent = parent.parentElement;
+                }
+
+                return selected;
+            };
+
+            const evaporatorSymbol = findNearestSymbolGroup(evaporatorAnchor, -1);
+            const condenserSymbol = findNearestSymbolGroup(condenserAnchor, 1);
+
+            if (
+                !evaporatorSymbol
+                || !condenserSymbol
+                || evaporatorSymbol.group === condenserSymbol.group
+            ) {
+                return;
+            }
+
+            const moveExactly = (item, target) => {
+                const group = item.group;
+
+                if (group.dataset.symconOriginalTransform === undefined) {
+                    group.dataset.symconOriginalTransform =
+                        group.getAttribute('transform') || '';
+                }
+
+                const original = group.dataset.symconOriginalTransform;
+                const dx = target.cx - item.cx;
+                const dy = target.cy - item.cy;
+
+                group.setAttribute(
+                    'transform',
+                    'translate(' + dx + ' ' + dy + ')'
+                    + (original ? ' ' + original : '')
+                );
+            };
+
+            // Exakt Mittelpunkt gegen Mittelpunkt, inklusive Y-Position.
+            moveExactly(evaporatorSymbol, condenserSymbol);
+            moveExactly(condenserSymbol, evaporatorSymbol);
+
+            svg.dataset.symconHeatExchangerSymbolsSwapped = '1';
+        };
+
+        swapHeatExchangerSymbols();
+
         svg.dataset.refrigerantCircuitDirection = 'reversed';
     };
 
