@@ -998,6 +998,82 @@ class Waermepumpe extends IPSModuleStrict
         setText('#textCondenserPressure', evaporatorPressure);
         setText('#textCondenserTemperature', evaporatorTemperature);
 
+        /*
+         * Im Kühlbetrieb auch die grafischen Wärmetauscher-Symbole tauschen.
+         * Beschriftung und Messwerte bleiben an ihren Positionen; nur die
+         * nicht-textlichen Elemente der beiden Wärmetauscher wechseln die Seite.
+         */
+        const findHeatExchangerGroup = (labelSelector, pressureSelector, temperatureSelector) => {
+            const label = svg.querySelector(labelSelector);
+            if (!label) {
+                return null;
+            }
+
+            let group = label.parentElement;
+            while (group && group !== svg) {
+                if (
+                    group.tagName
+                    && group.tagName.toLowerCase() === 'g'
+                    && group.querySelector(pressureSelector)
+                    && group.querySelector(temperatureSelector)
+                ) {
+                    return group;
+                }
+                group = group.parentElement;
+            }
+
+            return null;
+        };
+
+        const evaporatorGroup = findHeatExchangerGroup(
+            '#textEvaporator',
+            '#textEvaporatorPressure',
+            '#textEvaporatorTemperature'
+        );
+        const condenserGroup = findHeatExchangerGroup(
+            '#textCondenser',
+            '#textCondenserPressure',
+            '#textCondenserTemperature'
+        );
+
+        if (evaporatorGroup && condenserGroup && evaporatorGroup !== condenserGroup) {
+            const evaporatorBox = evaporatorGroup.getBBox();
+            const condenserBox = condenserGroup.getBBox();
+            const deltaX =
+                (condenserBox.x + condenserBox.width / 2)
+                - (evaporatorBox.x + evaporatorBox.width / 2);
+
+            const moveGraphics = (group, offsetX) => {
+                Array.from(group.children).forEach((element) => {
+                    const isText =
+                        element.tagName
+                        && element.tagName.toLowerCase() === 'text';
+                    const containsText =
+                        element.querySelector
+                        && element.querySelector('text');
+
+                    if (isText || containsText) {
+                        return;
+                    }
+
+                    if (element.dataset.symconOriginalTransform === undefined) {
+                        element.dataset.symconOriginalTransform =
+                            element.getAttribute('transform') || '';
+                    }
+
+                    const originalTransform = element.dataset.symconOriginalTransform;
+                    element.setAttribute(
+                        'transform',
+                        'translate(' + offsetX + ' 0)'
+                        + (originalTransform ? ' ' + originalTransform : '')
+                    );
+                });
+            };
+
+            moveGraphics(evaporatorGroup, deltaX);
+            moveGraphics(condenserGroup, -deltaX);
+        }
+
         svg.dataset.refrigerantCircuitDirection = 'reversed';
     };
 
