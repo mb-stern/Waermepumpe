@@ -1403,19 +1403,43 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
-        const offIcon = card.content.querySelector('#gHPStatusOff');
-        if (!offIcon) {
-            return;
+        const setConfiguredVisibility = (selector, configured) => {
+            const element = card.content.querySelector(selector);
+            if (!element) {
+                return;
+            }
+
+            if (!configured) {
+                element.style.setProperty('display', 'none', 'important');
+                element.style.setProperty('visibility', 'hidden', 'important');
+            } else {
+                element.style.removeProperty('visibility');
+                element.style.removeProperty('display');
+            }
+        };
+
+        // Wärmepumpe Ein/Aus:
+        // Ohne Datenpunkt kein "Aus"-Symbol anzeigen.
+        setConfiguredVisibility(
+            '#gHPStatusOff',
+            !!currentConfig.heatingPumpStatusOnOff
+        );
+
+        // Tag/Nacht:
+        // Die Original-Card zeigt ohne Variable automatisch die Sonne.
+        // In Symcon werden Sonne UND Mond nur angezeigt, wenn eine
+        // Nachtbetriebsvariable tatsächlich konfiguriert ist.
+        const nightModeConfigured = !!currentConfig.heatingPumpNightMode;
+        if (!nightModeConfigured) {
+            setConfiguredVisibility('#gTimeSymbolDay', false);
+            setConfiguredVisibility('#gTimeSymbolNight', false);
         }
 
-        // Die Original-Card wertet einen fehlenden Ein/Aus-Datenpunkt wie "Aus"
-        // und blendet dadurch das Aus-Symbol ein. In Symcon ist der Datenpunkt
-        // optional: Ohne Zuordnung wird das Symbol vollständig ausgeblendet.
-        if (!currentConfig.heatingPumpStatusOnOff) {
-            offIcon.style.setProperty('display', 'none', 'important');
-            offIcon.style.setProperty('visibility', 'hidden', 'important');
-        } else {
-            offIcon.style.removeProperty('visibility');
+        // Warmwasser-/Heizungs-Umschaltventil:
+        // Die Original-Card zeichnet es in Grundstellung auch ohne Datenpunkt.
+        // Ohne Zuordnung soll das Ventilsymbol vollständig verschwinden.
+        if (!currentConfig.wwHeatingValve) {
+            setConfiguredVisibility('#gWWHeatingValve', false);
         }
     };
 
