@@ -999,24 +999,48 @@ class Waermepumpe extends IPSModuleStrict
         setText('#textCondenserTemperature', evaporatorTemperature);
 
         /*
-         * Im Kühlbetrieb auch die grafischen Wärmetauscher-Symbole tauschen.
-         * Beschriftung und Messwerte bleiben an ihren Positionen; nur die
-         * nicht-textlichen Elemente der beiden Wärmetauscher wechseln die Seite.
+         * Genau wie Beschriftung, Druck und Temperatur wird im Kühlbetrieb
+         * auch der grafische Wärmetauscherinhalt getauscht.
+         *
+         * Wir verschieben nichts. Stattdessen suchen wir in der Original-SVG
+         * die grafischen Elemente/Gruppen mit "Evaporator" bzw. "Condenser"
+         * im ID-Namen und tauschen deren Inhalt an Ort und Stelle.
          */
-        const findHeatExchangerGroup = (labelSelector, pressureSelector, temperatureSelector) => {
-            const label = svg.querySelector(labelSelector);
-            if (!label) {
+        const findGraphicGroup = (terms) => {
+            const all = Array.from(svg.querySelectorAll('[id]'));
+
+            const candidate = all.find((element) => {
+                const id = String(element.id || '').toLowerCase();
+
+                if (!terms.some((term) => id.includes(term))) {
+                    return false;
+                }
+
+                // Die Textfelder haben wir oben bereits separat getauscht.
+                if (
+                    id.startsWith('text')
+                    || element.tagName.toLowerCase() === 'text'
+                    || element.tagName.toLowerCase() === 'tspan'
+                ) {
+                    return false;
+                }
+
+                return true;
+            });
+
+            if (!candidate) {
                 return null;
             }
 
-            let group = label.parentElement;
+            // Wenn der Treffer selbst eine Gruppe ist, direkt benutzen.
+            if (candidate.tagName && candidate.tagName.toLowerCase() === 'g') {
+                return candidate;
+            }
+
+            // Sonst die kleinste umgebende Grafikgruppe verwenden.
+            let group = candidate.parentElement;
             while (group && group !== svg) {
-                if (
-                    group.tagName
-                    && group.tagName.toLowerCase() === 'g'
-                    && group.querySelector(pressureSelector)
-                    && group.querySelector(temperatureSelector)
-                ) {
+                if (group.tagName && group.tagName.toLowerCase() === 'g') {
                     return group;
                 }
                 group = group.parentElement;
@@ -1025,53 +1049,36 @@ class Waermepumpe extends IPSModuleStrict
             return null;
         };
 
-        const evaporatorGroup = findHeatExchangerGroup(
-            '#textEvaporator',
-            '#textEvaporatorPressure',
-            '#textEvaporatorTemperature'
-        );
-        const condenserGroup = findHeatExchangerGroup(
-            '#textCondenser',
-            '#textCondenserPressure',
-            '#textCondenserTemperature'
-        );
+        const evaporatorGraphic = findGraphicGroup([
+            'evaporator',
+            'verdampfer'
+        ]);
 
-        if (evaporatorGroup && condenserGroup && evaporatorGroup !== condenserGroup) {
-            const evaporatorBox = evaporatorGroup.getBBox();
-            const condenserBox = condenserGroup.getBBox();
-            const deltaX =
-                (condenserBox.x + condenserBox.width / 2)
-                - (evaporatorBox.x + evaporatorBox.width / 2);
+        const condenserGraphic = findGraphicGroup([
+            'condenser',
+            'kondensator',
+            'verfluessiger',
+            'verflüssiger'
+        ]);
 
-            const moveGraphics = (group, offsetX) => {
-                Array.from(group.children).forEach((element) => {
-                    const isText =
-                        element.tagName
-                        && element.tagName.toLowerCase() === 'text';
-                    const containsText =
-                        element.querySelector
-                        && element.querySelector('text');
+        if (
+            evaporatorGraphic
+            && condenserGraphic
+            && evaporatorGraphic !== condenserGraphic
+            && !svg.dataset.symconHeatExchangerGraphicsSwapped
+        ) {
+            /*
+             * Nur die Inhalte tauschen. Die Gruppenpositionen bleiben bestehen,
+             * dadurch sitzt das Kondensator-Symbol links bzw. das
+             * Verdampfer-Symbol rechts, ohne Koordinaten berechnen zu müssen.
+             */
+            const evaporatorContent = evaporatorGraphic.innerHTML;
+            const condenserContent = condenserGraphic.innerHTML;
 
-                    if (isText || containsText) {
-                        return;
-                    }
+            evaporatorGraphic.innerHTML = condenserContent;
+            condenserGraphic.innerHTML = evaporatorContent;
 
-                    if (element.dataset.symconOriginalTransform === undefined) {
-                        element.dataset.symconOriginalTransform =
-                            element.getAttribute('transform') || '';
-                    }
-
-                    const originalTransform = element.dataset.symconOriginalTransform;
-                    element.setAttribute(
-                        'transform',
-                        'translate(' + offsetX + ' 0)'
-                        + (originalTransform ? ' ' + originalTransform : '')
-                    );
-                });
-            };
-
-            moveGraphics(evaporatorGroup, deltaX);
-            moveGraphics(condenserGroup, -deltaX);
+            svg.dataset.symconHeatExchangerGraphicsSwapped = '1';
         }
 
         svg.dataset.refrigerantCircuitDirection = 'reversed';
