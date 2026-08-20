@@ -350,7 +350,7 @@ class Waermepumpe extends IPSModuleStrict
 
                     ['type' => 'Label', 'caption' => 'Betriebszustände'],
                     $this->VariableGrid([
-                        ['caption' => 'Wärmepumpe Ein/Aus (optional)', 'name' => 'HeatingPumpStatusOnOff'],
+                        ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff'],
                         ['caption' => 'Nachtbetrieb aktiv', 'name' => 'HeatingPumpNightMode'],
                         ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
                         ['caption' => 'Partybetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
@@ -371,13 +371,6 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut'],
                         ['caption' => 'Lüfterdrehzahl / Lüfter aktiv', 'name' => 'FanSpeed']
                     ]),
-                    [
-                        'type'  => 'RowLayout',
-                        'items' => [
-                            ['type' => 'ValidationTextBox', 'name' => 'FanActiveStatusValues', 'caption' => 'Lüfter – Statuswerte']
-                        ]
-                    ],
-
                     ['type' => 'Label', 'caption' => 'Temperaturen'],
                     $this->VariableGrid([
                         ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
