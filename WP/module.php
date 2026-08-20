@@ -59,6 +59,7 @@ class Waermepumpe extends IPSModuleStrict
 
         'OutdoorTemperature',
         'AmbientTemperatureNormal',
+        'AmbientTemperatureActual',
         'AmbientTemperatureReduced',
         'AmbientTemperatureParty',
         'SupplyTemperature',
@@ -154,6 +155,7 @@ class Waermepumpe extends IPSModuleStrict
 
         $this->RegisterPropertyInteger('OutdoorTemperature', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureNormal', 0);
+        $this->RegisterPropertyInteger('AmbientTemperatureActual', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureReduced', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureParty', 0);
         $this->RegisterPropertyInteger('SupplyTemperature', 0);
@@ -328,9 +330,10 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableGrid([
                         ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
                         ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
-                        ['caption' => 'Quelle Eingang', 'name' => 'TemperatureGroundWaterIn'],
-                        ['caption' => 'Quelle Ausgang', 'name' => 'TemperatureGroundWaterOut'],
-                        ['caption' => 'Raumtemperatur Normal', 'name' => 'AmbientTemperatureNormal'],
+                        ['caption' => 'Quelle Eingang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterIn'],
+                        ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut'],
+                        ['caption' => 'Raumtemperatur Soll', 'name' => 'AmbientTemperatureNormal'],
+                        ['caption' => 'Raumtemperatur Ist (optional)', 'name' => 'AmbientTemperatureActual'],
                         ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
                         ['caption' => 'Raumtemperatur Party', 'name' => 'AmbientTemperatureParty']
                     ]),
@@ -357,7 +360,7 @@ class Waermepumpe extends IPSModuleStrict
                     ['type' => 'Label', 'caption' => 'Betriebszustände'],
                     $this->VariableGrid([
                         ['caption' => 'Verdichter aktiv', 'name' => 'CompressorRunning'],
-                        ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff'],
+                        ['caption' => 'Wärmepumpe Ein/Aus (optional)', 'name' => 'HeatingPumpStatusOnOff'],
                         ['caption' => 'Nachtbetrieb aktiv', 'name' => 'HeatingPumpNightMode'],
                         ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
                         ['caption' => 'Partybetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
@@ -1379,6 +1382,27 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
+    const applyOptionalStatusVisibility = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const offIcon = card.content.querySelector('#gHPStatusOff');
+        if (!offIcon) {
+            return;
+        }
+
+        // Die Original-Card wertet einen fehlenden Ein/Aus-Datenpunkt wie "Aus"
+        // und blendet dadurch das Aus-Symbol ein. In Symcon ist der Datenpunkt
+        // optional: Ohne Zuordnung wird das Symbol vollständig ausgeblendet.
+        if (!currentConfig.heatingPumpStatusOnOff) {
+            offIcon.style.setProperty('display', 'none', 'important');
+            offIcon.style.setProperty('visibility', 'hidden', 'important');
+        } else {
+            offIcon.style.removeProperty('visibility');
+        }
+    };
+
     const applyControlIcons = (card) => {
         if (!card || !card.content) {
             return;
@@ -1537,14 +1561,15 @@ class Waermepumpe extends IPSModuleStrict
                     updateRefrigerantValues(card);
                     applyThemeColors(card);
                     applyRefrigerantCircuitMode(card);
+                    applyOptionalStatusVisibility(card);
                     applyControlIcons(card);
                     applyFanAnimation(card);
 
                     // Die Original-Card kann im selben Render-Zyklus die
                     // Statusgruppen nochmals ausblenden. Deshalb Sichtbarkeit
                     // kurz danach nochmals durchsetzen.
-                    window.setTimeout(() => applyControlIcons(card), 60);
-                    window.setTimeout(() => applyControlIcons(card), 180);
+                    window.setTimeout(() => { applyOptionalStatusVisibility(card); applyControlIcons(card); }, 60);
+                    window.setTimeout(() => { applyOptionalStatusVisibility(card); applyControlIcons(card); }, 180);
 
                     return;
                 }
@@ -1651,7 +1676,7 @@ HTML;
             'additionalHeating'            => $this->EntityName('AdditionalHeating'),
 
             'outdoorTemperature'           => $this->EntityName('OutdoorTemperature'),
-            'ambientTemperatureNormal'     => $this->EntityName('AmbientTemperatureNormal'),
+            'ambientTemperatureNormal'      => $this->EntityNameWithFallback('AmbientTemperatureNormal', 'AmbientTemperatureActual'),
             'ambientTemperatureReduced'    => $this->EntityName('AmbientTemperatureReduced'),
             'ambientTemperatureParty'      => $this->EntityName('AmbientTemperatureParty'),
             'supplyTemperature'            => $this->EntityName('SupplyTemperature'),
@@ -1894,6 +1919,16 @@ HTML;
             3       => (string) $value,
             default => $value
         };
+    }
+
+    private function EntityNameWithFallback(string $primaryProperty, string $fallbackProperty): ?string
+    {
+        $primaryId = $this->ReadPropertyInteger($primaryProperty);
+        if ($primaryId > 0 && IPS_VariableExists($primaryId)) {
+            return 'ips_' . $primaryId;
+        }
+
+        return $this->EntityName($fallbackProperty);
     }
 
     private function EntityName(string $property): ?string
