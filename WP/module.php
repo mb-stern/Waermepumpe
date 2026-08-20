@@ -326,25 +326,10 @@ class Waermepumpe extends IPSModuleStrict
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Wärmepumpe',
                 'items'   => [
-                    ['type' => 'Label', 'caption' => 'Temperaturen'],
-                    $this->VariableGrid([
-                        ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
-                        ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
-                        ['caption' => 'Quelle Eingang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterIn'],
-                        ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut'],
-                        ['caption' => 'Raumtemperatur Soll', 'name' => 'AmbientTemperatureNormal'],
-                        ['caption' => 'Raumtemperatur Ist (optional)', 'name' => 'AmbientTemperatureActual'],
-                        ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
-                        ['caption' => 'Raumtemperatur Party', 'name' => 'AmbientTemperatureParty']
-                    ]),
 
-                    ['type' => 'Label', 'caption' => 'Status und Steuerung'],
+                    ['type' => 'Label', 'caption' => 'Betriebsstatus'],
                     $this->VariableGrid([
-                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable'],
-                        ['caption' => 'Betriebsart Heizen (Integer)', 'name' => 'HeatingControlVariable'],
-                        ['caption' => 'Betriebsart Warmwasser (Integer)', 'name' => 'HotWaterControlVariable'],
-                        ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable'],
-                        ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed']
+                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable']
                     ]),
                     [
                         'type'  => 'RowLayout',
@@ -352,32 +337,70 @@ class Waermepumpe extends IPSModuleStrict
                             ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHeatingValues', 'caption' => 'Heizen – Statuswerte'],
                             ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHotWaterValues', 'caption' => 'Warmwasser – Statuswerte'],
                             ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusCoolingValues', 'caption' => 'Kühlen – Statuswerte'],
-                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusDefrostValues', 'caption' => 'Abtauen – Statuswerte'],
-                            ['type' => 'ValidationTextBox', 'name' => 'FanActiveStatusValues', 'caption' => 'Lüfter – Statuswerte']
+                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusDefrostValues', 'caption' => 'Abtauen – Statuswerte']
                         ]
                     ],
 
+                    ['type' => 'Label', 'caption' => 'Betriebsarten und Steuerung'],
+                    $this->VariableGrid([
+                        ['caption' => 'Betriebsart Heizen (Integer)', 'name' => 'HeatingControlVariable'],
+                        ['caption' => 'Betriebsart Warmwasser (Integer)', 'name' => 'HotWaterControlVariable'],
+                        ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable']
+                    ]),
+
                     ['type' => 'Label', 'caption' => 'Betriebszustände'],
                     $this->VariableGrid([
-                        ['caption' => 'Verdichter aktiv', 'name' => 'CompressorRunning'],
                         ['caption' => 'Wärmepumpe Ein/Aus (optional)', 'name' => 'HeatingPumpStatusOnOff'],
                         ['caption' => 'Nachtbetrieb aktiv', 'name' => 'HeatingPumpNightMode'],
                         ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
                         ['caption' => 'Partybetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
-                        ['caption' => 'Zusatzheizung aktiv', 'name' => 'AdditionalHeating']
+                        ['caption' => 'Zusatzheizung aktiv', 'name' => 'AdditionalHeating'],
+                        ['caption' => 'Warnung aktiv', 'name' => 'Warning'],
+                        ['caption' => 'Fehler aktiv', 'name' => 'Error']
+                    ]),
+
+                    ['type' => 'Label', 'caption' => 'Verdichter'],
+                    $this->VariableGrid([
+                        ['caption' => 'Verdichter aktiv', 'name' => 'CompressorRunning'],
+                        ['caption' => 'Verdichterdrehzahl', 'name' => 'CompressorValue']
+                    ]),
+
+                    ['type' => 'Label', 'caption' => 'Primärquelle'],
+                    $this->VariableGrid([
+                        ['caption' => 'Quelle Eingang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterIn'],
+                        ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut'],
+                        ['caption' => 'Lüfterdrehzahl / Lüfter aktiv', 'name' => 'FanSpeed']
+                    ]),
+                    [
+                        'type'  => 'RowLayout',
+                        'items' => [
+                            ['type' => 'ValidationTextBox', 'name' => 'FanActiveStatusValues', 'caption' => 'Lüfter – Statuswerte']
+                        ]
+                    ],
+
+                    ['type' => 'Label', 'caption' => 'Temperaturen'],
+                    $this->VariableGrid([
+                        ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
+                        ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature']
+                    ]),
+
+                    ['type' => 'Label', 'caption' => 'Raumtemperaturen'],
+                    $this->VariableGrid([
+                        ['caption' => 'Raumtemperatur Normal', 'name' => 'AmbientTemperatureNormal'],
+                        ['caption' => 'Raumtemperatur Ist (Fallback)', 'name' => 'AmbientTemperatureActual'],
+                        ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
+                        ['caption' => 'Raumtemperatur Party', 'name' => 'AmbientTemperatureParty']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Kältekreis'],
                     $this->VariableGrid([
-                        ['caption' => 'Warnung aktiv', 'name' => 'Warning'],
-                        ['caption' => 'Fehler aktiv', 'name' => 'Error'],
                         ['caption' => 'Niederdruck', 'name' => 'EvaporatorPressure'],
                         ['caption' => 'Verdampfungstemperatur', 'name' => 'EvaporatorTemperature'],
                         ['caption' => 'Hochdruck', 'name' => 'CondenserPressure'],
                         ['caption' => 'Kondensationstemperatur', 'name' => 'CondenserTemperature'],
-                        ['caption' => 'Expansionsventil Öffnung', 'name' => 'ExpansionValveOpening'],
-                        ['caption' => 'Verdichterdrehzahl', 'name' => 'CompressorValue']
+                        ['caption' => 'Expansionsventil Öffnung', 'name' => 'ExpansionValveOpening']
                     ])
+
                 ]
             ],
 
@@ -1676,6 +1699,8 @@ HTML;
             'additionalHeating'            => $this->EntityName('AdditionalHeating'),
 
             'outdoorTemperature'           => $this->EntityName('OutdoorTemperature'),
+            // Original-Card-Feld: ambientTemperatureNormal.
+            // Wenn kein Normalwert konfiguriert ist, wird die Raumtemperatur Ist verwendet.
             'ambientTemperatureNormal'      => $this->EntityNameWithFallback('AmbientTemperatureNormal', 'AmbientTemperatureActual'),
             'ambientTemperatureReduced'    => $this->EntityName('AmbientTemperatureReduced'),
             'ambientTemperatureParty'      => $this->EntityName('AmbientTemperatureParty'),
