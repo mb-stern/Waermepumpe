@@ -928,6 +928,67 @@ class Waermepumpe extends IPSModuleStrict
         return embeddedSvg;
     };
 
+    /*
+     * Speicher-Farbskala direkt in der Original-Card ersetzen.
+     * Dadurch verwendet deren eigenes tankColors() automatisch unsere Skala
+     * und nichts muss nachträglich an SVG-Gradienten überschrieben werden.
+     *
+     * 20 °C blau
+     * 35 °C türkis
+     * 45 °C grün
+     * 50 °C gelb
+     * 55 °C orange
+     * 65 °C rot
+     */
+    HeatPumpClass.prototype.tempColor = function(temp) {
+        const value = Number(temp);
+
+        if (!Number.isFinite(value)) {
+            return '#ffffff00';
+        }
+
+        const stops = [
+            [20, [33, 150, 243]],
+            [35, [0, 188, 212]],
+            [45, [76, 175, 80]],
+            [50, [255, 235, 59]],
+            [55, [255, 152, 0]],
+            [65, [244, 67, 54]]
+        ];
+
+        const toHex = (rgb) =>
+            '#' + rgb.map((component) =>
+                Math.max(0, Math.min(255, Math.round(component)))
+                    .toString(16)
+                    .padStart(2, '0')
+            ).join('');
+
+        if (value <= stops[0][0]) {
+            return toHex(stops[0][1]);
+        }
+
+        const last = stops[stops.length - 1];
+        if (value >= last[0]) {
+            return toHex(last[1]);
+        }
+
+        for (let i = 0; i < stops.length - 1; i++) {
+            const t1 = stops[i][0];
+            const c1 = stops[i][1];
+            const t2 = stops[i + 1][0];
+            const c2 = stops[i + 1][1];
+
+            if (value >= t1 && value <= t2) {
+                const factor = (value - t1) / (t2 - t1);
+                return toHex(c1.map((component, index) =>
+                    component + (c2[index] - component) * factor
+                ));
+            }
+        }
+
+        return '#ffffff00';
+    };
+
     HeatPumpClass.prototype.readLocalization = function(lang, hass) {
         try {
             HeatPumpClass.localization = embeddedLocalization;
@@ -1539,105 +1600,6 @@ class Waermepumpe extends IPSModuleStrict
     };
 
 
-    const applyTankTemperatureColors = (card) => {
-        if (!card || !card.content) {
-            return;
-        }
-
-        // Praxisgerechte Skala: 20 blau, 35 türkis, 45 grün,
-        // 50 gelb, 55 orange, 65 rot.
-        const colorStops = [
-            [20, [33, 150, 243]],
-            [35, [0, 188, 212]],
-            [45, [76, 175, 80]],
-            [50, [255, 235, 59]],
-            [55, [255, 152, 0]],
-            [65, [244, 67, 54]]
-        ];
-
-        const rgbString = (rgb) =>
-            'rgb(' + rgb[0] + ', ' + rgb[1] + ', ' + rgb[2] + ')';
-
-        const temperatureColor = (temperature) => {
-            const value = Number(temperature);
-            if (!Number.isFinite(value)) return null;
-
-            if (value <= colorStops[0][0]) {
-                return rgbString(colorStops[0][1]);
-            }
-
-            const last = colorStops[colorStops.length - 1];
-            if (value >= last[0]) {
-                return rgbString(last[1]);
-            }
-
-            for (let i = 0; i < colorStops.length - 1; i++) {
-                const t1 = colorStops[i][0];
-                const c1 = colorStops[i][1];
-                const t2 = colorStops[i + 1][0];
-                const c2 = colorStops[i + 1][1];
-
-                if (value >= t1 && value <= t2) {
-                    const f = (value - t1) / (t2 - t1);
-                    const rgb = c1.map((component, index) =>
-                        Math.round(component + (c2[index] - component) * f)
-                    );
-                    return rgbString(rgb);
-                }
-            }
-
-            return null;
-        };
-
-        const stateValue = (entity) => {
-            if (!entity || !currentStates[entity]) return null;
-            const value = Number(currentStates[entity].state);
-            return Number.isFinite(value) ? value : null;
-        };
-
-        const setStop = (selector, temperature) => {
-            const stop = card.content.querySelector(selector);
-            const color = temperatureColor(temperature);
-            if (stop && color) {
-                stop.setAttribute('stop-color', color);
-                stop.style.setProperty('stop-color', color, 'important');
-            }
-        };
-
-        const applyTank = (enabled, upEntity, middleEntity, downEntity, stops) => {
-            if (!enabled) return;
-
-            const up = stateValue(upEntity);
-            if (up === null) return;
-
-            let middle = stateValue(middleEntity);
-            let down = stateValue(downEntity);
-
-            if (middle === null) middle = up - 5;
-            if (down === null) down = middle - 5;
-
-            setStop(stops.up, up);
-            setStop(stops.middle, middle);
-            setStop(stops.down, down);
-        };
-
-        applyTank(
-            !!currentConfig.tankHP,
-            currentConfig.tankTempHPUp,
-            currentConfig.tankTempHPMiddle,
-            currentConfig.tankTempHPDown,
-            {up: '#stop3020', middle: '#stop3040', down: '#stop3030'}
-        );
-
-        applyTank(
-            !!currentConfig.tankWW,
-            currentConfig.tankTempWWUp,
-            currentConfig.tankTempWWMiddle,
-            currentConfig.tankTempWWDown,
-            {up: '#stop3050', middle: '#stop3070', down: '#stop3060'}
-        );
-    };
-
     const applyThreeHeaterRods = (card) => {
         if (!card || !card.content) {
             return;
@@ -1651,17 +1613,17 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
-        const heaterRodCount = Math.max(0, Math.min(3, Number(currentConfig.heaterRodCount || 0)));
+        const heaterRodCount = Math.max(
+            0,
+            Math.min(3, Number(currentConfig.heaterRodCount || 0))
+        );
 
-        // Bei aktivierter Drei-Heizstab-Erweiterung wird der einzelne
-        // Original-Heizstab der Lovelace-Card vollständig unterdrückt.
-        if (heaterRodCount > 0) {
-            original.style.setProperty('display', 'none', 'important');
-            original.style.setProperty('visibility', 'hidden', 'important');
-        } else {
-            original.style.removeProperty('display');
-            original.style.removeProperty('visibility');
-        }
+        /*
+         * Der einzelne Original-WW-Heizstab wird grundsätzlich unterdrückt.
+         * Sonst würde er bei Anzahl 0 durch heaterRodWW wieder erscheinen.
+         */
+        original.style.setProperty('display', 'none', 'important');
+        original.style.setProperty('visibility', 'hidden', 'important');
 
         const ensureRod = (id, y) => {
             let rod = svg.querySelector('#' + id);
@@ -1669,13 +1631,17 @@ class Waermepumpe extends IPSModuleStrict
             if (!rod) {
                 rod = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 rod.setAttribute('id', id);
-                // Drei klar getrennte Heizstäbe innerhalb des WW-Speichers.
-                // Form entspricht bewusst dem Original: horizontale Stabform
-                // mit kurzem Bogen am inneren Ende.
+
+                /*
+                 * Geometrie bewusst unabhängig vom Originalpfad.
+                 * Anschluss rechts an der Speicherwand, Heizstab nach links.
+                 */
                 rod.setAttribute(
                     'd',
-                    'm 745 ' + y + ' h -40 c -4.7507 0 -5.0111 -10 0 -10 h 40'
+                    'M 745 ' + y + ' H 705 C 699 ' + y + ' 699 ' + (y - 10)
+                    + ' 705 ' + (y - 10) + ' H 745'
                 );
+
                 rod.setAttribute('fill', 'none');
                 tankGroup.appendChild(rod);
             }
@@ -1683,40 +1649,81 @@ class Waermepumpe extends IPSModuleStrict
             rod.style.setProperty('fill', 'none', 'important');
             rod.style.setProperty('stroke-width', '5', 'important');
             rod.style.setProperty('stroke-linecap', 'round', 'important');
-            rod.style.setProperty('stroke', '#ffe082', 'important');
+            rod.style.setProperty('stroke-linejoin', 'round', 'important');
+
             return rod;
         };
 
+        /*
+         * Die drei Positionen liegen gut verteilt im WW-Speicher.
+         * Inaktiv bleibt der vorhandene Stab sichtbar, aber dezent.
+         * Aktiv erhält jede Stufe eine klar erkennbare warme Farbe.
+         */
         const rods = [
-            { element: ensureRod('pathHeaterRodWW1', 495), entity: currentConfig.heaterRod1 },
-            { element: ensureRod('pathHeaterRodWW2', 535), entity: currentConfig.heaterRod2 },
-            { element: ensureRod('pathHeaterRodWW3', 575), entity: currentConfig.heaterRod3 }
+            {
+                element: ensureRod('pathHeaterRodWW1', 485),
+                entity: currentConfig.heaterRod1,
+                activeColor: '#fff176'
+            },
+            {
+                element: ensureRod('pathHeaterRodWW2', 525),
+                entity: currentConfig.heaterRod2,
+                activeColor: '#ffb300'
+            },
+            {
+                element: ensureRod('pathHeaterRodWW3', 565),
+                entity: currentConfig.heaterRod3,
+                activeColor: '#ff6d00'
+            }
         ];
 
         const isActive = (entity) => {
-            if (!entity || !currentStates[entity]) {
+            if (!entity || !currentStates || !currentStates[entity]) {
                 return false;
             }
 
-            const value = String(currentStates[entity].state ?? '').trim().toLowerCase();
+            const raw = currentStates[entity].state;
+            const value = String(raw ?? '').trim().toLowerCase();
 
-            if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
+            if (['1', 'true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
                 return true;
             }
-            if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
+
+            if (['0', 'false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
                 return false;
             }
 
-            const numeric = Number(value);
+            const numeric = Number(raw);
             return Number.isFinite(numeric) && numeric !== 0;
         };
 
-        rods.forEach(({element, entity}, index) => {
-            const configuredRod = index < heaterRodCount;
-            const active = configuredRod && !!entity && isActive(entity);
+        rods.forEach((rodInfo, index) => {
+            const exists = index < heaterRodCount;
 
-            element.style.setProperty('display', active ? 'block' : 'none', 'important');
-            element.style.setProperty('visibility', active ? 'visible' : 'hidden', 'important');
+            if (!exists) {
+                rodInfo.element.style.setProperty('display', 'none', 'important');
+                rodInfo.element.style.setProperty('visibility', 'hidden', 'important');
+                return;
+            }
+
+            const active = isActive(rodInfo.entity);
+
+            rodInfo.element.style.setProperty('display', 'block', 'important');
+            rodInfo.element.style.setProperty('visibility', 'visible', 'important');
+            rodInfo.element.style.setProperty(
+                'stroke',
+                active ? rodInfo.activeColor : 'rgba(255,255,255,0.55)',
+                'important'
+            );
+
+            /*
+             * Kontur erhöht den Kontrast auch bei rotem/orangem Speicher.
+             */
+            rodInfo.element.style.setProperty(
+                'filter',
+                'drop-shadow(0 0 1.5px rgba(0,0,0,0.95))',
+                'important'
+            );
         });
     };
 
@@ -1937,7 +1944,6 @@ class Waermepumpe extends IPSModuleStrict
                         applyThemeColors(this);
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
-                        applyTankTemperatureColors(this);
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
@@ -1965,7 +1971,6 @@ class Waermepumpe extends IPSModuleStrict
                 applyThemeColors(card);
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
-                applyTankTemperatureColors(card);
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
