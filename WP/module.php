@@ -1665,9 +1665,9 @@ class Waermepumpe extends IPSModuleStrict
          * 3 Heizstäbe -> 565 / 595 / 625
          */
         const rodPositions = {
-            1: [625],
-            2: [595, 625],
-            3: [565, 595, 625]
+            1: [610],
+            2: [580, 610],
+            3: [550, 580, 610]
         };
 
         const configuredPositions = rodPositions[heaterRodCount] || [];
@@ -1681,7 +1681,7 @@ class Waermepumpe extends IPSModuleStrict
         const rods = [0, 1, 2].map((index) => ({
             element: ensureRod(
                 'pathHeaterRodWW' + (index + 1),
-                configuredPositions[index] || 625
+                configuredPositions[index] || 610
             ),
             entity: rodEntities[index],
             activeColor: rodColors[index]
