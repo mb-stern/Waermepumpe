@@ -220,8 +220,11 @@ class Waermepumpe extends IPSModuleStrict
         // Erweiterte Symcon-Darstellung: drei echte Heizstäbe im Warmwasserspeicher
         $this->RegisterPropertyInteger('HeaterRodCount', 0);
         $this->RegisterPropertyInteger('HeaterRod1', 0);
+        $this->RegisterPropertyFloat('HeaterRod1Threshold', 1.0);
         $this->RegisterPropertyInteger('HeaterRod2', 0);
+        $this->RegisterPropertyFloat('HeaterRod2Threshold', 1.0);
         $this->RegisterPropertyInteger('HeaterRod3', 0);
+        $this->RegisterPropertyFloat('HeaterRod3Threshold', 1.0);
 
         // Solarthermie
         $this->RegisterPropertyBoolean('ThermalSolarAvailable', false);
@@ -426,23 +429,59 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableRow('Puffer unten', 'TankTempHPDown', 'Warmwasser unten', 'TankTempWWDown'),
                     $this->VariableRow('Speicherladepumpe aktiv', 'StorageChargingPumpRunning', 'Zirkulationspumpe aktiv', 'CirculatingPumpRunning'),
                     $this->VariableRow('Umschaltventil Warmwasser/Heizung', 'WWHeatingValve', 'Heizstab Puffer aktiv', 'HeaterRodHP'),
+                    ['type' => 'Label', 'caption' => 'Heizstäbe Warmwasserspeicher'],
                     [
-                        'type' => 'Select',
-                        'name' => 'HeaterRodCount',
-                        'caption' => 'Anzahl Heizstäbe',
-                        'options' => [
-                            ['caption' => 'Keine', 'value' => 0],
-                            ['caption' => '1', 'value' => 1],
-                            ['caption' => '2', 'value' => 2],
-                            ['caption' => '3', 'value' => 3]
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'Select',
+                                'name' => 'HeaterRodCount',
+                                'caption' => 'Anzahl Heizstäbe',
+                                'options' => [
+                                    ['caption' => 'Keine', 'value' => 0],
+                                    ['caption' => '1', 'value' => 1],
+                                    ['caption' => '2', 'value' => 2],
+                                    ['caption' => '3', 'value' => 3]
+                                ]
+                            ]
                         ]
                     ],
-                    $this->VariableGrid([
-                        ['caption' => 'Heizstab 1 aktiv', 'name' => 'HeaterRod1'],
-                        ['caption' => 'Heizstab 2 aktiv', 'name' => 'HeaterRod2'],
-                        ['caption' => 'Heizstab 3 aktiv', 'name' => 'HeaterRod3']
-                    ])
-                ]
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            $this->VariableSelect('Heizstab 1', 'HeaterRod1'),
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'HeaterRod1Threshold',
+                                'caption' => 'Ein ab',
+                                'digits' => 1
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            $this->VariableSelect('Heizstab 2', 'HeaterRod2'),
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'HeaterRod2Threshold',
+                                'caption' => 'Ein ab',
+                                'digits' => 1
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            $this->VariableSelect('Heizstab 3', 'HeaterRod3'),
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'HeaterRod3Threshold',
+                                'caption' => 'Ein ab',
+                                'digits' => 1
+                            ]
+                        ]
+                    ]                ]
             ],
 
             $this->HeatingCircuitPanel(1),
@@ -512,6 +551,15 @@ class Waermepumpe extends IPSModuleStrict
                     ''
                 )
             ]
+        ];
+    }
+
+    private function VariableSelect(string $caption, string $name): array
+    {
+        return [
+            'type'     => 'SelectVariable',
+            'name'     => $name,
+            'caption'  => $caption
         ];
     }
 
@@ -1676,6 +1724,11 @@ class Waermepumpe extends IPSModuleStrict
             currentConfig.heaterRod2,
             currentConfig.heaterRod3
         ];
+        const rodThresholds = [
+            currentConfig.heaterRod1Threshold,
+            currentConfig.heaterRod2Threshold,
+            currentConfig.heaterRod3Threshold
+        ];
         const rodColors = ['#fff176', '#ffb300', '#ff6d00'];
 
         const rods = [0, 1, 2].map((index) => ({
@@ -1684,27 +1737,30 @@ class Waermepumpe extends IPSModuleStrict
                 configuredPositions[index] || 610
             ),
             entity: rodEntities[index],
+            threshold: rodThresholds[index],
             activeColor: rodColors[index]
         }));
 
-        const isActive = (entity) => {
+        const isActive = (entity, threshold) => {
             if (!entity || !currentStates || !currentStates[entity]) {
                 return false;
             }
 
             const raw = currentStates[entity].state;
             const value = String(raw ?? '').trim().toLowerCase();
+            const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : 1;
 
-            if (['1', 'true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
-                return true;
+            // Bool: true entspricht 1, false entspricht 0.
+            if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
+                return 1 >= limit;
             }
 
-            if (['0', 'false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
-                return false;
+            if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
+                return 0 >= limit;
             }
 
             const numeric = Number(raw);
-            return Number.isFinite(numeric) && numeric !== 0;
+            return Number.isFinite(numeric) && numeric >= limit;
         };
 
         rods.forEach((rodInfo, index) => {
@@ -1716,7 +1772,7 @@ class Waermepumpe extends IPSModuleStrict
                 return;
             }
 
-            const active = isActive(rodInfo.entity);
+            const active = isActive(rodInfo.entity, rodInfo.threshold);
 
             rodInfo.element.style.setProperty('display', 'block', 'important');
             rodInfo.element.style.setProperty('visibility', 'visible', 'important');
@@ -2136,8 +2192,11 @@ HTML;
             // Symcon-Erweiterung für drei getrennte Heizstäbe
             'heaterRodCount'                => $this->ReadPropertyInteger('HeaterRodCount'),
             'heaterRod1'                    => $this->EntityName('HeaterRod1'),
+            'heaterRod1Threshold'           => $this->ReadPropertyFloat('HeaterRod1Threshold'),
             'heaterRod2'                    => $this->EntityName('HeaterRod2'),
+            'heaterRod2Threshold'           => $this->ReadPropertyFloat('HeaterRod2Threshold'),
             'heaterRod3'                    => $this->EntityName('HeaterRod3'),
+            'heaterRod3Threshold'           => $this->ReadPropertyFloat('HeaterRod3Threshold'),
 
             'thermalSolarAvailable'         => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
             'thermalSolarPump'              => $this->EntityName('ThermalSolarPump'),
