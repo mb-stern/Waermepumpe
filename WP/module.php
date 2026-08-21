@@ -1661,17 +1661,17 @@ class Waermepumpe extends IPSModuleStrict
          */
         const rods = [
             {
-                element: ensureRod('pathHeaterRodWW1', 485),
+                element: ensureRod('pathHeaterRodWW1', 535),
                 entity: currentConfig.heaterRod1,
                 activeColor: '#fff176'
             },
             {
-                element: ensureRod('pathHeaterRodWW2', 525),
+                element: ensureRod('pathHeaterRodWW2', 565),
                 entity: currentConfig.heaterRod2,
                 activeColor: '#ffb300'
             },
             {
-                element: ensureRod('pathHeaterRodWW3', 565),
+                element: ensureRod('pathHeaterRodWW3', 595),
                 entity: currentConfig.heaterRod3,
                 activeColor: '#ff6d00'
             }
