@@ -37,6 +37,9 @@ class Waermepumpe extends IPSModuleStrict
         'HeaterRodHP',
         'HeaterRodLevel1',
         'HeaterRodLevel2',
+        'HeaterRod1',
+        'HeaterRod2',
+        'HeaterRod3',
         'ThermalSolarPump'
     ];
 
@@ -101,6 +104,9 @@ class Waermepumpe extends IPSModuleStrict
         'HeaterRodHP',
         'HeaterRodLevel1',
         'HeaterRodLevel2',
+        'HeaterRod1',
+        'HeaterRod2',
+        'HeaterRod3',
 
         'ThermalSolarPump',
         'ThermalSolarPumpSpeed',
@@ -210,6 +216,12 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('HeaterRodHP', 0);
         $this->RegisterPropertyInteger('HeaterRodLevel1', 0);
         $this->RegisterPropertyInteger('HeaterRodLevel2', 0);
+
+        // Erweiterte Symcon-Darstellung: drei echte Heizstäbe im Warmwasserspeicher
+        $this->RegisterPropertyInteger('HeaterRodCount', 0);
+        $this->RegisterPropertyInteger('HeaterRod1', 0);
+        $this->RegisterPropertyInteger('HeaterRod2', 0);
+        $this->RegisterPropertyInteger('HeaterRod3', 0);
 
         // Solarthermie
         $this->RegisterPropertyBoolean('ThermalSolarAvailable', false);
@@ -413,9 +425,23 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableRow('Puffer Mitte', 'TankTempHPMiddle', 'Warmwasser Mitte', 'TankTempWWMiddle'),
                     $this->VariableRow('Puffer unten', 'TankTempHPDown', 'Warmwasser unten', 'TankTempWWDown'),
                     $this->VariableRow('Speicherladepumpe aktiv', 'StorageChargingPumpRunning', 'Zirkulationspumpe aktiv', 'CirculatingPumpRunning'),
-                    $this->VariableRow('Umschaltventil Warmwasser/Heizung', 'WWHeatingValve', 'Heizstab Warmwasser aktiv', 'HeaterRodWW'),
-                    $this->VariableRow('Heizstab Puffer aktiv', 'HeaterRodHP', 'Heizstab Stufe 1 aktiv', 'HeaterRodLevel1'),
-                    $this->VariableRow('Heizstab Stufe 2 aktiv', 'HeaterRodLevel2', '', '')
+                    $this->VariableRow('Umschaltventil Warmwasser/Heizung', 'WWHeatingValve', 'Heizstab Puffer aktiv', 'HeaterRodHP'),
+                    [
+                        'type' => 'Select',
+                        'name' => 'HeaterRodCount',
+                        'caption' => 'Anzahl Heizstäbe',
+                        'options' => [
+                            ['caption' => 'Keine', 'value' => 0],
+                            ['caption' => '1', 'value' => 1],
+                            ['caption' => '2', 'value' => 2],
+                            ['caption' => '3', 'value' => 3]
+                        ]
+                    ],
+                    $this->VariableGrid([
+                        ['caption' => 'Heizstab 1 aktiv', 'name' => 'HeaterRod1'],
+                        ['caption' => 'Heizstab 2 aktiv', 'name' => 'HeaterRod2'],
+                        ['caption' => 'Heizstab 3 aktiv', 'name' => 'HeaterRod3']
+                    ])
                 ]
             ],
 
@@ -1351,7 +1377,7 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         requestAnimationFrame(() => {
-            window.setTimeout(() => applyCardData(), 0);
+            queueMicrotask(() => applyCardData());
         });
     };
 
@@ -1510,6 +1536,188 @@ class Waermepumpe extends IPSModuleStrict
         if (!currentConfig.wwHeatingValve) {
             setConfiguredVisibility('#gWWHeatingValve', false);
         }
+    };
+
+
+    const applyTankTemperatureColors = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        // Praxisgerechte Skala: 20 blau, 35 türkis, 45 grün,
+        // 50 gelb, 55 orange, 65 rot.
+        const colorStops = [
+            [20, [33, 150, 243]],
+            [35, [0, 188, 212]],
+            [45, [76, 175, 80]],
+            [50, [255, 235, 59]],
+            [55, [255, 152, 0]],
+            [65, [244, 67, 54]]
+        ];
+
+        const rgbString = (rgb) =>
+            'rgb(' + rgb[0] + ', ' + rgb[1] + ', ' + rgb[2] + ')';
+
+        const temperatureColor = (temperature) => {
+            const value = Number(temperature);
+            if (!Number.isFinite(value)) return null;
+
+            if (value <= colorStops[0][0]) {
+                return rgbString(colorStops[0][1]);
+            }
+
+            const last = colorStops[colorStops.length - 1];
+            if (value >= last[0]) {
+                return rgbString(last[1]);
+            }
+
+            for (let i = 0; i < colorStops.length - 1; i++) {
+                const t1 = colorStops[i][0];
+                const c1 = colorStops[i][1];
+                const t2 = colorStops[i + 1][0];
+                const c2 = colorStops[i + 1][1];
+
+                if (value >= t1 && value <= t2) {
+                    const f = (value - t1) / (t2 - t1);
+                    const rgb = c1.map((component, index) =>
+                        Math.round(component + (c2[index] - component) * f)
+                    );
+                    return rgbString(rgb);
+                }
+            }
+
+            return null;
+        };
+
+        const stateValue = (entity) => {
+            if (!entity || !currentStates[entity]) return null;
+            const value = Number(currentStates[entity].state);
+            return Number.isFinite(value) ? value : null;
+        };
+
+        const setStop = (selector, temperature) => {
+            const stop = card.content.querySelector(selector);
+            const color = temperatureColor(temperature);
+            if (stop && color) {
+                stop.setAttribute('stop-color', color);
+                stop.style.setProperty('stop-color', color, 'important');
+            }
+        };
+
+        const applyTank = (enabled, upEntity, middleEntity, downEntity, stops) => {
+            if (!enabled) return;
+
+            const up = stateValue(upEntity);
+            if (up === null) return;
+
+            let middle = stateValue(middleEntity);
+            let down = stateValue(downEntity);
+
+            if (middle === null) middle = up - 5;
+            if (down === null) down = middle - 5;
+
+            setStop(stops.up, up);
+            setStop(stops.middle, middle);
+            setStop(stops.down, down);
+        };
+
+        applyTank(
+            !!currentConfig.tankHP,
+            currentConfig.tankTempHPUp,
+            currentConfig.tankTempHPMiddle,
+            currentConfig.tankTempHPDown,
+            {up: '#stop3020', middle: '#stop3040', down: '#stop3030'}
+        );
+
+        applyTank(
+            !!currentConfig.tankWW,
+            currentConfig.tankTempWWUp,
+            currentConfig.tankTempWWMiddle,
+            currentConfig.tankTempWWDown,
+            {up: '#stop3050', middle: '#stop3070', down: '#stop3060'}
+        );
+    };
+
+    const applyThreeHeaterRods = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+        const tankGroup = svg.querySelector('#gTankWW');
+        const original = svg.querySelector('#pathHeaterRodWW');
+
+        if (!tankGroup || !original) {
+            return;
+        }
+
+        const heaterRodCount = Math.max(0, Math.min(3, Number(currentConfig.heaterRodCount || 0)));
+
+        // Bei aktivierter Drei-Heizstab-Erweiterung wird der einzelne
+        // Original-Heizstab der Lovelace-Card vollständig unterdrückt.
+        if (heaterRodCount > 0) {
+            original.style.setProperty('display', 'none', 'important');
+            original.style.setProperty('visibility', 'hidden', 'important');
+        } else {
+            original.style.removeProperty('display');
+            original.style.removeProperty('visibility');
+        }
+
+        const ensureRod = (id, y) => {
+            let rod = svg.querySelector('#' + id);
+
+            if (!rod) {
+                rod = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                rod.setAttribute('id', id);
+                // Drei klar getrennte Heizstäbe innerhalb des WW-Speichers.
+                // Form entspricht bewusst dem Original: horizontale Stabform
+                // mit kurzem Bogen am inneren Ende.
+                rod.setAttribute(
+                    'd',
+                    'm 745 ' + y + ' h -40 c -4.7507 0 -5.0111 -10 0 -10 h 40'
+                );
+                rod.setAttribute('fill', 'none');
+                tankGroup.appendChild(rod);
+            }
+
+            rod.style.setProperty('fill', 'none', 'important');
+            rod.style.setProperty('stroke-width', '5', 'important');
+            rod.style.setProperty('stroke-linecap', 'round', 'important');
+            rod.style.setProperty('stroke', '#ffe082', 'important');
+            return rod;
+        };
+
+        const rods = [
+            { element: ensureRod('pathHeaterRodWW1', 495), entity: currentConfig.heaterRod1 },
+            { element: ensureRod('pathHeaterRodWW2', 535), entity: currentConfig.heaterRod2 },
+            { element: ensureRod('pathHeaterRodWW3', 575), entity: currentConfig.heaterRod3 }
+        ];
+
+        const isActive = (entity) => {
+            if (!entity || !currentStates[entity]) {
+                return false;
+            }
+
+            const value = String(currentStates[entity].state ?? '').trim().toLowerCase();
+
+            if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
+                return true;
+            }
+            if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
+                return false;
+            }
+
+            const numeric = Number(value);
+            return Number.isFinite(numeric) && numeric !== 0;
+        };
+
+        rods.forEach(({element, entity}, index) => {
+            const configuredRod = index < heaterRodCount;
+            const active = configuredRod && !!entity && isActive(entity);
+
+            element.style.setProperty('display', active ? 'block' : 'none', 'important');
+            element.style.setProperty('visibility', active ? 'visible' : 'hidden', 'important');
+        });
     };
 
     const applyControlIcons = (card) => {
@@ -1713,37 +1921,55 @@ class Waermepumpe extends IPSModuleStrict
         try {
             clearError();
 
+            /*
+             * Alle Symcon-Anpassungen synchron direkt NACH setValues() der
+             * Original-Card ausführen. Keine Timer und kein Polling.
+             */
+            if (!card.__symconSetValuesHookInstalled && typeof card.setValues === 'function') {
+                const originalSetValues = card.setValues;
+
+                card.setValues = function(hass) {
+                    const result = originalSetValues.call(this, hass);
+
+                    if (this.content) {
+                        applyCoolingVisualization(this);
+                        updateRefrigerantValues(this);
+                        applyThemeColors(this);
+                        applyRefrigerantCircuitMode(this);
+                        applyOptionalStatusVisibility(this);
+                        applyTankTemperatureColors(this);
+                        applyThreeHeaterRods(this);
+                        applyControlIcons(this);
+                        applyFanAnimation(this);
+                    }
+
+                    return result;
+                };
+
+                card.__symconSetValuesHookInstalled = true;
+            }
+
             card.setConfig(currentConfig);
             card.hass = {
                 language: 'de-DE',
                 states: currentStates
             };
 
-            const finalizeSvg = (attempt = 0) => {
-                if (card.content) {
-                    applyCoolingVisualization(card);
-                    updateRefrigerantValues(card);
-                    applyThemeColors(card);
-                    applyRefrigerantCircuitMode(card);
-                    applyOptionalStatusVisibility(card);
-                    applyControlIcons(card);
-                    applyFanAnimation(card);
-
-                    // Die Original-Card kann im selben Render-Zyklus die
-                    // Statusgruppen nochmals ausblenden. Deshalb Sichtbarkeit
-                    // kurz danach nochmals durchsetzen.
-                    window.setTimeout(() => { applyOptionalStatusVisibility(card); applyControlIcons(card); }, 60);
-                    window.setTimeout(() => { applyOptionalStatusVisibility(card); applyControlIcons(card); }, 180);
-
-                    return;
-                }
-
-                if (attempt < 40) {
-                    window.setTimeout(() => finalizeSvg(attempt + 1), 25);
-                }
-            };
-
-            finalizeSvg();
+            /*
+             * Falls die Card beim Setzen von hass keinen setValues()-Aufruf
+             * auslöst, einmal synchron mit dem aktuellen Zustand anwenden.
+             */
+            if (card.content) {
+                applyCoolingVisualization(card);
+                updateRefrigerantValues(card);
+                applyThemeColors(card);
+                applyRefrigerantCircuitMode(card);
+                applyOptionalStatusVisibility(card);
+                applyTankTemperatureColors(card);
+                applyThreeHeaterRods(card);
+                applyControlIcons(card);
+                applyFanAnimation(card);
+            }
         } catch (error) {
             showError(
                 'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
@@ -1891,6 +2117,12 @@ HTML;
             'heaterRodHP'                   => $this->EntityName('HeaterRodHP'),
             'heaterRodLevel1'               => $this->EntityName('HeaterRodLevel1'),
             'heaterRodLevel2'               => $this->EntityName('HeaterRodLevel2'),
+
+            // Symcon-Erweiterung für drei getrennte Heizstäbe
+            'heaterRodCount'                => $this->ReadPropertyInteger('HeaterRodCount'),
+            'heaterRod1'                    => $this->EntityName('HeaterRod1'),
+            'heaterRod2'                    => $this->EntityName('HeaterRod2'),
+            'heaterRod3'                    => $this->EntityName('HeaterRod3'),
 
             'thermalSolarAvailable'         => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
             'thermalSolarPump'              => $this->EntityName('ThermalSolarPump'),
