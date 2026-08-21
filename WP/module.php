@@ -220,11 +220,11 @@ class Waermepumpe extends IPSModuleStrict
         // Erweiterte Symcon-Darstellung: drei echte Heizstäbe im Warmwasserspeicher
         $this->RegisterPropertyInteger('HeaterRodCount', 0);
         $this->RegisterPropertyInteger('HeaterRod1', 0);
-        $this->RegisterPropertyFloat('HeaterRod1Threshold', 1.0);
+        $this->RegisterPropertyInteger('HeaterRod1Threshold', 1);
         $this->RegisterPropertyInteger('HeaterRod2', 0);
-        $this->RegisterPropertyFloat('HeaterRod2Threshold', 1.0);
+        $this->RegisterPropertyInteger('HeaterRod2Threshold', 1);
         $this->RegisterPropertyInteger('HeaterRod3', 0);
-        $this->RegisterPropertyFloat('HeaterRod3Threshold', 1.0);
+        $this->RegisterPropertyInteger('HeaterRod3Threshold', 1);
 
         // Solarthermie
         $this->RegisterPropertyBoolean('ThermalSolarAvailable', false);
@@ -454,7 +454,7 @@ class Waermepumpe extends IPSModuleStrict
                                 'type' => 'NumberSpinner',
                                 'name' => 'HeaterRod1Threshold',
                                 'caption' => 'Ein ab',
-                                'digits' => 1
+                                'digits' => 0
                             ]
                         ]
                     ],
@@ -466,7 +466,7 @@ class Waermepumpe extends IPSModuleStrict
                                 'type' => 'NumberSpinner',
                                 'name' => 'HeaterRod2Threshold',
                                 'caption' => 'Ein ab',
-                                'digits' => 1
+                                'digits' => 0
                             ]
                         ]
                     ],
@@ -478,7 +478,7 @@ class Waermepumpe extends IPSModuleStrict
                                 'type' => 'NumberSpinner',
                                 'name' => 'HeaterRod3Threshold',
                                 'caption' => 'Ein ab',
-                                'digits' => 1
+                                'digits' => 0
                             ]
                         ]
                     ]                ]
@@ -2192,11 +2192,11 @@ HTML;
             // Symcon-Erweiterung für drei getrennte Heizstäbe
             'heaterRodCount'                => $this->ReadPropertyInteger('HeaterRodCount'),
             'heaterRod1'                    => $this->EntityName('HeaterRod1'),
-            'heaterRod1Threshold'           => $this->ReadPropertyFloat('HeaterRod1Threshold'),
+            'heaterRod1Threshold'           => $this->ReadPropertyInteger('HeaterRod1Threshold'),
             'heaterRod2'                    => $this->EntityName('HeaterRod2'),
-            'heaterRod2Threshold'           => $this->ReadPropertyFloat('HeaterRod2Threshold'),
+            'heaterRod2Threshold'           => $this->ReadPropertyInteger('HeaterRod2Threshold'),
             'heaterRod3'                    => $this->EntityName('HeaterRod3'),
-            'heaterRod3Threshold'           => $this->ReadPropertyFloat('HeaterRod3Threshold'),
+            'heaterRod3Threshold'           => $this->ReadPropertyInteger('HeaterRod3Threshold'),
 
             'thermalSolarAvailable'         => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
             'thermalSolarPump'              => $this->EntityName('ThermalSolarPump'),
