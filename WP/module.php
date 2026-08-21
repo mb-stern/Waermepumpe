@@ -1014,6 +1014,75 @@ class Waermepumpe extends IPSModuleStrict
         setText('#textCondenserPressure', evaporatorPressure);
         setText('#textCondenserTemperature', evaporatorTemperature);
 
+        /*
+         * Die Original-SVG hat eindeutige IDs für genau die beiden
+         * Wärmetauscher-Symbole:
+         *
+         * Verdampfer:
+         *   #pathHPModelEvaporatorSymbol001
+         *   #pathHPModelEvaporatorSymbol002
+         *
+         * Verflüssiger:
+         *   #pathHPModelCondenserSymbol
+         *
+         * Im Kühlbetrieb werden ausschließlich diese drei Pfade verschoben.
+         * Verdichter, Expansionsventil, Pumpen, Leitungen und Texte bleiben
+         * unangetastet.
+         */
+        const evaporatorSymbols = [
+            svg.querySelector('#pathHPModelEvaporatorSymbol001'),
+            svg.querySelector('#pathHPModelEvaporatorSymbol002')
+        ].filter(Boolean);
+
+        const condenserSymbol = svg.querySelector('#pathHPModelCondenserSymbol');
+
+        if (
+            evaporatorSymbols.length === 2
+            && condenserSymbol
+            && svg.dataset.symconHeatExchangerSymbolsSwapped !== '1'
+        ) {
+            const unionBox = (elements) => {
+                const boxes = elements.map((element) => element.getBBox());
+
+                const minX = Math.min(...boxes.map((box) => box.x));
+                const minY = Math.min(...boxes.map((box) => box.y));
+                const maxX = Math.max(...boxes.map((box) => box.x + box.width));
+                const maxY = Math.max(...boxes.map((box) => box.y + box.height));
+
+                return {
+                    cx: (minX + maxX) / 2,
+                    cy: (minY + maxY) / 2
+                };
+            };
+
+            const evaporatorCenter = unionBox(evaporatorSymbols);
+            const condenserCenter = unionBox([condenserSymbol]);
+
+            const evaporatorDx = condenserCenter.cx - evaporatorCenter.cx;
+            const evaporatorDy = condenserCenter.cy - evaporatorCenter.cy;
+
+            const condenserDx = evaporatorCenter.cx - condenserCenter.cx;
+            const condenserDy = evaporatorCenter.cy - condenserCenter.cy;
+
+            const movePath = (element, dx, dy) => {
+                const originalTransform = element.getAttribute('transform') || '';
+
+                element.setAttribute(
+                    'transform',
+                    'translate(' + dx + ' ' + dy + ')'
+                    + (originalTransform ? ' ' + originalTransform : '')
+                );
+            };
+
+            evaporatorSymbols.forEach((element) => {
+                movePath(element, evaporatorDx, evaporatorDy);
+            });
+
+            movePath(condenserSymbol, condenserDx, condenserDy);
+
+            svg.dataset.symconHeatExchangerSymbolsSwapped = '1';
+        }
+
         svg.dataset.refrigerantCircuitDirection = 'reversed';
     };
 
