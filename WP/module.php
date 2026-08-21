@@ -1631,20 +1631,19 @@ class Waermepumpe extends IPSModuleStrict
             if (!rod) {
                 rod = document.createElementNS('http://www.w3.org/2000/svg', 'path');
                 rod.setAttribute('id', id);
-
-                /*
-                 * Geometrie bewusst unabhängig vom Originalpfad.
-                 * Anschluss rechts an der Speicherwand, Heizstab nach links.
-                 */
-                rod.setAttribute(
-                    'd',
-                    'M 745 ' + y + ' H 705 C 699 ' + y + ' 699 ' + (y - 10)
-                    + ' 705 ' + (y - 10) + ' H 745'
-                );
-
                 rod.setAttribute('fill', 'none');
                 tankGroup.appendChild(rod);
             }
+
+            /*
+             * Position bei jeder Aktualisierung neu setzen. So rutschen die
+             * Heizstäbe beim Ändern der Anzahl sofort von unten nach oben.
+             */
+            rod.setAttribute(
+                'd',
+                'M 745 ' + y + ' H 705 C 699 ' + y + ' 699 ' + (y - 10)
+                + ' 705 ' + (y - 10) + ' H 745'
+            );
 
             rod.style.setProperty('fill', 'none', 'important');
             rod.style.setProperty('stroke-width', '5', 'important');
@@ -1659,23 +1658,34 @@ class Waermepumpe extends IPSModuleStrict
          * Inaktiv bleibt der vorhandene Stab sichtbar, aber dezent.
          * Aktiv erhält jede Stufe eine klar erkennbare warme Farbe.
          */
-        const rods = [
-            {
-                element: ensureRod('pathHeaterRodWW1', 535),
-                entity: currentConfig.heaterRod1,
-                activeColor: '#fff176'
-            },
-            {
-                element: ensureRod('pathHeaterRodWW2', 565),
-                entity: currentConfig.heaterRod2,
-                activeColor: '#ffb300'
-            },
-            {
-                element: ensureRod('pathHeaterRodWW3', 595),
-                entity: currentConfig.heaterRod3,
-                activeColor: '#ff6d00'
-            }
+        /*
+         * Die vorhandenen Heizstäbe werden immer von unten nach oben angeordnet:
+         * 1 Heizstab  -> 625 (ganz unten)
+         * 2 Heizstäbe -> 595 / 625
+         * 3 Heizstäbe -> 565 / 595 / 625
+         */
+        const rodPositions = {
+            1: [625],
+            2: [595, 625],
+            3: [565, 595, 625]
+        };
+
+        const configuredPositions = rodPositions[heaterRodCount] || [];
+        const rodEntities = [
+            currentConfig.heaterRod1,
+            currentConfig.heaterRod2,
+            currentConfig.heaterRod3
         ];
+        const rodColors = ['#fff176', '#ffb300', '#ff6d00'];
+
+        const rods = [0, 1, 2].map((index) => ({
+            element: ensureRod(
+                'pathHeaterRodWW' + (index + 1),
+                configuredPositions[index] || 625
+            ),
+            entity: rodEntities[index],
+            activeColor: rodColors[index]
+        }));
 
         const isActive = (entity) => {
             if (!entity || !currentStates || !currentStates[entity]) {
