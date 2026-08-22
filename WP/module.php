@@ -1726,7 +1726,7 @@ class Waermepumpe extends IPSModuleStrict
             currentConfig.heaterRod2Threshold,
             currentConfig.heaterRod3Threshold
         ];
-        const rodColors = ['#fff176', '#ffb300', '#ff6d00'];
+        const rodColors = ['#ff0000', '#ff0000', '#ff0000'];
 
         const rods = [0, 1, 2].map((index) => ({
             element: ensureRod(
