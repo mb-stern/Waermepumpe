@@ -1969,8 +1969,14 @@ class Waermepumpe extends IPSModuleStrict
          *
          * Ventil aktiv = Boiler/Warmwasser
          * Ventil inaktiv = Heizkreis
+         *
+         * Ist KEIN Ventil konfiguriert, gibt es keine unterscheidbare
+         * hydraulische Stellung. Dann verwenden Heizungs- und Boilerseite
+         * denselben Vorlauf-/Rücklauf-Farbverlauf.
          */
-        const hotWaterActive = stateIsOn(currentConfig.wwHeatingValve);
+        const valveConfigured = !!currentConfig.wwHeatingValve;
+        const hotWaterActive =
+            valveConfigured && stateIsOn(currentConfig.wwHeatingValve);
 
         const circuits = [
             {
@@ -2417,12 +2423,20 @@ class Waermepumpe extends IPSModuleStrict
         );
 
         /*
-         * Keine Warmwasserladung:
-         * Die Wendel im Boiler übernimmt vollständig die aktuelle
-         * Boilertemperaturfarbe. Erst bei aktiver Warmwasserladung wird
-         * weiter oben der Verlauf aus WP-Vorlauf und Boiler/Rücklauf gesetzt.
+         * Kein Umschaltventil konfiguriert:
+         * Boiler- und Heizungsseite verwenden denselben Vorlauf-/Rücklauf-
+         * Farbverlauf. So entstehen ohne Ventil keine widersprüchlichen
+         * Farben für dieselbe hydraulische Verbindung.
+         *
+         * Ventil konfiguriert und auf Heizung:
+         * Boiler-Wendel zeigt die aktuelle Boilertemperaturfarbe.
          */
-        if (boilerColor) {
+        if (!valveConfigured && firstHeatingColors) {
+            setBoilerCoilGradient(
+                firstHeatingColors.supply,
+                firstHeatingColors.reflux
+            );
+        } else if (boilerColor) {
             setBoilerCoilGradient(
                 boilerColor,
                 boilerColor
@@ -2457,7 +2471,9 @@ class Waermepumpe extends IPSModuleStrict
 
         const svg = card.content;
 
-        const hotWaterActive = stateIsOn(currentConfig.wwHeatingValve);
+        const hotWaterActive =
+            !!currentConfig.wwHeatingValve
+            && stateIsOn(currentConfig.wwHeatingValve);
 
         const readFirstNumber = (entities) => {
             for (const entity of entities) {
