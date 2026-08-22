@@ -181,13 +181,13 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TankTempWWMiddle', 0);
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
 
-        // Farben Heizkreis (Temperatur-Farbverlauf)
-        $this->RegisterPropertyInteger('HeatingCircuitColor10', 18100);      // #0046B4
-        $this->RegisterPropertyInteger('HeatingCircuitColor20', 2201331);    // #2196F3
-        $this->RegisterPropertyInteger('HeatingCircuitColor30', 6602495);    // #64BEFF
-        $this->RegisterPropertyInteger('HeatingCircuitColor35', 16772411);   // #FFEB3B
-        $this->RegisterPropertyInteger('HeatingCircuitColor45', 16750592);   // #FF9800
-        $this->RegisterPropertyInteger('HeatingCircuitColor55', 16007990);   // #F44336
+        // Einheitlicher Temperatur-Farbverlauf für Heizkreis, Speicher und Wärmetauscher
+        $this->RegisterPropertyInteger('TemperatureColor20', 26316);      // #0066CC
+        $this->RegisterPropertyInteger('TemperatureColor30', 6733823);    // #66BFFF
+        $this->RegisterPropertyInteger('TemperatureColor40', 16769126);   // #FFE066
+        $this->RegisterPropertyInteger('TemperatureColor50', 16752412);   // #FF9F1C
+        $this->RegisterPropertyInteger('TemperatureColor60', 15746116);   // #F04444
+        $this->RegisterPropertyInteger('TemperatureColor70', 10361627);   // #9E1B1B
 
         // Heizkreis 1
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
@@ -495,22 +495,22 @@ class Waermepumpe extends IPSModuleStrict
 
             [
                 'type'    => 'ExpansionPanel',
-                'caption' => 'Farben Heizkreis',
+                'caption' => 'Temperaturfarben',
                 'items'   => [
                     [
                         'type'  => 'RowLayout',
                         'items' => [
-                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor10', 'caption' => '10 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor20', 'caption' => '20 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor30', 'caption' => '30 °C', 'allowTransparent' => false]
+                            ['type' => 'SelectColor', 'name' => 'TemperatureColor20', 'caption' => '20 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'TemperatureColor30', 'caption' => '30 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'TemperatureColor40', 'caption' => '40 °C', 'allowTransparent' => false]
                         ]
                     ],
                     [
                         'type'  => 'RowLayout',
                         'items' => [
-                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor35', 'caption' => '35 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor45', 'caption' => '45 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor55', 'caption' => '55 °C', 'allowTransparent' => false]
+                            ['type' => 'SelectColor', 'name' => 'TemperatureColor50', 'caption' => '50 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'TemperatureColor60', 'caption' => '60 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'TemperatureColor70', 'caption' => '70 °C', 'allowTransparent' => false]
                         ]
                     ]
                 ]
@@ -1005,64 +1005,100 @@ class Waermepumpe extends IPSModuleStrict
     };
 
     /*
-     * Speicher-Farbskala direkt in der Original-Card ersetzen.
-     * Dadurch verwendet deren eigenes tankColors() automatisch unsere Skala
-     * und nichts muss nachträglich an SVG-Gradienten überschrieben werden.
-     *
-     * 20 °C blau
-     * 35 °C türkis
-     * 45 °C grün
-     * 50 °C gelb
-     * 55 °C orange
-     * 65 °C rot
+     * Einheitliche Temperatur-Farbskala für die gesamte Hydraulik:
+     * 20 / 30 / 40 / 50 / 60 / 70 °C.
+     * Dazwischen wird stufenlos interpoliert.
      */
-    HeatPumpClass.prototype.tempColor = function(temp) {
-        const value = Number(temp);
+    const getTemperatureColorStops = () => {
+        const configured = currentConfig.temperatureColors || {};
+
+        const intToRgb = (value, fallback) => {
+            const number = Number(value);
+            if (!Number.isFinite(number)) {
+                return fallback;
+            }
+
+            const color = Math.max(0, Math.min(0xFFFFFF, Math.trunc(number)));
+
+            return [
+                (color >> 16) & 0xFF,
+                (color >> 8) & 0xFF,
+                color & 0xFF
+            ];
+        };
+
+        return [
+            [20, intToRgb(configured['20'], [0, 102, 204])],
+            [30, intToRgb(configured['30'], [102, 191, 255])],
+            [40, intToRgb(configured['40'], [255, 224, 102])],
+            [50, intToRgb(configured['50'], [255, 159, 28])],
+            [60, intToRgb(configured['60'], [240, 68, 68])],
+            [70, intToRgb(configured['70'], [158, 27, 27])]
+        ];
+    };
+
+    const rgbToHex = (rgb) =>
+        '#' + rgb.map((component) =>
+            Math.max(0, Math.min(255, Math.round(component)))
+                .toString(16)
+                .padStart(2, '0')
+        ).join('');
+
+    const temperatureColor = (temperature) => {
+        const value = Number(temperature);
 
         if (!Number.isFinite(value)) {
-            return '#ffffff00';
+            return null;
         }
 
-        const stops = [
-            [20, [33, 150, 243]],
-            [35, [0, 188, 212]],
-            [45, [76, 175, 80]],
-            [50, [255, 235, 59]],
-            [55, [255, 152, 0]],
-            [65, [244, 67, 54]]
-        ];
-
-        const toHex = (rgb) =>
-            '#' + rgb.map((component) =>
-                Math.max(0, Math.min(255, Math.round(component)))
-                    .toString(16)
-                    .padStart(2, '0')
-            ).join('');
+        const stops = getTemperatureColorStops();
 
         if (value <= stops[0][0]) {
-            return toHex(stops[0][1]);
+            return rgbToHex(stops[0][1]);
         }
 
         const last = stops[stops.length - 1];
         if (value >= last[0]) {
-            return toHex(last[1]);
+            return rgbToHex(last[1]);
         }
 
         for (let i = 0; i < stops.length - 1; i++) {
-            const t1 = stops[i][0];
-            const c1 = stops[i][1];
-            const t2 = stops[i + 1][0];
-            const c2 = stops[i + 1][1];
+            const [t1, c1] = stops[i];
+            const [t2, c2] = stops[i + 1];
 
             if (value >= t1 && value <= t2) {
                 const factor = (value - t1) / (t2 - t1);
-                return toHex(c1.map((component, index) =>
+
+                return rgbToHex(c1.map((component, index) =>
                     component + (c2[index] - component) * factor
                 ));
             }
         }
 
-        return '#ffffff00';
+        return null;
+    };
+
+    const readStateNumber = (entity) => {
+        if (!entity || !currentStates || !currentStates[entity]) {
+            return null;
+        }
+
+        const raw = currentStates[entity].state;
+        const normalized = String(raw ?? '')
+            .trim()
+            .replace(',', '.')
+            .replace(/[^0-9+\-.]/g, '');
+
+        const value = Number(normalized);
+        return Number.isFinite(value) ? value : null;
+    };
+
+    /*
+     * Die Speicher der Original-Card verwenden tempColor().
+     * Dadurch gilt automatisch dieselbe Skala für Puffer und Warmwasser.
+     */
+    HeatPumpClass.prototype.tempColor = function(temp) {
+        return temperatureColor(temp) || '#ffffff00';
     };
 
     HeatPumpClass.prototype.readLocalization = function(lang, hass) {
@@ -1722,107 +1758,46 @@ class Waermepumpe extends IPSModuleStrict
         }
     };
 
+    const storedCircuitColorKey = 'symconHeatPumpStoredCircuitColors';
+
+    const loadStoredCircuitColors = () => {
+        try {
+            const raw = window.sessionStorage
+                ? window.sessionStorage.getItem(storedCircuitColorKey)
+                : null;
+
+            return raw ? JSON.parse(raw) : {};
+        } catch (error) {
+            return {};
+        }
+    };
+
+    const saveStoredCircuitColors = (colors) => {
+        try {
+            if (window.sessionStorage) {
+                window.sessionStorage.setItem(
+                    storedCircuitColorKey,
+                    JSON.stringify(colors)
+                );
+            }
+        } catch (error) {
+            // Speicherung ist nur Komfort; Darstellung funktioniert auch ohne.
+        }
+    };
+
+    let storedCircuitColors = loadStoredCircuitColors();
+
     const applyHeatingCircuitTemperatureColors = (card) => {
         if (!card || !card.content) {
             return;
         }
 
         const svg = card.content;
-
-        /*
-         * Gemeinsame Farbskala für Heizen und Kühlen:
-         * Standard:
-         * 10 °C dunkelblau
-         * 20 °C blau
-         * 30 °C hellblau
-         * 35 °C gelb
-         * 45 °C orange
-         * 55 °C rot
-         *
-         * Alle sechs Farben sind im Konfigurationsformular einstellbar.
-         */
-        const temperatureColor = (temperature) => {
-            const value = Number(temperature);
-
-            if (!Number.isFinite(value)) {
-                return null;
-            }
-
-            const configuredColors = currentConfig.heatingCircuitColors || {};
-
-            const intToRgb = (value, fallback) => {
-                const number = Number(value);
-                if (!Number.isFinite(number)) {
-                    return fallback;
-                }
-
-                const color = Math.max(0, Math.min(0xFFFFFF, Math.trunc(number)));
-
-                return [
-                    (color >> 16) & 0xFF,
-                    (color >> 8) & 0xFF,
-                    color & 0xFF
-                ];
-            };
-
-            const stops = [
-                [10, intToRgb(configuredColors['10'], [0, 70, 180])],
-                [20, intToRgb(configuredColors['20'], [33, 150, 243])],
-                [30, intToRgb(configuredColors['30'], [100, 190, 255])],
-                [35, intToRgb(configuredColors['35'], [255, 235, 59])],
-                [45, intToRgb(configuredColors['45'], [255, 152, 0])],
-                [55, intToRgb(configuredColors['55'], [244, 67, 54])]
-            ];
-
-            const toHex = (rgb) =>
-                '#' + rgb.map((component) =>
-                    Math.max(0, Math.min(255, Math.round(component)))
-                        .toString(16)
-                        .padStart(2, '0')
-                ).join('');
-
-            if (value <= stops[0][0]) {
-                return toHex(stops[0][1]);
-            }
-
-            const last = stops[stops.length - 1];
-            if (value >= last[0]) {
-                return toHex(last[1]);
-            }
-
-            for (let i = 0; i < stops.length - 1; i++) {
-                const [t1, c1] = stops[i];
-                const [t2, c2] = stops[i + 1];
-
-                if (value >= t1 && value <= t2) {
-                    const factor = (value - t1) / (t2 - t1);
-
-                    return toHex(c1.map((component, index) =>
-                        component + (c2[index] - component) * factor
-                    ));
-                }
-            }
-
-            return null;
-        };
-
-        const readStateNumber = (entity) => {
-            if (!entity || !currentStates || !currentStates[entity]) {
-                return null;
-            }
-
-            const raw = currentStates[entity].state;
-            const normalized = String(raw ?? '')
-                .trim()
-                .replace(',', '.')
-                .replace(/[^0-9+\-.]/g, '');
-
-            const value = Number(normalized);
-            return Number.isFinite(value) ? value : null;
-        };
+        const hotWaterActive = stateIsOn(currentConfig.wwHeatingValve);
 
         const circuits = [
             {
+                key: '1',
                 gradient: 'linearGradientCircuit1',
                 supply: currentConfig.supplyTemperatureHeating,
                 reflux: currentConfig.refluxTemperatureHeating,
@@ -1830,6 +1805,7 @@ class Waermepumpe extends IPSModuleStrict
                 refluxPipes: ['#pathPipeToHP']
             },
             {
+                key: '2',
                 gradient: 'linearGradientCircuit2',
                 supply: currentConfig.supplyTemperatureHeating2,
                 reflux: currentConfig.refluxTemperatureHeating2,
@@ -1837,6 +1813,7 @@ class Waermepumpe extends IPSModuleStrict
                 refluxPipes: ['#pathPipeToHP2']
             },
             {
+                key: '3',
                 gradient: 'linearGradientCircuit3',
                 supply: currentConfig.supplyTemperatureHeating3,
                 reflux: currentConfig.refluxTemperatureHeating3,
@@ -1845,91 +1822,224 @@ class Waermepumpe extends IPSModuleStrict
             }
         ];
 
-        const setPipeColor = (selectors, color) => {
+        const setStrokeColor = (selectors, color) => {
+            if (!color) {
+                return;
+            }
+
             selectors.forEach((selector) => {
                 const element = svg.querySelector(selector);
-                if (!element) {
-                    return;
+                if (element) {
+                    element.style.setProperty('stroke', color, 'important');
                 }
-
-                element.style.setProperty('stroke', color, 'important');
             });
         };
 
-        let firstConfiguredCircuit = null;
-
-        circuits.forEach(({gradient, supply, reflux, supplyPipes, refluxPipes}) => {
-            const gradientElement = svg.querySelector('#' + gradient);
-
-            if (!gradientElement) {
+        const setGradient = (gradientId, supplyColor, refluxColor) => {
+            const gradient = svg.querySelector('#' + gradientId);
+            if (!gradient || !supplyColor || !refluxColor) {
                 return;
             }
 
-            const supplyTemperature = readStateNumber(supply);
-            const refluxTemperature = readStateNumber(reflux);
+            const stops = gradient.querySelectorAll('stop');
+            if (stops.length < 2) {
+                return;
+            }
+
+            stops[0].style.setProperty('stop-color', supplyColor, 'important');
+            stops[0].setAttribute('stop-color', supplyColor);
+
+            stops[stops.length - 1].style.setProperty(
+                'stop-color',
+                refluxColor,
+                'important'
+            );
+            stops[stops.length - 1].setAttribute('stop-color', refluxColor);
+        };
+
+        let firstHeatingColors = null;
+        let storedChanged = false;
+
+        circuits.forEach((circuit) => {
+            const supplyTemperature = readStateNumber(circuit.supply);
+            const refluxTemperature = readStateNumber(circuit.reflux);
+
+            let colors = storedCircuitColors[circuit.key] || null;
 
             /*
-             * Nur eingreifen, wenn beide Temperaturen vorhanden sind.
+             * Nur im Heizbetrieb werden die gespeicherten Heizkreisfarben
+             * aktualisiert. Beim Umschalten auf Warmwasser bleiben Heizkörper/
+             * Fußbodenheizung optisch auf ihrem letzten Heiz-Zustand stehen.
              */
-            if (supplyTemperature === null || refluxTemperature === null) {
-                return;
+            if (
+                !hotWaterActive
+                && supplyTemperature !== null
+                && refluxTemperature !== null
+            ) {
+                colors = {
+                    supply: temperatureColor(supplyTemperature),
+                    reflux: temperatureColor(refluxTemperature)
+                };
+
+                storedCircuitColors[circuit.key] = colors;
+                storedChanged = true;
             }
 
-            const supplyColor = temperatureColor(supplyTemperature);
-            const refluxColor = temperatureColor(refluxTemperature);
-
-            if (!supplyColor || !refluxColor) {
-                return;
-            }
-
-            if (!firstConfiguredCircuit) {
-                firstConfiguredCircuit = {
-                    supplyColor,
-                    refluxColor
+            /*
+             * Falls die Seite erstmals während Warmwasserladung geöffnet wird
+             * und noch nichts gespeichert ist, nehmen wir einmal die aktuell
+             * vorhandenen Werte als Startzustand.
+             */
+            if (
+                !colors
+                && supplyTemperature !== null
+                && refluxTemperature !== null
+            ) {
+                colors = {
+                    supply: temperatureColor(supplyTemperature),
+                    reflux: temperatureColor(refluxTemperature)
                 };
             }
 
-            const stops = gradientElement.querySelectorAll('stop');
-            if (stops.length >= 2) {
-                /*
-                 * Heizkörper bzw. Fußbodenheizung selbst:
-                 * Vorlauf- und Rücklaufseite verwenden die echte Temperatur.
-                 */
-                stops[0].style.setProperty('stop-color', supplyColor, 'important');
-                stops[0].setAttribute('stop-color', supplyColor);
+            if (!colors || !colors.supply || !colors.reflux) {
+                return;
+            }
 
-                stops[stops.length - 1].style.setProperty('stop-color', refluxColor, 'important');
-                stops[stops.length - 1].setAttribute('stop-color', refluxColor);
+            if (!firstHeatingColors) {
+                firstHeatingColors = colors;
+            }
+
+            setGradient(circuit.gradient, colors.supply, colors.reflux);
+            setStrokeColor(circuit.supplyPipes, colors.supply);
+            setStrokeColor(circuit.refluxPipes, colors.reflux);
+        });
+
+        if (storedChanged) {
+            saveStoredCircuitColors(storedCircuitColors);
+        }
+
+        /*
+         * Gemeinsame Hydraulik am Umschaltventil:
+         *
+         * Heizung aktiv:
+         *   letzte/aktuelle Heizkreisfarbe.
+         *
+         * Warmwasser aktiv:
+         *   die Wärmepumpen-Vorlauftemperatur färbt die Leitung zum Boiler
+         *   und die Heizwendel im Boiler. Die Heizkreisfarben bleiben stehen.
+         */
+        if (hotWaterActive) {
+            const hpSupplyTemperature = readStateNumber(currentConfig.supplyTemperature);
+            const boilerTemperature =
+                readStateNumber(currentConfig.tankTempWWUp)
+                ?? readStateNumber(currentConfig.tankTempWWMiddle)
+                ?? readStateNumber(currentConfig.tankTempWWDown);
+
+            const hotColor =
+                temperatureColor(hpSupplyTemperature)
+                || temperatureColor(boilerTemperature);
+
+            const boilerColor =
+                temperatureColor(boilerTemperature)
+                || hotColor;
+
+            setStrokeColor(
+                ['#pathPipeHotColdHeatpump', '#pathPipeHotWaterToTank'],
+                hotColor
+            );
+
+            /*
+             * Heizwendel im Warmwasserspeicher: Eintritt nach tatsächlichem
+             * WP-Vorlauf, Speicher-/Austrittsseite nach Boilertemperatur.
+             * Falls die SVG nur einen einzelnen Pfad hat, erhält er die
+             * Vorlauffarbe.
+             */
+            setStrokeColor(['#pathPipeHotWaterToTank'], hotColor);
+
+            // Gemeinsame Leitung zur Heizseite nicht live mitziehen lassen.
+            if (firstHeatingColors) {
+                setStrokeColor(
+                    ['#pathPipeToBuffer'],
+                    firstHeatingColors.supply
+                );
+                setStrokeColor(
+                    ['#pathPipeFromBuffer'],
+                    firstHeatingColors.reflux
+                );
             }
 
             /*
-             * Die separaten Anschlussleitungen zum Heizkreis bekommen
-             * dieselben realen Temperaturfarben.
+             * Die Wärmeübertrager-Symbole in der Wärmepumpe übernehmen
+             * ebenfalls die gemeinsame Temperaturskala.
              */
-            setPipeColor(supplyPipes, supplyColor);
-            setPipeColor(refluxPipes, refluxColor);
-        });
+            const condenserTemperature =
+                readStateNumber(currentConfig.condenserTemperature);
+            const evaporatorTemperature =
+                readStateNumber(currentConfig.evaporatorTemperature);
+
+            const condenserColor = temperatureColor(condenserTemperature);
+            const evaporatorColor = temperatureColor(evaporatorTemperature);
+
+            setStrokeColor(
+                ['#pathHPModelCondenserSymbol'],
+                condenserColor
+            );
+            setStrokeColor(
+                [
+                    '#pathHPModelEvaporatorSymbol001',
+                    '#pathHPModelEvaporatorSymbol002'
+                ],
+                evaporatorColor
+            );
+
+            // Zusätzliche Boilerfarbe am Speicher-Heizstab, falls vorhanden.
+            if (boilerColor) {
+                const heaterRodWW = svg.querySelector('#pathHeaterRodWW');
+                if (heaterRodWW) {
+                    heaterRodWW.style.setProperty(
+                        'stroke',
+                        boilerColor,
+                        'important'
+                    );
+                }
+            }
+
+            return;
+        }
 
         /*
-         * Gemeinsame Leitungen zwischen Wärmepumpe und Heizkreis/Puffer:
-         * Diese gehören nicht zu einem eigenen linearGradientCircuit.
-         * Wenn mindestens ein Heizkreis vollständig konfiguriert ist,
-         * verwenden wir dessen Vorlauf-/Rücklauffarbe auch hier.
-         *
-         * Bei mehreren Heizkreisen wird der erste vollständig konfigurierte
-         * Heizkreis als Referenz für die gemeinsame Leitung verwendet.
+         * Heizbetrieb: gemeinsame Leitungen folgen wieder dem Heizkreis.
          */
-        if (firstConfiguredCircuit) {
-            setPipeColor(
+        if (firstHeatingColors) {
+            setStrokeColor(
                 ['#pathPipeToBuffer'],
-                firstConfiguredCircuit.supplyColor
+                firstHeatingColors.supply
             );
-
-            setPipeColor(
+            setStrokeColor(
                 ['#pathPipeFromBuffer'],
-                firstConfiguredCircuit.refluxColor
+                firstHeatingColors.reflux
             );
         }
+
+        /*
+         * Wärmepumpen-Wärmetauscher ebenfalls immer mit Temperaturfarbe.
+         */
+        const condenserTemperature =
+            readStateNumber(currentConfig.condenserTemperature);
+        const evaporatorTemperature =
+            readStateNumber(currentConfig.evaporatorTemperature);
+
+        setStrokeColor(
+            ['#pathHPModelCondenserSymbol'],
+            temperatureColor(condenserTemperature)
+        );
+        setStrokeColor(
+            [
+                '#pathHPModelEvaporatorSymbol001',
+                '#pathHPModelEvaporatorSymbol002'
+            ],
+            temperatureColor(evaporatorTemperature)
+        );
     };
 
     const applyOptionalStatusVisibility = (card) => {
@@ -2059,7 +2169,9 @@ class Waermepumpe extends IPSModuleStrict
             currentConfig.heaterRod2Threshold,
             currentConfig.heaterRod3Threshold
         ];
-        const rodColors = ['#ff0000', '#ff0000', '#ff0000'];
+        const activeRodColor =
+            temperatureColor(60) || '#f04444';
+        const rodColors = [activeRodColor, activeRodColor, activeRodColor];
 
         const rods = [0, 1, 2].map((index) => ({
             element: ensureRod(
@@ -2532,13 +2644,13 @@ HTML;
             'heaterRod3'                    => $this->EntityName('HeaterRod3'),
             'heaterRod3Threshold'           => $this->ReadPropertyInteger('HeaterRod3Threshold'),
 
-            'heatingCircuitColors'          => [
-                '10' => $this->ReadPropertyInteger('HeatingCircuitColor10'),
-                '20' => $this->ReadPropertyInteger('HeatingCircuitColor20'),
-                '30' => $this->ReadPropertyInteger('HeatingCircuitColor30'),
-                '35' => $this->ReadPropertyInteger('HeatingCircuitColor35'),
-                '45' => $this->ReadPropertyInteger('HeatingCircuitColor45'),
-                '55' => $this->ReadPropertyInteger('HeatingCircuitColor55')
+            'temperatureColors'             => [
+                '20' => $this->ReadPropertyInteger('TemperatureColor20'),
+                '30' => $this->ReadPropertyInteger('TemperatureColor30'),
+                '40' => $this->ReadPropertyInteger('TemperatureColor40'),
+                '50' => $this->ReadPropertyInteger('TemperatureColor50'),
+                '60' => $this->ReadPropertyInteger('TemperatureColor60'),
+                '70' => $this->ReadPropertyInteger('TemperatureColor70')
             ],
 
             'thermalSolarAvailable'         => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
