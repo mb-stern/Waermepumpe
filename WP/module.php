@@ -2129,6 +2129,15 @@ class Waermepumpe extends IPSModuleStrict
                 || hotColor;
 
             /*
+             * Warmwasserleitung aus dem Boiler zum Zapfhahn:
+             * immer mit der aktuellen Boilertemperaturfarbe darstellen.
+             */
+            setStrokeColor(
+                ['#pathPipeToCirculatingPump'],
+                boilerColor
+            );
+
+            /*
              * Warmwasserladung:
              * Oben/heiß = aktueller WP-Vorlauf,
              * unten/kühler = aktuelle Speichertemperatur als Rücklauf-Näherung.
@@ -2215,6 +2224,20 @@ class Waermepumpe extends IPSModuleStrict
                 firstHeatingColors.reflux
             );
         }
+
+        /*
+         * Warmwasserleitung aus dem Boiler zum Zapfhahn:
+         * unabhängig vom Betriebsmodus mit der aktuellen Boilertemperatur.
+         */
+        const boilerTemperature =
+            readStateNumber(currentConfig.tankTempWWUp)
+            ?? readStateNumber(currentConfig.tankTempWWMiddle)
+            ?? readStateNumber(currentConfig.tankTempWWDown);
+
+        setStrokeColor(
+            ['#pathPipeToCirculatingPump'],
+            temperatureColor(boilerTemperature)
+        );
 
         /*
          * Wärmepumpen-Wärmetauscher ebenfalls immer mit Temperaturfarbe.
