@@ -1993,6 +1993,55 @@ class Waermepumpe extends IPSModuleStrict
             stops[stops.length - 1].setAttribute('stop-color', refluxColor);
         };
 
+        const setHeatExchangerCoilGradient = (hotColor, coolColor) => {
+            /*
+             * Beide Wärmetauscher-Wendeln der Original-SVG verwenden
+             * linearGradientPipe1:
+             *   - pathPipeHotColdHeatpump  (Wendel bei der Wärmepumpe)
+             *   - pathPipeHotWaterToTank   (Wendel im Warmwasserspeicher)
+             */
+            const gradient = svg.querySelector('#linearGradientPipe1');
+            if (!gradient || !hotColor || !coolColor) {
+                return;
+            }
+
+            const stops = gradient.querySelectorAll('stop');
+            if (stops.length < 2) {
+                return;
+            }
+
+            stops[0].style.setProperty('stop-color', hotColor, 'important');
+            stops[0].setAttribute('stop-color', hotColor);
+
+            stops[stops.length - 1].style.setProperty(
+                'stop-color',
+                coolColor,
+                'important'
+            );
+            stops[stops.length - 1].setAttribute('stop-color', coolColor);
+
+            /*
+             * Sicherstellen, dass beide Pfade wirklich den gemeinsamen
+             * Gradient verwenden und keine frühere Direktfarbe gewinnt.
+             */
+            [
+                '#pathPipeHotColdHeatpump',
+                '#pathPipeHotWaterToTank'
+            ].forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (!element) {
+                    return;
+                }
+
+                element.style.removeProperty('stroke');
+                element.style.setProperty(
+                    'stroke',
+                    'url(#linearGradientPipe1)',
+                    'important'
+                );
+            });
+        };
+
         let firstHeatingColors = null;
         let storedChanged = false;
 
@@ -2079,18 +2128,15 @@ class Waermepumpe extends IPSModuleStrict
                 temperatureColor(boilerTemperature)
                 || hotColor;
 
-            setStrokeColor(
-                ['#pathPipeHotColdHeatpump', '#pathPipeHotWaterToTank'],
-                hotColor
-            );
-
             /*
-             * Heizwendel im Warmwasserspeicher: Eintritt nach tatsächlichem
-             * WP-Vorlauf, Speicher-/Austrittsseite nach Boilertemperatur.
-             * Falls die SVG nur einen einzelnen Pfad hat, erhält er die
-             * Vorlauffarbe.
+             * Warmwasserladung:
+             * Oben/heiß = aktueller WP-Vorlauf,
+             * unten/kühler = aktuelle Speichertemperatur als Rücklauf-Näherung.
              */
-            setStrokeColor(['#pathPipeHotWaterToTank'], hotColor);
+            setHeatExchangerCoilGradient(
+                hotColor,
+                boilerColor || hotColor
+            );
 
             // Gemeinsame Leitung zur Heizseite nicht live mitziehen lassen.
             if (firstHeatingColors) {
@@ -2157,6 +2203,15 @@ class Waermepumpe extends IPSModuleStrict
                     '#pathPipeToHP',
                     '#pathPipeToHP2'
                 ],
+                firstHeatingColors.reflux
+            );
+
+            /*
+             * Im Heizbetrieb folgen auch beide Wendeln dem aktuellen
+             * Vorlauf-/Rücklauf-Farbverlauf.
+             */
+            setHeatExchangerCoilGradient(
+                firstHeatingColors.supply,
                 firstHeatingColors.reflux
             );
         }
