@@ -2119,18 +2119,50 @@ class Waermepumpe extends IPSModuleStrict
             setGradientStops(gradient, hotColor, coolColor);
 
             const boilerCoil = svg.querySelector('#pathPipeHotWaterToTank');
-            if (boilerCoil) {
-                boilerCoil.style.setProperty(
-                    'stroke',
-                    'url(#symconLinearGradientBoilerCoil)',
-                    'important'
-                );
-                boilerCoil.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
+            if (!boilerCoil) {
+                return;
             }
+
+            /*
+             * Die Original-Card blendet diese Wendel nicht abhängig vom
+             * Ventil aus. Bei gleicher Farbe von Boiler und Wendel würde sie
+             * aber optisch vollständig im Speicher verschwinden.
+             *
+             * Deshalb eine schmale Kontur UNTER der eigentlichen Wendel.
+             * Die sichtbare Wendel selbst behält exakt ihre Temperaturfarbe.
+             */
+            let outline = svg.querySelector('#symconBoilerCoilOutline');
+
+            if (!outline) {
+                outline = boilerCoil.cloneNode(false);
+                outline.setAttribute('id', 'symconBoilerCoilOutline');
+                boilerCoil.parentNode.insertBefore(outline, boilerCoil);
+            }
+
+            const dark = window.matchMedia
+                && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            outline.style.setProperty(
+                'stroke',
+                dark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)',
+                'important'
+            );
+            outline.style.setProperty('stroke-width', '7', 'important');
+            outline.style.setProperty('stroke-opacity', '1', 'important');
+            outline.style.setProperty('fill', 'none', 'important');
+            outline.style.setProperty('display', 'inline', 'important');
+            outline.style.setProperty('visibility', 'visible', 'important');
+
+            boilerCoil.style.setProperty(
+                'stroke',
+                'url(#symconLinearGradientBoilerCoil)',
+                'important'
+            );
+            boilerCoil.style.setProperty('stroke-width', '5', 'important');
+            boilerCoil.style.setProperty('stroke-opacity', '1', 'important');
+            boilerCoil.style.setProperty('fill', 'none', 'important');
+            boilerCoil.style.setProperty('display', 'inline', 'important');
+            boilerCoil.style.setProperty('visibility', 'visible', 'important');
         };
 
         let firstHeatingColors = null;
