@@ -267,9 +267,24 @@ class Waermepumpe extends IPSModuleStrict
     {
         try {
             if ($Message === VM_UPDATE && IPS_GetKernelRunlevel() === KR_READY) {
-                // Fremd-Custom-Element komplett neu laden. Das entspricht dem
-                // bewährten ReloadHtml-Muster des Energiefluss-Moduls.
-                $this->ReloadHtml();
+                /*
+                 * Nur die aktuellen Zustände an die bestehende HTML-SDK-Seite
+                 * senden. Die Card/SVG wird NICHT neu aufgebaut.
+                 *
+                 * Dadurch flackert die Visualisierung bei regelmäßigen
+                 * Temperatur-, Leistungs- oder Drehzahlupdates nicht mehr.
+                 */
+                $this->UpdateVisualizationValue(
+                    json_encode(
+                        [
+                            'type'   => 'update',
+                            'states' => $this->BuildHassStates()
+                        ],
+                        JSON_THROW_ON_ERROR
+                        | JSON_UNESCAPED_UNICODE
+                        | JSON_UNESCAPED_SLASHES
+                    )
+                );
             }
         } catch (Throwable $e) {
             $this->LogMessage('MessageSink: ' . $e->getMessage(), KL_ERROR);
@@ -320,7 +335,11 @@ class Waermepumpe extends IPSModuleStrict
             SetValue($variableId, $typedValue);
         }
 
-        $this->ReloadHtml();
+        /*
+         * Kein kompletter HTML-Reload nötig.
+         * Die geänderte Variable löst VM_UPDATE aus und MessageSink()
+         * überträgt die neuen Zustände direkt an die bestehende Card.
+         */
     }
 
     public function GetVisualizationTile(): string
