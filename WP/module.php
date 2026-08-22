@@ -182,7 +182,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
 
         // Einheitlicher Temperatur-Farbverlauf für Heizkreis, Speicher und Wärmetauscher
-        $this->RegisterPropertyBoolean('UseCustomTemperatureColors', true);
+        $this->RegisterPropertyBoolean('UseCustomTemperatureColors', false);
         $this->RegisterPropertyInteger('TemperaturePoint1', 20);
         $this->RegisterPropertyInteger('TemperatureColor1', 26316);       // #0066CC
         $this->RegisterPropertyInteger('TemperaturePoint2', 30);
