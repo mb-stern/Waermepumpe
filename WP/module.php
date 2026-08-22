@@ -1599,6 +1599,41 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
+    const applyWWValvePipeGeometry = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+        const pipeToBuffer = svg.querySelector('#pathPipeToBuffer');
+
+        if (!pipeToBuffer) {
+            return;
+        }
+
+        /*
+         * Original:
+         * m 598,450 c 22,0 22,-15 22,-30 V 158 ...
+         *
+         * Der erste Bogen von (598/450) bis (620/420) liegt direkt
+         * innerhalb des Umschaltventils (Mittelpunkt 620/450, r=30).
+         *
+         * Ist das Ventil konfiguriert, startet die Leitung deshalb erst
+         * am oberen Rand des Ventils bei (620/420). Nur das tatsächlich
+         * hinter dem Ventil liegende Leitungsstück entfällt.
+         */
+        const originalPath =
+            'm 598,450 c 22,0 22,-15 22,-30 V 158 c 0,-12 5,-18 18,-18 H 750';
+
+        const valvePath =
+            'M 620,420 V 158 c 0,-12 5,-18 18,-18 H 750';
+
+        pipeToBuffer.setAttribute(
+            'd',
+            currentConfig.wwHeatingValve ? valvePath : originalPath
+        );
+    };
+
     const applyOptionalStatusVisibility = (card) => {
         if (!card || !card.content) {
             return;
@@ -2007,6 +2042,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyThemeColors(this);
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
+                        applyWWValvePipeGeometry(this);
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
@@ -2034,6 +2070,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyThemeColors(card);
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
+                applyWWValvePipeGeometry(card);
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
