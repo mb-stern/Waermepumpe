@@ -37,9 +37,6 @@ class Waermepumpe extends IPSModuleStrict
         'HeaterRodHP',
         'HeaterRodLevel1',
         'HeaterRodLevel2',
-        'HeaterRod1',
-        'HeaterRod2',
-        'HeaterRod3',
         'ThermalSolarPump'
     ];
 
