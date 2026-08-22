@@ -2668,6 +2668,245 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
+    const storedHeatingTemperatureKey =
+        'symconHeatPumpStoredHeatingTemperatures';
+
+    const loadStoredHeatingTemperatures = () => {
+        try {
+            const raw = window.sessionStorage
+                ? window.sessionStorage.getItem(storedHeatingTemperatureKey)
+                : null;
+
+            return raw ? JSON.parse(raw) : {};
+        } catch (error) {
+            return {};
+        }
+    };
+
+    const saveStoredHeatingTemperatures = (values) => {
+        try {
+            if (window.sessionStorage) {
+                window.sessionStorage.setItem(
+                    storedHeatingTemperatureKey,
+                    JSON.stringify(values)
+                );
+            }
+        } catch (error) {
+            // Anzeige funktioniert auch ohne Session-Speicher.
+        }
+    };
+
+    let storedHeatingTemperatures = loadStoredHeatingTemperatures();
+
+    const applySingleCircuitTemperatureDisplay = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        /*
+         * Diese Erweiterung gilt bewusst nur bei genau EINEM Heizkreis.
+         */
+        const circuits = [
+            {
+                key: '1',
+                type: String(currentConfig.heatingCircuitType1 || 'off'),
+                supply: currentConfig.supplyTemperatureHeating,
+                reflux: currentConfig.refluxTemperatureHeating,
+                supplyText: '#textSupplyTemperatureHeating',
+                refluxText: '#textRefluxTemperatureHeating'
+            },
+            {
+                key: '2',
+                type: String(currentConfig.heatingCircuitType2 || 'off'),
+                supply: currentConfig.supplyTemperatureHeating2,
+                reflux: currentConfig.refluxTemperatureHeating2,
+                supplyText: '#textSupplyTemperatureHeating2',
+                refluxText: '#textRefluxTemperatureHeating2'
+            },
+            {
+                key: '3',
+                type: String(currentConfig.heatingCircuitType3 || 'off'),
+                supply: currentConfig.supplyTemperatureHeating3,
+                reflux: currentConfig.refluxTemperatureHeating3,
+                supplyText: '#textSupplyTemperatureHeating3',
+                refluxText: '#textRefluxTemperatureHeating3'
+            }
+        ];
+
+        const activeCircuits = circuits.filter(
+            (circuit) => circuit.type !== 'off'
+        );
+
+        const tankGroup = svg.querySelector('#gTankWW');
+
+        /*
+         * Zusatztexte am Boiler entfernen, wenn mehr oder weniger als
+         * ein Heizkreis aktiv ist.
+         */
+        const removeBoilerTexts = () => {
+            [
+                '#symconBoilerSupplyTemperature',
+                '#symconBoilerRefluxTemperature'
+            ].forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (element && element.parentNode) {
+                    element.parentNode.removeChild(element);
+                }
+            });
+        };
+
+        if (activeCircuits.length !== 1 || !tankGroup) {
+            removeBoilerTexts();
+            return;
+        }
+
+        const circuit = activeCircuits[0];
+
+        /*
+         * Allein die Stellung des konfigurierten Umschaltventils ist
+         * maßgebend:
+         *   aktiv   = Boiler
+         *   inaktiv = Heizung
+         *
+         * Ohne Ventil gibt es keine Einfrier-/Umschaltlogik.
+         */
+        const valveConfigured = !!currentConfig.wwHeatingValve;
+        const boilerActive =
+            valveConfigured && stateIsOn(currentConfig.wwHeatingValve);
+
+        const supplyTemperature = readStateNumber(circuit.supply);
+        const refluxTemperature = readStateNumber(circuit.reflux);
+
+        const formatTemperature = (value) => {
+            if (value === null || !Number.isFinite(Number(value))) {
+                return '';
+            }
+
+            return new Intl.NumberFormat('de-CH', {
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1
+            }).format(Number(value)) + ' °C';
+        };
+
+        /*
+         * Im Heizbetrieb die letzten echten Heizkreiswerte speichern.
+         * Beim Boilerbetrieb werden diese Werte nicht mehr überschrieben.
+         */
+        if (
+            !boilerActive
+            && supplyTemperature !== null
+            && refluxTemperature !== null
+        ) {
+            storedHeatingTemperatures[circuit.key] = {
+                supply: supplyTemperature,
+                reflux: refluxTemperature
+            };
+
+            saveStoredHeatingTemperatures(storedHeatingTemperatures);
+        }
+
+        /*
+         * Beim Umschalten auf Boiler bleiben die Temperaturtexte am
+         * Heizkörper / an der Fußbodenheizung auf den letzten Heizwerten.
+         */
+        if (boilerActive) {
+            const stored = storedHeatingTemperatures[circuit.key];
+
+            if (stored) {
+                const supplyText = svg.querySelector(circuit.supplyText);
+                const refluxText = svg.querySelector(circuit.refluxText);
+
+                if (supplyText) {
+                    supplyText.textContent =
+                        formatTemperature(stored.supply);
+                }
+
+                if (refluxText) {
+                    refluxText.textContent =
+                        formatTemperature(stored.reflux);
+                }
+            }
+        }
+
+        const boilerTemperature =
+            readStateNumber(currentConfig.tankTempWWUp)
+            ?? readStateNumber(currentConfig.tankTempWWMiddle)
+            ?? readStateNumber(currentConfig.tankTempWWDown);
+
+        /*
+         * Zwei zusätzliche Temperaturwerte neben der Boiler-Wendel.
+         */
+        const ensureText = (id, y) => {
+            let element = svg.querySelector('#' + id);
+
+            if (!element) {
+                element = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'text'
+                );
+                element.setAttribute('id', id);
+                element.setAttribute('x', '642');
+                element.setAttribute('y', String(y));
+                element.setAttribute('text-anchor', 'end');
+                element.setAttribute('xml:space', 'preserve');
+                element.style.setProperty('font-size', '14px', 'important');
+                element.style.setProperty(
+                    'fill',
+                    'var(--primary-text-color)',
+                    'important'
+                );
+
+                tankGroup.appendChild(element);
+            }
+
+            return element;
+        };
+
+        const boilerSupplyText = ensureText(
+            'symconBoilerSupplyTemperature',
+            485
+        );
+        const boilerRefluxText = ensureText(
+            'symconBoilerRefluxTemperature',
+            507
+        );
+
+        if (boilerActive) {
+            /*
+             * Boiler wird geladen:
+             * Hier zeigen wir die aktuell anliegenden Vorlauf-/Rücklaufwerte.
+             * Diese Variablen dürfen während der Boilerladung weiterlaufen;
+             * nur die Anzeige am Heizkreis wird eingefroren.
+             */
+            boilerSupplyText.textContent =
+                'VL ' + formatTemperature(supplyTemperature);
+            boilerRefluxText.textContent =
+                'RL ' + formatTemperature(refluxTemperature);
+        } else {
+            /*
+             * Boiler wird nicht geladen:
+             * Beide Seiten der Wendel entsprechen optisch der Boiler-
+             * temperatur und zeigen deshalb denselben Wert.
+             */
+            const boilerText = formatTemperature(boilerTemperature);
+
+            boilerSupplyText.textContent =
+                boilerText ? 'VL ' + boilerText : '';
+            boilerRefluxText.textContent =
+                boilerText ? 'RL ' + boilerText : '';
+        }
+
+        /*
+         * Ohne konfiguriertes Ventil keine zusätzliche Boiler-VL/RL-Anzeige,
+         * weil keine hydraulische Umschaltung bekannt ist.
+         */
+        if (!valveConfigured) {
+            removeBoilerTexts();
+        }
+    };
+
     const applyTerminology = (card) => {
         if (!card || !card.content) {
             return;
@@ -3098,6 +3337,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyControlIcons(this);
                         applyFanAnimation(this);
                         applyHeatingReturnContinuity(this);
+                        applySingleCircuitTemperatureDisplay(this);
                     }
 
                     return result;
@@ -3131,6 +3371,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyControlIcons(card);
                 applyFanAnimation(card);
                 applyHeatingReturnContinuity(card);
+                applySingleCircuitTemperatureDisplay(card);
             }
         } catch (error) {
             showError(
