@@ -181,6 +181,14 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TankTempWWMiddle', 0);
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
 
+        // Farben Heizkreis (Temperatur-Farbverlauf)
+        $this->RegisterPropertyInteger('HeatingCircuitColor10', 18100);      // #0046B4
+        $this->RegisterPropertyInteger('HeatingCircuitColor20', 2201331);    // #2196F3
+        $this->RegisterPropertyInteger('HeatingCircuitColor30', 6602495);    // #64BEFF
+        $this->RegisterPropertyInteger('HeatingCircuitColor35', 16772411);   // #FFEB3B
+        $this->RegisterPropertyInteger('HeatingCircuitColor45', 16750592);   // #FF9800
+        $this->RegisterPropertyInteger('HeatingCircuitColor55', 16007990);   // #F44336
+
         // Heizkreis 1
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
         $this->RegisterPropertyInteger('HeatingCircuitPumpRunning1', 0);
@@ -484,6 +492,29 @@ class Waermepumpe extends IPSModuleStrict
             $this->HeatingCircuitPanel(1),
             $this->HeatingCircuitPanel(2),
             $this->HeatingCircuitPanel(3),
+
+            [
+                'type'    => 'ExpansionPanel',
+                'caption' => 'Farben Heizkreis',
+                'items'   => [
+                    [
+                        'type'  => 'RowLayout',
+                        'items' => [
+                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor10', 'caption' => '10 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor20', 'caption' => '20 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor30', 'caption' => '30 °C', 'allowTransparent' => false]
+                        ]
+                    ],
+                    [
+                        'type'  => 'RowLayout',
+                        'items' => [
+                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor35', 'caption' => '35 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor45', 'caption' => '45 °C', 'allowTransparent' => false],
+                            ['type' => 'SelectColor', 'name' => 'HeatingCircuitColor55', 'caption' => '55 °C', 'allowTransparent' => false]
+                        ]
+                    ]
+                ]
+            ],
 
             [
                 'type'    => 'ExpansionPanel',
@@ -1700,12 +1731,15 @@ class Waermepumpe extends IPSModuleStrict
 
         /*
          * Gemeinsame Farbskala für Heizen und Kühlen:
+         * Standard:
          * 10 °C dunkelblau
          * 20 °C blau
-         * 30 °C grün
-         * 40 °C gelb
-         * 50 °C orange
-         * 60 °C rot
+         * 30 °C hellblau
+         * 35 °C gelb
+         * 45 °C orange
+         * 55 °C rot
+         *
+         * Alle sechs Farben sind im Konfigurationsformular einstellbar.
          */
         const temperatureColor = (temperature) => {
             const value = Number(temperature);
@@ -1714,13 +1748,30 @@ class Waermepumpe extends IPSModuleStrict
                 return null;
             }
 
+            const configuredColors = currentConfig.heatingCircuitColors || {};
+
+            const intToRgb = (value, fallback) => {
+                const number = Number(value);
+                if (!Number.isFinite(number)) {
+                    return fallback;
+                }
+
+                const color = Math.max(0, Math.min(0xFFFFFF, Math.trunc(number)));
+
+                return [
+                    (color >> 16) & 0xFF,
+                    (color >> 8) & 0xFF,
+                    color & 0xFF
+                ];
+            };
+
             const stops = [
-                [10, [0, 70, 180]],
-                [20, [33, 150, 243]],
-                [30, [76, 175, 80]],
-                [40, [255, 235, 59]],
-                [50, [255, 152, 0]],
-                [60, [244, 67, 54]]
+                [10, intToRgb(configuredColors['10'], [0, 70, 180])],
+                [20, intToRgb(configuredColors['20'], [33, 150, 243])],
+                [30, intToRgb(configuredColors['30'], [100, 190, 255])],
+                [35, intToRgb(configuredColors['35'], [255, 235, 59])],
+                [45, intToRgb(configuredColors['45'], [255, 152, 0])],
+                [55, intToRgb(configuredColors['55'], [244, 67, 54])]
             ];
 
             const toHex = (rgb) =>
@@ -2480,6 +2531,15 @@ HTML;
             'heaterRod2Threshold'           => $this->ReadPropertyInteger('HeaterRod2Threshold'),
             'heaterRod3'                    => $this->EntityName('HeaterRod3'),
             'heaterRod3Threshold'           => $this->ReadPropertyInteger('HeaterRod3Threshold'),
+
+            'heatingCircuitColors'          => [
+                '10' => $this->ReadPropertyInteger('HeatingCircuitColor10'),
+                '20' => $this->ReadPropertyInteger('HeatingCircuitColor20'),
+                '30' => $this->ReadPropertyInteger('HeatingCircuitColor30'),
+                '35' => $this->ReadPropertyInteger('HeatingCircuitColor35'),
+                '45' => $this->ReadPropertyInteger('HeatingCircuitColor45'),
+                '55' => $this->ReadPropertyInteger('HeatingCircuitColor55')
+            ],
 
             'thermalSolarAvailable'         => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
             'thermalSolarPump'              => $this->EntityName('ThermalSolarPump'),
