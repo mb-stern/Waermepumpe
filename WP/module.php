@@ -1993,15 +1993,8 @@ class Waermepumpe extends IPSModuleStrict
             stops[stops.length - 1].setAttribute('stop-color', refluxColor);
         };
 
-        const setHeatExchangerCoilGradient = (hotColor, coolColor) => {
-            /*
-             * Beide Wärmetauscher-Wendeln der Original-SVG verwenden
-             * linearGradientPipe1:
-             *   - pathPipeHotColdHeatpump  (Wendel bei der Wärmepumpe)
-             *   - pathPipeHotWaterToTank   (Wendel im Warmwasserspeicher)
-             */
-            const gradient = svg.querySelector('#linearGradientPipe1');
-            if (!gradient || !hotColor || !coolColor) {
+        const setGradientStops = (gradient, color1, color2) => {
+            if (!gradient || !color1 || !color2) {
                 return;
             }
 
@@ -2010,36 +2003,68 @@ class Waermepumpe extends IPSModuleStrict
                 return;
             }
 
-            stops[0].style.setProperty('stop-color', hotColor, 'important');
-            stops[0].setAttribute('stop-color', hotColor);
+            stops[0].style.setProperty('stop-color', color1, 'important');
+            stops[0].setAttribute('stop-color', color1);
 
             stops[stops.length - 1].style.setProperty(
                 'stop-color',
-                coolColor,
+                color2,
                 'important'
             );
-            stops[stops.length - 1].setAttribute('stop-color', coolColor);
+            stops[stops.length - 1].setAttribute('stop-color', color2);
+        };
 
-            /*
-             * Sicherstellen, dass beide Pfade wirklich den gemeinsamen
-             * Gradient verwenden und keine frühere Direktfarbe gewinnt.
-             */
-            [
-                '#pathPipeHotColdHeatpump',
-                '#pathPipeHotWaterToTank'
-            ].forEach((selector) => {
-                const element = svg.querySelector(selector);
-                if (!element) {
-                    return;
-                }
+        const setHeatPumpCoilGradient = (hotColor, coolColor) => {
+            const gradient = svg.querySelector('#linearGradientPipe1');
+            setGradientStops(gradient, hotColor, coolColor);
 
-                element.style.removeProperty('stroke');
-                element.style.setProperty(
+            const heatPumpCoil = svg.querySelector('#pathPipeHotColdHeatpump');
+            if (heatPumpCoil) {
+                heatPumpCoil.style.setProperty(
                     'stroke',
                     'url(#linearGradientPipe1)',
                     'important'
                 );
+            }
+        };
+
+        const ensureBoilerCoilGradient = () => {
+            let gradient = svg.querySelector('#symconLinearGradientBoilerCoil');
+            if (gradient) {
+                return gradient;
+            }
+
+            const original = svg.querySelector('#linearGradientPipe1');
+            if (!original) {
+                return null;
+            }
+
+            gradient = original.cloneNode(true);
+            gradient.setAttribute('id', 'symconLinearGradientBoilerCoil');
+
+            gradient.querySelectorAll('stop').forEach((stop, index) => {
+                stop.setAttribute(
+                    'id',
+                    'symconBoilerCoilStop' + (index + 1)
+                );
             });
+
+            original.parentNode.appendChild(gradient);
+            return gradient;
+        };
+
+        const setBoilerCoilGradient = (hotColor, coolColor) => {
+            const gradient = ensureBoilerCoilGradient();
+            setGradientStops(gradient, hotColor, coolColor);
+
+            const boilerCoil = svg.querySelector('#pathPipeHotWaterToTank');
+            if (boilerCoil) {
+                boilerCoil.style.setProperty(
+                    'stroke',
+                    'url(#symconLinearGradientBoilerCoil)',
+                    'important'
+                );
+            }
         };
 
         let firstHeatingColors = null;
@@ -2138,12 +2163,24 @@ class Waermepumpe extends IPSModuleStrict
             );
 
             /*
+             * Die Wendel an der Wärmepumpe wird von der Boiler-Logik
+             * nicht verändert. Falls gespeicherte Heizkreisfarben vorhanden
+             * sind, behält sie ihren bisherigen Heizungs-Verlauf.
+             */
+            if (firstHeatingColors) {
+                setHeatPumpCoilGradient(
+                    firstHeatingColors.supply,
+                    firstHeatingColors.reflux
+                );
+            }
+
+            /*
              * Warmwasserladung aktiv:
              * Die Boiler-Wendel zeigt jetzt den echten Temperaturverlauf:
              * Eintritt = aktueller WP-Vorlauf,
              * Rücklauf/Boilerseite = aktuelle Boilertemperatur.
              */
-            setHeatExchangerCoilGradient(
+            setBoilerCoilGradient(
                 hotColor,
                 boilerColor || hotColor
             );
@@ -2215,6 +2252,11 @@ class Waermepumpe extends IPSModuleStrict
                 ],
                 firstHeatingColors.reflux
             );
+
+            setHeatPumpCoilGradient(
+                firstHeatingColors.supply,
+                firstHeatingColors.reflux
+            );
         }
 
         /*
@@ -2240,7 +2282,7 @@ class Waermepumpe extends IPSModuleStrict
          * weiter oben der Verlauf aus WP-Vorlauf und Boiler/Rücklauf gesetzt.
          */
         if (boilerColor) {
-            setHeatExchangerCoilGradient(
+            setBoilerCoilGradient(
                 boilerColor,
                 boilerColor
             );
