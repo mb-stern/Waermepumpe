@@ -1916,6 +1916,14 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         const svg = card.content;
+
+        /*
+         * Hydraulische Stellung ausschließlich über das konfigurierte
+         * Umschaltventil Warmwasser/Heizung bestimmen.
+         *
+         * Ventil aktiv = Boiler/Warmwasser
+         * Ventil inaktiv = Heizkreis
+         */
         const hotWaterActive = stateIsOn(currentConfig.wwHeatingValve);
 
         const circuits = [
@@ -2139,15 +2147,38 @@ class Waermepumpe extends IPSModuleStrict
          *   und die Heizwendel im Boiler. Die Heizkreisfarben bleiben stehen.
          */
         if (hotWaterActive) {
-            const hpSupplyTemperature = readStateNumber(currentConfig.supplyTemperature);
+            /*
+             * Während der Warmwasserladung bleiben die Heizkreis-Symbole auf
+             * ihren gespeicherten Heizfarben. Für Wärmepumpe und Boiler-Wendel
+             * verwenden wir dagegen die AKTUELLEN Vorlauf-/Rücklaufwerte.
+             *
+             * Priorität:
+             *   Heizkreis 1 -> Heizkreis 2 -> Heizkreis 3 -> WP-Vorlauf
+             */
+            const currentSupplyTemperature =
+                readStateNumber(currentConfig.supplyTemperatureHeating)
+                ?? readStateNumber(currentConfig.supplyTemperatureHeating2)
+                ?? readStateNumber(currentConfig.supplyTemperatureHeating3)
+                ?? readStateNumber(currentConfig.supplyTemperature);
+
+            const currentRefluxTemperature =
+                readStateNumber(currentConfig.refluxTemperatureHeating)
+                ?? readStateNumber(currentConfig.refluxTemperatureHeating2)
+                ?? readStateNumber(currentConfig.refluxTemperatureHeating3);
+
             const boilerTemperature =
                 readStateNumber(currentConfig.tankTempWWUp)
                 ?? readStateNumber(currentConfig.tankTempWWMiddle)
                 ?? readStateNumber(currentConfig.tankTempWWDown);
 
             const hotColor =
-                temperatureColor(hpSupplyTemperature)
+                temperatureColor(currentSupplyTemperature)
                 || temperatureColor(boilerTemperature);
+
+            const refluxColor =
+                temperatureColor(currentRefluxTemperature)
+                || temperatureColor(boilerTemperature)
+                || hotColor;
 
             const boilerColor =
                 temperatureColor(boilerTemperature)
@@ -2163,36 +2194,38 @@ class Waermepumpe extends IPSModuleStrict
             );
 
             /*
-             * Die Wendel an der Wärmepumpe wird von der Boiler-Logik
-             * nicht verändert. Falls gespeicherte Heizkreisfarben vorhanden
-             * sind, behält sie ihren bisherigen Heizungs-Verlauf.
+             * Wärmepumpen-Wendel:
+             * aktuelle Vorlauf-/Rücklauftemperatur, unabhängig vom
+             * separaten Boiler-Gradienten.
              */
-            if (firstHeatingColors) {
+            if (hotColor && refluxColor) {
                 setHeatPumpCoilGradient(
-                    firstHeatingColors.supply,
-                    firstHeatingColors.reflux
+                    hotColor,
+                    refluxColor
                 );
             }
 
             /*
              * Warmwasserladung aktiv:
-             * Die Boiler-Wendel zeigt jetzt den echten Temperaturverlauf:
-             * Eintritt = aktueller WP-Vorlauf,
-             * Rücklauf/Boilerseite = aktuelle Boilertemperatur.
+             * Boiler-Wendel = aktuelle Vorlauf-/Rücklauftemperatur.
              */
             setBoilerCoilGradient(
                 hotColor,
-                boilerColor || hotColor
+                refluxColor
             );
 
-            // Gemeinsame Leitung zur Heizseite nicht live mitziehen lassen.
+            // Heizseite während Boilerladung vollständig eingefroren lassen.
             if (firstHeatingColors) {
                 setStrokeColor(
                     ['#pathPipeToBuffer'],
                     firstHeatingColors.supply
                 );
                 setStrokeColor(
-                    ['#pathPipeFromBuffer'],
+                    [
+                        '#pathPipeFromBuffer',
+                        '#pathPipeToHP',
+                        '#pathPipeToHP2'
+                    ],
                     firstHeatingColors.reflux
                 );
             }
@@ -2307,6 +2340,76 @@ class Waermepumpe extends IPSModuleStrict
             ],
             temperatureColor(evaporatorTemperature)
         );
+    };
+
+    const applyHeatingReturnContinuity = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        const hotWaterActive = stateIsOn(currentConfig.wwHeatingValve);
+
+        const readFirstNumber = (entities) => {
+            for (const entity of entities) {
+                const value = readStateNumber(entity);
+                if (value !== null) {
+                    return value;
+                }
+            }
+
+            return null;
+        };
+
+        let refluxColor = null;
+
+        if (hotWaterActive) {
+            /*
+             * Während Warmwasserladung die zuletzt gespeicherte Heizfarbe
+             * verwenden, damit der Heizkreis optisch eingefroren bleibt.
+             */
+            const stored =
+                storedCircuitColors['1']
+                || storedCircuitColors['2']
+                || storedCircuitColors['3'];
+
+            refluxColor = stored && stored.reflux
+                ? stored.reflux
+                : null;
+        } else {
+            const refluxTemperature = readFirstNumber([
+                currentConfig.refluxTemperatureHeating,
+                currentConfig.refluxTemperatureHeating2,
+                currentConfig.refluxTemperatureHeating3
+            ]);
+
+            refluxColor = temperatureColor(refluxTemperature);
+        }
+
+        if (!refluxColor) {
+            return;
+        }
+
+        /*
+         * Diese SVG-Elemente bilden die sichtbare Rücklaufkette rechts.
+         * Besonders pathPipeToHP2 ist das kurze Teilstück, das sonst gerne
+         * in der ursprünglichen blauen Card-Farbe stehen bleibt.
+         */
+        [
+            '#pathPipeFromBuffer',
+            '#pathPipeToHP',
+            '#pathPipeToHP2'
+        ].forEach((selector) => {
+            const element = svg.querySelector(selector);
+
+            if (!element) {
+                return;
+            }
+
+            element.setAttribute('stroke', refluxColor);
+            element.style.setProperty('stroke', refluxColor, 'important');
+        });
     };
 
     const applyTerminology = (card) => {
@@ -2736,6 +2839,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
+                        applyHeatingReturnContinuity(this);
                     }
 
                     return result;
@@ -2766,6 +2870,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
+                applyHeatingReturnContinuity(card);
             }
         } catch (error) {
             showError(
