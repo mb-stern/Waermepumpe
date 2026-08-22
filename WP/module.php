@@ -193,7 +193,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TemperaturePoint5', 60);
         $this->RegisterPropertyInteger('TemperatureColor5', 15746116);    // #F04444
         $this->RegisterPropertyInteger('TemperaturePoint6', 70);
-        $this->RegisterPropertyInteger('TemperatureColor6', 10361627);    // #9E1B1B
+        $this->RegisterPropertyInteger('TemperatureColor6', 16711680);    // #FF0000
 
         // Heizkreis 1
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
@@ -1112,7 +1112,7 @@ class Waermepumpe extends IPSModuleStrict
             {temperature: 40, color: 16769126},
             {temperature: 50, color: 16752412},
             {temperature: 60, color: 15746116},
-            {temperature: 70, color: 10361627}
+            {temperature: 70, color: 16711680}
         ];
 
         const intToRgb = (value, fallback) => {
@@ -1136,7 +1136,7 @@ class Waermepumpe extends IPSModuleStrict
             [255, 224, 102],
             [255, 159, 28],
             [240, 68, 68],
-            [158, 27, 27]
+            [255, 0, 0]
         ];
 
         const stops = defaults.map((fallback, index) => {
@@ -1910,6 +1910,52 @@ class Waermepumpe extends IPSModuleStrict
 
     let storedCircuitColors = loadStoredCircuitColors();
 
+    const applyTemperatureColorOpacity = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        /*
+         * Die Original-Card verwendet bei Speicher und Hydraulik teilweise
+         * 50 % Deckkraft. Das verfälscht konfigurierte Temperaturfarben auf
+         * dunklem Hintergrund erheblich (Rot wirkt z.B. braun).
+         *
+         * Temperaturfarben deshalb überall mit voller Deckkraft darstellen.
+         */
+        [
+            '#pathTankWWChassis',
+            '#pathTankHPChassis'
+        ].forEach((selector) => {
+            const element = svg.querySelector(selector);
+            if (element) {
+                element.style.setProperty('fill-opacity', '1', 'important');
+            }
+        });
+
+        [
+            '#pathPipeRefluxWW',
+            '#pathPipeToCirculatingPump',
+            '#pathPipeHotColdHeatpump',
+            '#pathPipeToBuffer',
+            '#pathPipeFromBuffer',
+            '#pathPipeHotWaterToTank',
+            '#pathPipeToHeatingCircuitPump',
+            '#pathPipeToHeatingCircuitPump2',
+            '#pathPipeToHeatingCircuitPump3',
+            '#pathPipeToHP',
+            '#pathPipeToHP2',
+            '#pathPipeBufferToHeating',
+            '#pathPipeHeatingToBuffer'
+        ].forEach((selector) => {
+            const element = svg.querySelector(selector);
+            if (element) {
+                element.style.setProperty('stroke-opacity', '1', 'important');
+            }
+        });
+    };
+
     const applyHeatingCircuitTemperatureColors = (card) => {
         if (!card || !card.content) {
             return;
@@ -1962,6 +2008,7 @@ class Waermepumpe extends IPSModuleStrict
                 const element = svg.querySelector(selector);
                 if (element) {
                     element.style.setProperty('stroke', color, 'important');
+                    element.style.setProperty('stroke-opacity', '1', 'important');
                 }
             });
         };
@@ -1975,6 +2022,7 @@ class Waermepumpe extends IPSModuleStrict
                 const element = svg.querySelector(selector);
                 if (element) {
                     element.style.setProperty('fill', color, 'important');
+                    element.style.setProperty('fill-opacity', '1', 'important');
                 }
             });
         };
@@ -2033,6 +2081,11 @@ class Waermepumpe extends IPSModuleStrict
                     'url(#linearGradientPipe1)',
                     'important'
                 );
+                heatPumpCoil.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
             }
         };
 
@@ -2070,6 +2123,11 @@ class Waermepumpe extends IPSModuleStrict
                 boilerCoil.style.setProperty(
                     'stroke',
                     'url(#symconLinearGradientBoilerCoil)',
+                    'important'
+                );
+                boilerCoil.style.setProperty(
+                    'stroke-opacity',
+                    '1',
                     'important'
                 );
             }
@@ -2128,6 +2186,24 @@ class Waermepumpe extends IPSModuleStrict
             }
 
             setGradient(circuit.gradient, colors.supply, colors.reflux);
+
+            [
+                '#pathUnderfloorHeating' + circuit.key,
+                '#pathRadiatorPipeIn' + circuit.key,
+                '#pathRadiatorPipeOut' + circuit.key
+            ].forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (element) {
+                    element.style.setProperty('stroke-opacity', '1', 'important');
+                }
+            });
+
+            const radiator = svg.querySelector('#rectRadiator' + circuit.key);
+            if (radiator) {
+                radiator.style.setProperty('stroke-opacity', '1', 'important');
+                radiator.style.setProperty('fill-opacity', '1', 'important');
+            }
+
             setStrokeColor(circuit.supplyPipes, colors.supply);
             setStrokeColor(circuit.refluxPipes, colors.reflux);
         });
@@ -2836,6 +2912,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyOptionalStatusVisibility(this);
                         applyWWValvePipeGeometry(this);
                         applyHeatingCircuitTemperatureColors(this);
+                        applyTemperatureColorOpacity(this);
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
@@ -2867,6 +2944,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyOptionalStatusVisibility(card);
                 applyWWValvePipeGeometry(card);
                 applyHeatingCircuitTemperatureColors(card);
+                applyTemperatureColorOpacity(card);
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
