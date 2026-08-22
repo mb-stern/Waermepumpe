@@ -1691,6 +1691,146 @@ class Waermepumpe extends IPSModuleStrict
         }
     };
 
+    const applyHeatingCircuitTemperatureColors = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        /*
+         * Gemeinsame Farbskala für Heizen und Kühlen:
+         * 10 °C dunkelblau
+         * 20 °C blau
+         * 30 °C grün
+         * 40 °C gelb
+         * 50 °C orange
+         * 60 °C rot
+         */
+        const temperatureColor = (temperature) => {
+            const value = Number(temperature);
+
+            if (!Number.isFinite(value)) {
+                return null;
+            }
+
+            const stops = [
+                [10, [0, 70, 180]],
+                [20, [33, 150, 243]],
+                [30, [76, 175, 80]],
+                [40, [255, 235, 59]],
+                [50, [255, 152, 0]],
+                [60, [244, 67, 54]]
+            ];
+
+            const toHex = (rgb) =>
+                '#' + rgb.map((component) =>
+                    Math.max(0, Math.min(255, Math.round(component)))
+                        .toString(16)
+                        .padStart(2, '0')
+                ).join('');
+
+            if (value <= stops[0][0]) {
+                return toHex(stops[0][1]);
+            }
+
+            const last = stops[stops.length - 1];
+            if (value >= last[0]) {
+                return toHex(last[1]);
+            }
+
+            for (let i = 0; i < stops.length - 1; i++) {
+                const [t1, c1] = stops[i];
+                const [t2, c2] = stops[i + 1];
+
+                if (value >= t1 && value <= t2) {
+                    const factor = (value - t1) / (t2 - t1);
+
+                    return toHex(c1.map((component, index) =>
+                        component + (c2[index] - component) * factor
+                    ));
+                }
+            }
+
+            return null;
+        };
+
+        const readStateNumber = (entity) => {
+            if (!entity || !currentStates || !currentStates[entity]) {
+                return null;
+            }
+
+            const raw = currentStates[entity].state;
+            const normalized = String(raw ?? '')
+                .trim()
+                .replace(',', '.')
+                .replace(/[^0-9+\-.]/g, '');
+
+            const value = Number(normalized);
+            return Number.isFinite(value) ? value : null;
+        };
+
+        const circuits = [
+            {
+                gradient: 'linearGradientCircuit1',
+                supply: currentConfig.supplyTemperatureHeating,
+                reflux: currentConfig.refluxTemperatureHeating
+            },
+            {
+                gradient: 'linearGradientCircuit2',
+                supply: currentConfig.supplyTemperatureHeating2,
+                reflux: currentConfig.refluxTemperatureHeating2
+            },
+            {
+                gradient: 'linearGradientCircuit3',
+                supply: currentConfig.supplyTemperatureHeating3,
+                reflux: currentConfig.refluxTemperatureHeating3
+            }
+        ];
+
+        circuits.forEach(({gradient, supply, reflux}) => {
+            const gradientElement = svg.querySelector('#' + gradient);
+
+            if (!gradientElement) {
+                return;
+            }
+
+            const supplyTemperature = readStateNumber(supply);
+            const refluxTemperature = readStateNumber(reflux);
+
+            /*
+             * Nur eingreifen, wenn die Temperaturen tatsächlich konfiguriert
+             * und lesbar sind. Sonst bleibt die Originalfarbe der Card.
+             */
+            if (supplyTemperature === null || refluxTemperature === null) {
+                return;
+            }
+
+            const supplyColor = temperatureColor(supplyTemperature);
+            const refluxColor = temperatureColor(refluxTemperature);
+
+            if (!supplyColor || !refluxColor) {
+                return;
+            }
+
+            const stops = gradientElement.querySelectorAll('stop');
+            if (stops.length < 2) {
+                return;
+            }
+
+            /*
+             * Die beiden Enden des vorhandenen SVG-Gradienten werden ersetzt.
+             * Geometrie, Heizkörper/Fußbodenheizung und Leitungen bleiben
+             * vollständig Original-Card.
+             */
+            stops[0].style.setProperty('stop-color', supplyColor, 'important');
+            stops[0].setAttribute('stop-color', supplyColor);
+
+            stops[stops.length - 1].style.setProperty('stop-color', refluxColor, 'important');
+            stops[stops.length - 1].setAttribute('stop-color', refluxColor);
+        });
+    };
+
     const applyOptionalStatusVisibility = (card) => {
         if (!card || !card.content) {
             return;
@@ -2100,6 +2240,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
                         applyWWValvePipeGeometry(this);
+                        applyHeatingCircuitTemperatureColors(this);
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
@@ -2128,6 +2269,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
                 applyWWValvePipeGeometry(card);
+                applyHeatingCircuitTemperatureColors(card);
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
