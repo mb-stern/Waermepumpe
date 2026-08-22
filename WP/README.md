@@ -438,3 +438,8 @@ Wärmepumpen unterscheiden sich je nach Hersteller, Modell, Hydraulik und vorhan
 Nicht jede Anlage stellt sämtliche von der Visualisierung unterstützten Werte zur Verfügung. Nicht vorhandene Werte können einfach unkonfiguriert bleiben.
 
 Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betriebsdaten und ersetzt keine sicherheitsrelevanten Funktionen oder Regelungen der Wärmepumpe.
+
+## Versionen
+
+### Version 1.0 (22.08.2026)
+- Initiale Version.
