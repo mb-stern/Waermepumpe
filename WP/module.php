@@ -182,6 +182,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
 
         // Einheitlicher Temperatur-Farbverlauf für Heizkreis, Speicher und Wärmetauscher
+        $this->RegisterPropertyBoolean('UseCustomTemperatureColors', true);
         $this->RegisterPropertyInteger('TemperaturePoint1', 20);
         $this->RegisterPropertyInteger('TemperatureColor1', 26316);       // #0066CC
         $this->RegisterPropertyInteger('TemperaturePoint2', 30);
@@ -522,6 +523,11 @@ class Waermepumpe extends IPSModuleStrict
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Temperaturfarben',
                 'items'   => [
+                    [
+                        'type' => 'CheckBox',
+                        'name' => 'UseCustomTemperatureColors',
+                        'caption' => 'Eigene Temperaturfarben verwenden'
+                    ],
                     [
                         'type' => 'RowLayout',
                         'items' => [
@@ -1115,6 +1121,8 @@ class Waermepumpe extends IPSModuleStrict
         return embeddedSvg;
     };
 
+    const originalTempColor = HeatPumpClass.prototype.tempColor;
+
     /*
      * Einheitliche Temperatur-Farbskala für die gesamte Hydraulik:
      * 20 / 30 / 40 / 50 / 60 / 70 °C.
@@ -1187,6 +1195,10 @@ class Waermepumpe extends IPSModuleStrict
         ).join('');
 
     const temperatureColor = (temperature) => {
+        if (!currentConfig.useCustomTemperatureColors) {
+            return null;
+        }
+
         const value = Number(temperature);
 
         if (!Number.isFinite(value)) {
@@ -1240,6 +1252,14 @@ class Waermepumpe extends IPSModuleStrict
      * Dadurch gilt automatisch dieselbe Skala für Puffer und Warmwasser.
      */
     HeatPumpClass.prototype.tempColor = function(temp) {
+        if (!currentConfig.useCustomTemperatureColors) {
+            if (typeof originalTempColor === 'function') {
+                return originalTempColor.call(this, temp);
+            }
+
+            return '#ffffff00';
+        }
+
         return temperatureColor(temp) || '#ffffff00';
     };
 
@@ -1929,7 +1949,92 @@ class Waermepumpe extends IPSModuleStrict
 
     let storedCircuitColors = loadStoredCircuitColors();
 
+    const restoreOriginalTemperatureColors = (card) => {
+        if (!card || !card.content || currentConfig.useCustomTemperatureColors) {
+            return;
+        }
+
+        const svg = card.content;
+
+        /*
+         * Entfernt ausschließlich unsere Inline-Überschreibungen.
+         * Danach greifen wieder die im Original-SVG/der Original-Card
+         * definierten Farben und Gradienten.
+         */
+        [
+            '#pathPipeRefluxWW',
+            '#pathPipeToCirculatingPump',
+            '#pathPipeHotColdHeatpump',
+            '#pathPipeToBuffer',
+            '#pathPipeFromBuffer',
+            '#pathPipeHotWaterToTank',
+            '#pathPipeToHeatingCircuitPump',
+            '#pathPipeToHeatingCircuitPump2',
+            '#pathPipeToHeatingCircuitPump3',
+            '#pathPipeToHP',
+            '#pathPipeToHP2',
+            '#pathPipeBufferToHeating',
+            '#pathPipeHeatingToBuffer',
+            '#pathHPModelCondenserSymbol',
+            '#pathHPModelEvaporatorSymbol001',
+            '#pathHPModelEvaporatorSymbol002',
+            '#pathUnderfloorHeating1',
+            '#pathUnderfloorHeating2',
+            '#pathUnderfloorHeating3',
+            '#pathRadiatorPipeIn1',
+            '#pathRadiatorPipeIn2',
+            '#pathRadiatorPipeIn3',
+            '#pathRadiatorPipeOut1',
+            '#pathRadiatorPipeOut2',
+            '#pathRadiatorPipeOut3',
+            '#rectRadiator1',
+            '#rectRadiator2',
+            '#rectRadiator3',
+            '#pathTankWWChassis',
+            '#pathTankHPChassis'
+        ].forEach((selector) => {
+            const element = svg.querySelector(selector);
+            if (!element) {
+                return;
+            }
+
+            element.style.removeProperty('stroke');
+            element.style.removeProperty('stroke-opacity');
+            element.style.removeProperty('fill');
+            element.style.removeProperty('fill-opacity');
+        });
+
+        /*
+         * Boiler-Wendel wieder an den Originalgradienten hängen.
+         */
+        const boilerCoil = svg.querySelector('#pathPipeHotWaterToTank');
+        if (boilerCoil) {
+            boilerCoil.style.removeProperty('display');
+            boilerCoil.style.removeProperty('visibility');
+            boilerCoil.style.removeProperty('stroke-width');
+            boilerCoil.style.removeProperty('stroke-opacity');
+            boilerCoil.style.setProperty(
+                'stroke',
+                'url(#linearGradientPipe1)'
+            );
+        }
+
+        const outline = svg.querySelector('#symconBoilerCoilOutline');
+        if (outline && outline.parentNode) {
+            outline.parentNode.removeChild(outline);
+        }
+
+        const customGradient = svg.querySelector('#symconLinearGradientBoilerCoil');
+        if (customGradient && customGradient.parentNode) {
+            customGradient.parentNode.removeChild(customGradient);
+        }
+    };
+
     const applyTemperatureColorOpacity = (card) => {
+        if (!currentConfig.useCustomTemperatureColors) {
+            return;
+        }
+
         if (!card || !card.content) {
             return;
         }
@@ -1976,6 +2081,10 @@ class Waermepumpe extends IPSModuleStrict
     };
 
     const applyHeatingCircuitTemperatureColors = (card) => {
+        if (!currentConfig.useCustomTemperatureColors) {
+            return;
+        }
+
         if (!card || !card.content) {
             return;
         }
@@ -2484,6 +2593,10 @@ class Waermepumpe extends IPSModuleStrict
     };
 
     const applyHeatingReturnContinuity = (card) => {
+        if (!currentConfig.useCustomTemperatureColors) {
+            return;
+        }
+
         if (!card || !card.content) {
             return;
         }
@@ -2978,6 +3091,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
                         applyWWValvePipeGeometry(this);
+                        restoreOriginalTemperatureColors(this);
                         applyHeatingCircuitTemperatureColors(this);
                         applyTemperatureColorOpacity(this);
                         applyThreeHeaterRods(this);
@@ -3010,6 +3124,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
                 applyWWValvePipeGeometry(card);
+                restoreOriginalTemperatureColors(card);
                 applyHeatingCircuitTemperatureColors(card);
                 applyTemperatureColorOpacity(card);
                 applyThreeHeaterRods(card);
@@ -3174,6 +3289,7 @@ HTML;
             'heaterRod3'                    => $this->EntityName('HeaterRod3'),
             'heaterRod3Threshold'           => $this->ReadPropertyInteger('HeaterRod3Threshold'),
 
+            'useCustomTemperatureColors'   => $this->ReadPropertyBoolean('UseCustomTemperatureColors'),
             'temperatureColorScale'        => [
                 [
                     'temperature' => $this->ReadPropertyInteger('TemperaturePoint1'),
