@@ -23,3 +23,8 @@ Unterstützt werden die drei von der Heat Pump Card vorgesehenen Wärmepumpentyp
 - Sole/Wasser (`G2W`)
 
 Je nach gewähltem Wärmepumpentyp wird die Darstellung automatisch angepasst.
+
+# Versionen
+
+### Version 1.0 (22.08.2026)
+- Initiale Version.
