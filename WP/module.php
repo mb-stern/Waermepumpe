@@ -1599,6 +1599,98 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
+    const applyWWValvePipeGeometry = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        const pipeToBuffer = svg.querySelector('#pathPipeToBuffer');
+        const pipeFromBuffer = svg.querySelector('#pathPipeFromBuffer');
+        const pipeHotCold = svg.querySelector('#pathPipeHotColdHeatpump');
+        const pipeHotWater = svg.querySelector('#pathPipeHotWaterToTank');
+
+        /*
+         * Das Umschaltventil sitzt bei (620 / 450), Radius 30.
+         * Es gibt drei Leitungsstücke, die in den Ventilbereich hineinlaufen:
+         *
+         * 1. pathPipeToBuffer          -> nach oben
+         * 2. pathPipeHotColdHeatpump  -> von links
+         * 3. pathPipeHotWaterToTank   -> vom Warmwasserspeicher
+         *
+         * Nur diese drei Endstücke werden am Ventilrand gekürzt.
+         */
+
+        if (pipeToBuffer) {
+            const original =
+                'm 598,450 c 22,0 22,-15 22,-30 V 158 c 0,-12 5,-18 18,-18 H 750';
+
+            const withValve =
+                'M 620,420 V 158 c 0,-12 5,-18 18,-18 H 750';
+
+            pipeToBuffer.setAttribute(
+                'd',
+                currentConfig.wwHeatingValve ? withValve : original
+            );
+        }
+
+        if (pipeFromBuffer) {
+            const original =
+                'm 997,265 c 0,15 0,30 -22,30 H 650 c -15,0 -22,13 -22,30 v 170 c 0,18 -18,30 -30,30';
+
+            /*
+             * Blaue Rücklaufleitung:
+             * Der senkrechte Abschnitt liegt bei x=628 und läuft damit
+             * durch den Ventilkreis (Mittelpunkt 620/450, r=30).
+             * Nur der Bereich innerhalb des Kreises wird ausgespart.
+             */
+            const withValve =
+                'm 997,265 c 0,15 0,30 -22,30 H 650 c -15,0 -22,13 -22,30 V 420 '
+                + 'M 628,480 V 495 c 0,18 -18,30 -30,30';
+
+            pipeFromBuffer.setAttribute(
+                'd',
+                currentConfig.wwHeatingValve ? withValve : original
+            );
+        }
+
+        if (pipeHotCold) {
+            const original =
+                'm 598,525 h -85 c -15,0 -30,0 -35,-15 0,-15 15,-15 30,-15 15,0 30,0 30,10 0,5 -15,5 -30,5 -15,0 -30,0 -30,-15 0,-15 15,-15 30,-15 15,0 30,0 30,10 0,5 -15,5 -30,5 -15,0 -30,0 -30,-15 0,-15 15,-15 30,-15 15,0 30,0 30,10 0,5 -15,5 -30,5 -15,0 -30,0 -30,-15 0,-15 15,-15 30,-15 h 90';
+
+            /*
+             * Original endet bei x=598 / y=450 und läuft damit in den
+             * Ventilkreis hinein. Mit Ventil endet der letzte horizontale
+             * Abschnitt bereits bei x=590, also exakt am linken Kreisrand.
+             */
+            const withValve =
+                'm 598,525 h -85 c -15,0 -30,0 -35,-15 0,-15 15,-15 30,-15 15,0 30,0 30,10 0,5 -15,5 -30,5 -15,0 -30,0 -30,-15 0,-15 15,-15 30,-15 15,0 30,0 30,10 0,5 -15,5 -30,5 -15,0 -30,0 -30,-15 0,-15 15,-15 30,-15 15,0 30,0 30,10 0,5 -15,5 -30,5 -15,0 -30,0 -30,-15 0,-15 15,-15 30,-15 h 82';
+
+            pipeHotCold.setAttribute(
+                'd',
+                currentConfig.wwHeatingValve ? withValve : original
+            );
+        }
+
+        if (pipeHotWater) {
+            const original =
+                'm 598,525 h 95 c 15,0 30,0 35,-15 0,-15 -15,-15 -30,-15 -15,0 -30,0 -30,10 0,5 15,5 30,5 15,0 30,0 30,-15 0,-15 -15,-15 -30,-15 -15,0 -30,0 -30,10 0,5 15,5 30,5 15,0 30,0 30,-15 0,-15 -15,-15 -30,-15 -15,0 -30,0 -30,10 0,5 15,5 30,5 15,0 30,0 30,-15 0,-15 -15,-15 -30,-15 H 598';
+
+            /*
+             * Dieser Pfad kommt von rechts aus Richtung Warmwasserspeicher.
+             * Mit Ventil endet er deshalb am rechten Kreisrand bei x=650.
+             */
+            const withValve =
+                'm 598,525 h 95 c 15,0 30,0 35,-15 0,-15 -15,-15 -30,-15 -15,0 -30,0 -30,10 0,5 15,5 30,5 15,0 30,0 30,-15 0,-15 -15,-15 -30,-15 -15,0 -30,0 -30,10 0,5 15,5 30,5 15,0 30,0 30,-15 0,-15 -15,-15 -30,-15 -15,0 -30,0 -30,10 0,5 15,5 30,5 15,0 30,0 30,-15 0,-15 -15,-15 -30,-15 H 650';
+
+            pipeHotWater.setAttribute(
+                'd',
+                currentConfig.wwHeatingValve ? withValve : original
+            );
+        }
+    };
+
     const applyOptionalStatusVisibility = (card) => {
         if (!card || !card.content) {
             return;
@@ -2007,6 +2099,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyThemeColors(this);
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
+                        applyWWValvePipeGeometry(this);
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
@@ -2034,6 +2127,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyThemeColors(card);
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
+                applyWWValvePipeGeometry(card);
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
