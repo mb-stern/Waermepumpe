@@ -2138,9 +2138,10 @@ class Waermepumpe extends IPSModuleStrict
             );
 
             /*
-             * Warmwasserladung:
-             * Oben/heiß = aktueller WP-Vorlauf,
-             * unten/kühler = aktuelle Speichertemperatur als Rücklauf-Näherung.
+             * Warmwasserladung aktiv:
+             * Die Boiler-Wendel zeigt jetzt den echten Temperaturverlauf:
+             * Eintritt = aktueller WP-Vorlauf,
+             * Rücklauf/Boilerseite = aktuelle Boilertemperatur.
              */
             setHeatExchangerCoilGradient(
                 hotColor,
@@ -2214,15 +2215,6 @@ class Waermepumpe extends IPSModuleStrict
                 ],
                 firstHeatingColors.reflux
             );
-
-            /*
-             * Im Heizbetrieb folgen auch beide Wendeln dem aktuellen
-             * Vorlauf-/Rücklauf-Farbverlauf.
-             */
-            setHeatExchangerCoilGradient(
-                firstHeatingColors.supply,
-                firstHeatingColors.reflux
-            );
         }
 
         /*
@@ -2234,10 +2226,25 @@ class Waermepumpe extends IPSModuleStrict
             ?? readStateNumber(currentConfig.tankTempWWMiddle)
             ?? readStateNumber(currentConfig.tankTempWWDown);
 
+        const boilerColor = temperatureColor(boilerTemperature);
+
         setStrokeColor(
             ['#pathPipeToCirculatingPump'],
-            temperatureColor(boilerTemperature)
+            boilerColor
         );
+
+        /*
+         * Keine Warmwasserladung:
+         * Die Wendel im Boiler übernimmt vollständig die aktuelle
+         * Boilertemperaturfarbe. Erst bei aktiver Warmwasserladung wird
+         * weiter oben der Verlauf aus WP-Vorlauf und Boiler/Rücklauf gesetzt.
+         */
+        if (boilerColor) {
+            setHeatExchangerCoilGradient(
+                boilerColor,
+                boilerColor
+            );
+        }
 
         /*
          * Wärmepumpen-Wärmetauscher ebenfalls immer mit Temperaturfarbe.
