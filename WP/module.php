@@ -182,12 +182,18 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
 
         // Einheitlicher Temperatur-Farbverlauf für Heizkreis, Speicher und Wärmetauscher
-        $this->RegisterPropertyInteger('TemperatureColor20', 26316);      // #0066CC
-        $this->RegisterPropertyInteger('TemperatureColor30', 6733823);    // #66BFFF
-        $this->RegisterPropertyInteger('TemperatureColor40', 16769126);   // #FFE066
-        $this->RegisterPropertyInteger('TemperatureColor50', 16752412);   // #FF9F1C
-        $this->RegisterPropertyInteger('TemperatureColor60', 15746116);   // #F04444
-        $this->RegisterPropertyInteger('TemperatureColor70', 10361627);   // #9E1B1B
+        $this->RegisterPropertyInteger('TemperaturePoint1', 20);
+        $this->RegisterPropertyInteger('TemperatureColor1', 26316);       // #0066CC
+        $this->RegisterPropertyInteger('TemperaturePoint2', 30);
+        $this->RegisterPropertyInteger('TemperatureColor2', 6733823);     // #66BFFF
+        $this->RegisterPropertyInteger('TemperaturePoint3', 40);
+        $this->RegisterPropertyInteger('TemperatureColor3', 16769126);    // #FFE066
+        $this->RegisterPropertyInteger('TemperaturePoint4', 50);
+        $this->RegisterPropertyInteger('TemperatureColor4', 16752412);    // #FF9F1C
+        $this->RegisterPropertyInteger('TemperaturePoint5', 60);
+        $this->RegisterPropertyInteger('TemperatureColor5', 15746116);    // #F04444
+        $this->RegisterPropertyInteger('TemperaturePoint6', 70);
+        $this->RegisterPropertyInteger('TemperatureColor6', 10361627);    // #9E1B1B
 
         // Heizkreis 1
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
@@ -498,19 +504,105 @@ class Waermepumpe extends IPSModuleStrict
                 'caption' => 'Temperaturfarben',
                 'items'   => [
                     [
-                        'type'  => 'RowLayout',
+                        'type' => 'RowLayout',
                         'items' => [
-                            ['type' => 'SelectColor', 'name' => 'TemperatureColor20', 'caption' => '20 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'TemperatureColor30', 'caption' => '30 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'TemperatureColor40', 'caption' => '40 °C', 'allowTransparent' => false]
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint1',
+                                'caption' => 'Stufe 1 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor1',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
                         ]
                     ],
                     [
-                        'type'  => 'RowLayout',
+                        'type' => 'RowLayout',
                         'items' => [
-                            ['type' => 'SelectColor', 'name' => 'TemperatureColor50', 'caption' => '50 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'TemperatureColor60', 'caption' => '60 °C', 'allowTransparent' => false],
-                            ['type' => 'SelectColor', 'name' => 'TemperatureColor70', 'caption' => '70 °C', 'allowTransparent' => false]
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint2',
+                                'caption' => 'Stufe 2 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor2',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint3',
+                                'caption' => 'Stufe 3 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor3',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint4',
+                                'caption' => 'Stufe 4 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor4',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint5',
+                                'caption' => 'Stufe 5 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor5',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint6',
+                                'caption' => 'Stufe 6 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor6',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
                         ]
                     ]
                 ]
@@ -1010,7 +1102,18 @@ class Waermepumpe extends IPSModuleStrict
      * Dazwischen wird stufenlos interpoliert.
      */
     const getTemperatureColorStops = () => {
-        const configured = currentConfig.temperatureColors || {};
+        const configured = Array.isArray(currentConfig.temperatureColorScale)
+            ? currentConfig.temperatureColorScale
+            : [];
+
+        const defaults = [
+            {temperature: 20, color: 26316},
+            {temperature: 30, color: 6733823},
+            {temperature: 40, color: 16769126},
+            {temperature: 50, color: 16752412},
+            {temperature: 60, color: 15746116},
+            {temperature: 70, color: 10361627}
+        ];
 
         const intToRgb = (value, fallback) => {
             const number = Number(value);
@@ -1027,14 +1130,34 @@ class Waermepumpe extends IPSModuleStrict
             ];
         };
 
-        return [
-            [20, intToRgb(configured['20'], [0, 102, 204])],
-            [30, intToRgb(configured['30'], [102, 191, 255])],
-            [40, intToRgb(configured['40'], [255, 224, 102])],
-            [50, intToRgb(configured['50'], [255, 159, 28])],
-            [60, intToRgb(configured['60'], [240, 68, 68])],
-            [70, intToRgb(configured['70'], [158, 27, 27])]
+        const fallbackRgb = [
+            [0, 102, 204],
+            [102, 191, 255],
+            [255, 224, 102],
+            [255, 159, 28],
+            [240, 68, 68],
+            [158, 27, 27]
         ];
+
+        const stops = defaults.map((fallback, index) => {
+            const item = configured[index] || fallback;
+            const temperature = Number(item.temperature);
+
+            return [
+                Number.isFinite(temperature)
+                    ? temperature
+                    : fallback.temperature,
+                intToRgb(item.color, fallbackRgb[index])
+            ];
+        });
+
+        /*
+         * Die Temperaturwerte dürfen frei konfiguriert werden.
+         * Für die Interpolation sortieren wir sie automatisch aufsteigend.
+         */
+        stops.sort((a, b) => a[0] - b[0]);
+
+        return stops;
     };
 
     const rgbToHex = (rgb) =>
@@ -1205,7 +1328,7 @@ class Waermepumpe extends IPSModuleStrict
         const condenserPressure = getText('#textCondenserPressure');
         const condenserTemperature = getText('#textCondenserTemperature');
 
-        setText('#textEvaporator', condenserLabel || 'Verflüssiger');
+        setText('#textEvaporator', condenserLabel || 'Kondensator');
         setText('#textEvaporatorPressure', condenserPressure);
         setText('#textEvaporatorTemperature', condenserTemperature);
 
@@ -1835,6 +1958,19 @@ class Waermepumpe extends IPSModuleStrict
             });
         };
 
+        const setFillColor = (selectors, color) => {
+            if (!color) {
+                return;
+            }
+
+            selectors.forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (element) {
+                    element.style.setProperty('fill', color, 'important');
+                }
+            });
+        };
+
         const setGradient = (gradientId, supplyColor, refluxColor) => {
             const gradient = svg.querySelector('#' + gradientId);
             if (!gradient || !supplyColor || !refluxColor) {
@@ -1980,7 +2116,7 @@ class Waermepumpe extends IPSModuleStrict
             const condenserColor = temperatureColor(condenserTemperature);
             const evaporatorColor = temperatureColor(evaporatorTemperature);
 
-            setStrokeColor(
+            setFillColor(
                 ['#pathHPModelCondenserSymbol'],
                 condenserColor
             );
@@ -2016,7 +2152,11 @@ class Waermepumpe extends IPSModuleStrict
                 firstHeatingColors.supply
             );
             setStrokeColor(
-                ['#pathPipeFromBuffer'],
+                [
+                    '#pathPipeFromBuffer',
+                    '#pathPipeToHP',
+                    '#pathPipeToHP2'
+                ],
                 firstHeatingColors.reflux
             );
         }
@@ -2029,7 +2169,7 @@ class Waermepumpe extends IPSModuleStrict
         const evaporatorTemperature =
             readStateNumber(currentConfig.evaporatorTemperature);
 
-        setStrokeColor(
+        setFillColor(
             ['#pathHPModelCondenserSymbol'],
             temperatureColor(condenserTemperature)
         );
@@ -2040,6 +2180,17 @@ class Waermepumpe extends IPSModuleStrict
             ],
             temperatureColor(evaporatorTemperature)
         );
+    };
+
+    const applyTerminology = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const condenserText = card.content.querySelector('#textCondenser');
+        if (condenserText) {
+            condenserText.textContent = 'Kondensator';
+        }
     };
 
     const applyOptionalStatusVisibility = (card) => {
@@ -2449,6 +2600,7 @@ class Waermepumpe extends IPSModuleStrict
                     if (this.content) {
                         applyCoolingVisualization(this);
                         updateRefrigerantValues(this);
+                        applyTerminology(this);
                         applyThemeColors(this);
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
@@ -2478,6 +2630,7 @@ class Waermepumpe extends IPSModuleStrict
             if (card.content) {
                 applyCoolingVisualization(card);
                 updateRefrigerantValues(card);
+                applyTerminology(card);
                 applyThemeColors(card);
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
@@ -2644,13 +2797,31 @@ HTML;
             'heaterRod3'                    => $this->EntityName('HeaterRod3'),
             'heaterRod3Threshold'           => $this->ReadPropertyInteger('HeaterRod3Threshold'),
 
-            'temperatureColors'             => [
-                '20' => $this->ReadPropertyInteger('TemperatureColor20'),
-                '30' => $this->ReadPropertyInteger('TemperatureColor30'),
-                '40' => $this->ReadPropertyInteger('TemperatureColor40'),
-                '50' => $this->ReadPropertyInteger('TemperatureColor50'),
-                '60' => $this->ReadPropertyInteger('TemperatureColor60'),
-                '70' => $this->ReadPropertyInteger('TemperatureColor70')
+            'temperatureColorScale'        => [
+                [
+                    'temperature' => $this->ReadPropertyInteger('TemperaturePoint1'),
+                    'color'       => $this->ReadPropertyInteger('TemperatureColor1')
+                ],
+                [
+                    'temperature' => $this->ReadPropertyInteger('TemperaturePoint2'),
+                    'color'       => $this->ReadPropertyInteger('TemperatureColor2')
+                ],
+                [
+                    'temperature' => $this->ReadPropertyInteger('TemperaturePoint3'),
+                    'color'       => $this->ReadPropertyInteger('TemperatureColor3')
+                ],
+                [
+                    'temperature' => $this->ReadPropertyInteger('TemperaturePoint4'),
+                    'color'       => $this->ReadPropertyInteger('TemperatureColor4')
+                ],
+                [
+                    'temperature' => $this->ReadPropertyInteger('TemperaturePoint5'),
+                    'color'       => $this->ReadPropertyInteger('TemperatureColor5')
+                ],
+                [
+                    'temperature' => $this->ReadPropertyInteger('TemperaturePoint6'),
+                    'color'       => $this->ReadPropertyInteger('TemperatureColor6')
+                ]
             ],
 
             'thermalSolarAvailable'         => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
