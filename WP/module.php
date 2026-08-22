@@ -1599,70 +1599,6 @@ class Waermepumpe extends IPSModuleStrict
         });
     };
 
-    const applyWWValvePipeMask = (card) => {
-        if (!card || !card.content) {
-            return;
-        }
-
-        const svg = card.content;
-        const valveConfigured = !!currentConfig.wwHeatingValve;
-        const pipe = svg.querySelector('#pathPipeToBuffer');
-
-        if (!pipe) {
-            return;
-        }
-
-        /*
-         * Ohne konfiguriertes Ventil keine Aussparung in der Leitung.
-         */
-        if (!valveConfigured) {
-            pipe.removeAttribute('mask');
-            return;
-        }
-
-        /*
-         * Das Umschaltventil liegt bei (620 / 450), Radius 30.
-         * Die Leitung wird an dieser Stelle transparent ausgespart.
-         * Dadurch bleibt der komplette Symcon-Hintergrund transparent und
-         * trotzdem scheint keine Leitung durch das Ventilsymbol.
-         */
-        let defs = svg.querySelector('defs');
-        if (!defs) {
-            defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-            svg.insertBefore(defs, svg.firstChild);
-        }
-
-        let mask = svg.querySelector('#symconWWValvePipeMask');
-        if (!mask) {
-            mask = document.createElementNS('http://www.w3.org/2000/svg', 'mask');
-            mask.setAttribute('id', 'symconWWValvePipeMask');
-            mask.setAttribute('maskUnits', 'userSpaceOnUse');
-            mask.setAttribute('x', '0');
-            mask.setAttribute('y', '0');
-            mask.setAttribute('width', '1100');
-            mask.setAttribute('height', '700');
-
-            const visibleArea = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-            visibleArea.setAttribute('x', '0');
-            visibleArea.setAttribute('y', '0');
-            visibleArea.setAttribute('width', '1100');
-            visibleArea.setAttribute('height', '700');
-            visibleArea.setAttribute('fill', 'white');
-
-            const valveCutout = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-            valveCutout.setAttribute('cx', '620');
-            valveCutout.setAttribute('cy', '450');
-            valveCutout.setAttribute('r', '31');
-            valveCutout.setAttribute('fill', 'black');
-
-            mask.appendChild(visibleArea);
-            mask.appendChild(valveCutout);
-            defs.appendChild(mask);
-        }
-
-        pipe.setAttribute('mask', 'url(#symconWWValvePipeMask)');
-    };
-
     const applyOptionalStatusVisibility = (card) => {
         if (!card || !card.content) {
             return;
@@ -2071,7 +2007,6 @@ class Waermepumpe extends IPSModuleStrict
                         applyThemeColors(this);
                         applyRefrigerantCircuitMode(this);
                         applyOptionalStatusVisibility(this);
-                        applyWWValvePipeMask(this);
                         applyThreeHeaterRods(this);
                         applyControlIcons(this);
                         applyFanAnimation(this);
@@ -2099,7 +2034,6 @@ class Waermepumpe extends IPSModuleStrict
                 applyThemeColors(card);
                 applyRefrigerantCircuitMode(card);
                 applyOptionalStatusVisibility(card);
-                applyWWValvePipeMask(card);
                 applyThreeHeaterRods(card);
                 applyControlIcons(card);
                 applyFanAnimation(card);
