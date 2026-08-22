@@ -1774,21 +1774,40 @@ class Waermepumpe extends IPSModuleStrict
             {
                 gradient: 'linearGradientCircuit1',
                 supply: currentConfig.supplyTemperatureHeating,
-                reflux: currentConfig.refluxTemperatureHeating
+                reflux: currentConfig.refluxTemperatureHeating,
+                supplyPipes: ['#pathPipeToHeatingCircuitPump'],
+                refluxPipes: ['#pathPipeToHP']
             },
             {
                 gradient: 'linearGradientCircuit2',
                 supply: currentConfig.supplyTemperatureHeating2,
-                reflux: currentConfig.refluxTemperatureHeating2
+                reflux: currentConfig.refluxTemperatureHeating2,
+                supplyPipes: ['#pathPipeToHeatingCircuitPump2'],
+                refluxPipes: ['#pathPipeToHP2']
             },
             {
                 gradient: 'linearGradientCircuit3',
                 supply: currentConfig.supplyTemperatureHeating3,
-                reflux: currentConfig.refluxTemperatureHeating3
+                reflux: currentConfig.refluxTemperatureHeating3,
+                supplyPipes: ['#pathPipeToHeatingCircuitPump3'],
+                refluxPipes: []
             }
         ];
 
-        circuits.forEach(({gradient, supply, reflux}) => {
+        const setPipeColor = (selectors, color) => {
+            selectors.forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (!element) {
+                    return;
+                }
+
+                element.style.setProperty('stroke', color, 'important');
+            });
+        };
+
+        let firstConfiguredCircuit = null;
+
+        circuits.forEach(({gradient, supply, reflux, supplyPipes, refluxPipes}) => {
             const gradientElement = svg.querySelector('#' + gradient);
 
             if (!gradientElement) {
@@ -1799,8 +1818,7 @@ class Waermepumpe extends IPSModuleStrict
             const refluxTemperature = readStateNumber(reflux);
 
             /*
-             * Nur eingreifen, wenn die Temperaturen tatsächlich konfiguriert
-             * und lesbar sind. Sonst bleibt die Originalfarbe der Card.
+             * Nur eingreifen, wenn beide Temperaturen vorhanden sind.
              */
             if (supplyTemperature === null || refluxTemperature === null) {
                 return;
@@ -1813,22 +1831,54 @@ class Waermepumpe extends IPSModuleStrict
                 return;
             }
 
+            if (!firstConfiguredCircuit) {
+                firstConfiguredCircuit = {
+                    supplyColor,
+                    refluxColor
+                };
+            }
+
             const stops = gradientElement.querySelectorAll('stop');
-            if (stops.length < 2) {
-                return;
+            if (stops.length >= 2) {
+                /*
+                 * Heizkörper bzw. Fußbodenheizung selbst:
+                 * Vorlauf- und Rücklaufseite verwenden die echte Temperatur.
+                 */
+                stops[0].style.setProperty('stop-color', supplyColor, 'important');
+                stops[0].setAttribute('stop-color', supplyColor);
+
+                stops[stops.length - 1].style.setProperty('stop-color', refluxColor, 'important');
+                stops[stops.length - 1].setAttribute('stop-color', refluxColor);
             }
 
             /*
-             * Die beiden Enden des vorhandenen SVG-Gradienten werden ersetzt.
-             * Geometrie, Heizkörper/Fußbodenheizung und Leitungen bleiben
-             * vollständig Original-Card.
+             * Die separaten Anschlussleitungen zum Heizkreis bekommen
+             * dieselben realen Temperaturfarben.
              */
-            stops[0].style.setProperty('stop-color', supplyColor, 'important');
-            stops[0].setAttribute('stop-color', supplyColor);
-
-            stops[stops.length - 1].style.setProperty('stop-color', refluxColor, 'important');
-            stops[stops.length - 1].setAttribute('stop-color', refluxColor);
+            setPipeColor(supplyPipes, supplyColor);
+            setPipeColor(refluxPipes, refluxColor);
         });
+
+        /*
+         * Gemeinsame Leitungen zwischen Wärmepumpe und Heizkreis/Puffer:
+         * Diese gehören nicht zu einem eigenen linearGradientCircuit.
+         * Wenn mindestens ein Heizkreis vollständig konfiguriert ist,
+         * verwenden wir dessen Vorlauf-/Rücklauffarbe auch hier.
+         *
+         * Bei mehreren Heizkreisen wird der erste vollständig konfigurierte
+         * Heizkreis als Referenz für die gemeinsame Leitung verwendet.
+         */
+        if (firstConfiguredCircuit) {
+            setPipeColor(
+                ['#pathPipeToBuffer'],
+                firstConfiguredCircuit.supplyColor
+            );
+
+            setPipeColor(
+                ['#pathPipeFromBuffer'],
+                firstConfiguredCircuit.refluxColor
+            );
+        }
     };
 
     const applyOptionalStatusVisibility = (card) => {
