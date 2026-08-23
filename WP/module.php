@@ -7129,99 +7129,101 @@ window.SymconHeatPump = {
                 );
                 group.style.removeProperty('filter');
 
+                /*
+                 * Drei Zustände wie bisher gewünscht:
+                 *
+                 * 1. AUS / nicht eingeschaltet
+                 *    -> Originalfarbe, aber matt
+                 *
+                 * 2. EINGESCHALTET / freigegeben
+                 *    -> Originalfarbe, volle Helligkeit
+                 *
+                 * 3. AKTIV / läuft tatsächlich
+                 *    -> Heizen + Warmwasser orange,
+                 *       Kühlen blau
+                 */
                 let color = enabledColor;
+                let opacity = 1;
 
                 if (running) {
                     color = definition.runningColor;
+                    opacity = 1;
                 } else if (hasControl && !control.enabled) {
-                    color = '#777777';
-                    group.style.setProperty(
-                        'opacity',
-                        '0.60',
-                        'important'
-                    );
+                    color = enabledColor;
+                    opacity = 0.42;
                 }
+
+                group.style.setProperty(
+                    'opacity',
+                    String(opacity),
+                    'important'
+                );
 
                 /*
                  * Warmwasserhahn ist im Original ein reines Füllsymbol.
                  * Ein zusätzlicher Stroke macht ihn sichtbar dicker und
                  * verformt genau den Eindruck, der im Screenshot auffällt.
                  */
-                const isHotWaterStatus =
-                    definition.functionName === 'hotwater';
-
                 /*
-                 * Warmwasser bleibt wieder das originale <use>-Symbol der
-                 * Card. Damit sieht der Wasserhahn exakt wieder so aus wie
-                 * vor unserem Färbungsumbau.
+                 * ALLE Symbole der oberen Statusleiste bleiben jetzt
+                 * vollständig im Originalzustand der SVG.
                  *
-                 * Beim <use> wird ausschließlich fill gesetzt.
+                 * Die Original-Card färbt diese Symbole über
+                 * var(--primary-text-color). Deshalb ändern wir bei
+                 * Heizen, Warmwasser und Kühlen nur diese CSS-Variable
+                 * am jeweiligen Originalelement.
+                 *
+                 * Keine Pfade klonen, keine Geometrie ändern,
+                 * kein zusätzlicher Stroke.
                  */
                 group.style.setProperty(
-                    'fill',
+                    '--primary-text-color',
                     color,
                     'important'
                 );
-
-                if (!isHotWaterStatus) {
-                    group.style.setProperty(
-                        'stroke',
-                        color,
-                        'important'
-                    );
-                } else {
-                    group.style.removeProperty('stroke');
-                }
                 group.style.setProperty(
                     'color',
                     color,
                     'important'
                 );
 
-                if (!isHotWaterStatus) {
+                /*
+                 * fill/currentColor zusätzlich am Container setzen, damit
+                 * sowohl <g>-Symbole als auch das <use>-Warmwassersymbol
+                 * zuverlässig reagieren.
+                 */
+                group.style.setProperty(
+                    'fill',
+                    'var(--primary-text-color)',
+                    'important'
+                );
+                group.style.removeProperty('stroke');
+
+                /*
+                 * Bereits von älteren Versionen gesetzte Inline-Farben an
+                 * den Originalpfaden entfernen. Danach greift wieder die
+                 * Original-SVG-Logik über --primary-text-color.
+                 */
+                if (String(group.tagName || '').toLowerCase() !== 'use') {
                     group.querySelectorAll(
-                        'path, rect, circle, ellipse, line, polyline, polygon, use'
+                        'path, rect, circle, ellipse, line, polyline, polygon'
                     ).forEach((element) => {
-                    const computed = getComputedStyle(element);
-                    const fill =
-                        String(computed.fill || '').toLowerCase();
-                    const stroke =
-                        String(computed.stroke || '').toLowerCase();
-
-                    if (
-                        fill !== 'none'
-                        && fill !== 'transparent'
-                        && fill !== 'rgba(0, 0, 0, 0)'
-                    ) {
-                        element.setAttribute('fill', color);
-                        element.style.setProperty(
-                            'fill',
-                            color,
-                            'important'
-                        );
-                    }
-
-                    if (!isHotWaterStatus && (
-                        stroke !== 'none'
-                        && stroke !== 'transparent'
-                        && stroke !== 'rgba(0, 0, 0, 0)'
-                    )) {
-                        element.setAttribute('stroke', color);
-                        element.style.setProperty(
-                            'stroke',
-                            color,
-                            'important'
-                        );
-                    }
+                        element.style.removeProperty('fill');
+                        element.style.removeProperty('stroke');
+                        element.style.removeProperty('color');
+                        element.removeAttribute('fill');
+                        element.removeAttribute('stroke');
                     });
                 }
 
                 if (running) {
                     group.style.setProperty(
                         'filter',
-                        'brightness(1.12) saturate(1.12)',
+                        'brightness(1.08) saturate(1.15)',
                         'important'
                     );
+                } else {
+                    group.style.removeProperty('filter');
                 }
 
                 if (hasControl) {
