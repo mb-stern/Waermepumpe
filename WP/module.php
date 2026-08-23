@@ -2876,31 +2876,54 @@ class Waermepumpe extends IPSModuleStrict
         if (boilerActive) {
             /*
              * Boiler wird geladen:
-             * Hier zeigen wir die aktuell anliegenden Vorlauf-/Rücklaufwerte.
-             * Diese Variablen dürfen während der Boilerladung weiterlaufen;
-             * nur die Anzeige am Heizkreis wird eingefroren.
+             * Die beiden Zusatzwerte zeigen ausschließlich während dieser
+             * Phase die aktuell anliegenden Vorlauf-/Rücklauftemperaturen.
+             *
+             * Gleichzeitig bleiben die Temperaturwerte am einzigen Heizkreis
+             * auf den zuletzt im Heizbetrieb gespeicherten Werten eingefroren.
+             * Maßgebend ist ausschließlich die Stellung des
+             * Umschaltventils Warmwasser/Heizung.
              */
             boilerSupplyText.textContent =
                 formatTemperature(supplyTemperature);
             boilerRefluxText.textContent =
                 formatTemperature(refluxTemperature);
+
+            boilerSupplyText.style.setProperty(
+                'display',
+                'inline',
+                'important'
+            );
+            boilerRefluxText.style.setProperty(
+                'display',
+                'inline',
+                'important'
+            );
         } else {
             /*
-             * Boiler wird nicht geladen:
-             * Beide Seiten der Wendel entsprechen optisch der Boiler-
-             * temperatur und zeigen deshalb denselben Wert.
+             * Keine Boilerladung:
+             * Die zusätzlichen Vorlauf-/Rücklaufwerte am Boiler vollständig
+             * ausblenden. Die normale Boilertemperatur im Speicher bleibt
+             * selbstverständlich erhalten.
              */
-            const boilerText = formatTemperature(boilerTemperature);
+            boilerSupplyText.textContent = '';
+            boilerRefluxText.textContent = '';
 
-            boilerSupplyText.textContent =
-                boilerText;
-            boilerRefluxText.textContent =
-                boilerText;
+            boilerSupplyText.style.setProperty(
+                'display',
+                'none',
+                'important'
+            );
+            boilerRefluxText.style.setProperty(
+                'display',
+                'none',
+                'important'
+            );
         }
 
         /*
-         * Ohne konfiguriertes Ventil keine zusätzliche Boiler-VL/RL-Anzeige,
-         * weil keine hydraulische Umschaltung bekannt ist.
+         * Ohne konfiguriertes Ventil gibt es keine eindeutige Boilerphase.
+         * Deshalb werden die zusätzlichen Werte ebenfalls nicht angezeigt.
          */
         if (!valveConfigured) {
             removeBoilerTexts();
