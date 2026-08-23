@@ -5786,39 +5786,28 @@ window.SymconHeatPump = {
                     );
                     circle.setAttribute('cx', '0');
                     circle.setAttribute('cy', '0');
-                    circle.setAttribute('r', '17');
+                    circle.setAttribute('r', '20');
                     circle.setAttribute('fill', 'none');
                     circle.setAttribute('stroke-width', '2');
 
                     /*
-                     * Im Kreis steht nur das Symbol.
-                     * Der aktuelle Wert wird darunter angezeigt, damit die
-                     * Sollwert-Icons nicht gedrängt wirken.
+                     * Zusatz-Sollwerticon in derselben Größe wie die
+                     * Original-Icons. Im Kreis steht ausschließlich der
+                     * Zahlenwert – ohne WW, ±, Einheit oder Gradzeichen.
                      */
-                    const symbol = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'text'
-                    );
-                    symbol.setAttribute('x', '0');
-                    symbol.setAttribute('y', '4');
-                    symbol.setAttribute('text-anchor', 'middle');
-                    symbol.setAttribute('font-size', '10');
-                    symbol.setAttribute('font-weight', '600');
-                    symbol.textContent = shortLabel;
-
                     const value = document.createElementNS(
                         'http://www.w3.org/2000/svg',
                         'text'
                     );
                     value.setAttribute('id', id + 'Value');
                     value.setAttribute('x', '0');
-                    value.setAttribute('y', '31');
+                    value.setAttribute('y', '5');
                     value.setAttribute('text-anchor', 'middle');
-                    value.setAttribute('font-size', '10');
+                    value.setAttribute('dominant-baseline', 'middle');
+                    value.setAttribute('font-size', '12');
                     value.setAttribute('font-weight', '600');
 
                     group.appendChild(circle);
-                    group.appendChild(symbol);
                     group.appendChild(value);
                     settings.appendChild(group);
 
@@ -5909,16 +5898,10 @@ window.SymconHeatPump = {
                     }
 
                     /*
-                     * Für die kompakte Icon-Darstellung Einheit kürzen.
+                     * Im Kreis ausschließlich den Zahlenwert anzeigen.
+                     * Keine Einheit und kein Gradzeichen.
                      */
-                    let unit = String(control.unit || '').trim();
-
-                    if (unit === '°C') {
-                        unit = '°';
-                    }
-
-                    valueElement.textContent =
-                        formatted + unit;
+                    valueElement.textContent = formatted;
                 }
             });
         };
