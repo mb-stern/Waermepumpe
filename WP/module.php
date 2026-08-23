@@ -5830,7 +5830,7 @@ window.SymconHeatPump = {
                      */
                     flowPath.setAttribute(
                         'd',
-                        'M 838 82 '
+                        'M 837 82 '
                         + 'L 847 82 L 847 118 '
                         + 'L 857 118 L 857 82 '
                         + 'L 867 82 L 867 118 '
@@ -5839,8 +5839,8 @@ window.SymconHeatPump = {
                         + 'L 897 118 L 897 82 '
                         + 'L 907 82 L 907 118 '
                         + 'L 917 118 L 917 82 '
-                        + 'L 927 82 L 927 118 '
-                        + 'L 936 118'
+                        + 'L 927 82 L 927 115 '
+                        + 'L 937 115'
                     );
 
                     flowPath.setAttribute(
@@ -5891,9 +5891,40 @@ window.SymconHeatPump = {
                     radiatorOverlay.classList.add(
                         'symcon-flow-emitter'
                     );
+
+                    /*
+                     * Nicht auf geerbte SVG-/CSS-Werte verlassen:
+                     * der Heizkörper-Fluss bekommt seine sichtbaren
+                     * Eigenschaften direkt auf dem Overlay.
+                     */
                     radiatorOverlay.style.setProperty(
                         'fill',
                         'none',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'stroke',
+                        'rgba(255,255,255,.82)',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'stroke-width',
+                        '2',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'stroke-dasharray',
+                        '4 7',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'stroke-linecap',
+                        'round',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'opacity',
+                        '1',
                         'important'
                     );
 
@@ -7158,6 +7189,14 @@ window.SymconHeatPump = {
                 }
 
                 /*
+                 * Warmwasserhahn ist im Original ein reines Füllsymbol.
+                 * Ein zusätzlicher Stroke macht ihn sichtbar dicker und
+                 * verformt genau den Eindruck, der im Screenshot auffällt.
+                 */
+                const isHotWaterStatus =
+                    definition.functionName === 'hotwater';
+
+                /*
                  * Statusleiste wirklich DIREKT einfärben.
                  * Nicht auf Vererbung vertrauen.
                  */
@@ -7166,11 +7205,20 @@ window.SymconHeatPump = {
                     color,
                     'important'
                 );
-                group.style.setProperty(
-                    'stroke',
-                    color,
-                    'important'
-                );
+
+                if (isHotWaterStatus) {
+                    group.style.setProperty(
+                        'stroke',
+                        'none',
+                        'important'
+                    );
+                } else {
+                    group.style.setProperty(
+                        'stroke',
+                        color,
+                        'important'
+                    );
+                }
                 group.style.setProperty(
                     'color',
                     color,
@@ -7199,7 +7247,14 @@ window.SymconHeatPump = {
                         );
                     }
 
-                    if (
+                    if (isHotWaterStatus) {
+                        element.removeAttribute('stroke');
+                        element.style.setProperty(
+                            'stroke',
+                            'none',
+                            'important'
+                        );
+                    } else if (
                         stroke !== 'none'
                         && stroke !== 'transparent'
                         && stroke !== 'rgba(0, 0, 0, 0)'
