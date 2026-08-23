@@ -2755,11 +2755,120 @@ class Waermepumpe extends IPSModuleStrict
                 );
             }
 
+            const existingReturnText =
+                svg.querySelector('#symconThermalSolarReturnTemp');
+
+            if (existingReturnText) {
+                existingReturnText.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                existingReturnText.style.setProperty(
+                    'visibility',
+                    'hidden',
+                    'important'
+                );
+            }
+
             return;
         }
 
         solarGroup.style.setProperty('display', 'inline', 'important');
         solarGroup.style.setProperty('visibility', 'visible', 'important');
+
+        /*
+         * Solarpumpe nur anzeigen, wenn dafür tatsächlich eine Variable
+         * konfiguriert wurde. Die Solarthermie selbst kann also sichtbar sein,
+         * ohne dass automatisch eine Pumpe dargestellt wird.
+         */
+        const solarPumpGroup = svg.querySelector('#gThermalSolarPump');
+        if (solarPumpGroup) {
+            const pumpConfigured = !!currentConfig.thermalSolarPump;
+
+            solarPumpGroup.style.setProperty(
+                'display',
+                pumpConfigured ? 'inline' : 'none',
+                'important'
+            );
+            solarPumpGroup.style.setProperty(
+                'visibility',
+                pumpConfigured ? 'visible' : 'hidden',
+                'important'
+            );
+        }
+
+        /*
+         * Kühle Solar-Rücklauftemperatur nur anzeigen, wenn Solar Rücklauf
+         * tatsächlich konfiguriert ist.
+         */
+        let solarReturnText =
+            svg.querySelector('#symconThermalSolarReturnTemp');
+
+        if (currentConfig.thermalSolarReturnTemp) {
+            if (!solarReturnText) {
+                solarReturnText = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'text'
+                );
+                solarReturnText.setAttribute(
+                    'id',
+                    'symconThermalSolarReturnTemp'
+                );
+                solarReturnText.setAttribute('x', '955');
+                solarReturnText.setAttribute('y', '610');
+                solarReturnText.setAttribute('text-anchor', 'end');
+                solarReturnText.setAttribute('xml:space', 'preserve');
+                solarReturnText.style.setProperty(
+                    'font-size',
+                    '16px',
+                    'important'
+                );
+                solarReturnText.style.setProperty(
+                    'fill',
+                    'var(--primary-text-color)',
+                    'important'
+                );
+
+                solarGroup.appendChild(solarReturnText);
+            }
+
+            const returnValue =
+                readStateNumber(currentConfig.thermalSolarReturnTemp);
+
+            if (returnValue !== null) {
+                solarReturnText.textContent =
+                    new Intl.NumberFormat('de-CH', {
+                        minimumFractionDigits: 1,
+                        maximumFractionDigits: 1
+                    }).format(returnValue) + ' °C';
+            } else {
+                solarReturnText.textContent = '';
+            }
+
+            solarReturnText.style.setProperty(
+                'display',
+                'inline',
+                'important'
+            );
+            solarReturnText.style.setProperty(
+                'visibility',
+                'visible',
+                'important'
+            );
+        } else if (solarReturnText) {
+            solarReturnText.textContent = '';
+            solarReturnText.style.setProperty(
+                'display',
+                'none',
+                'important'
+            );
+            solarReturnText.style.setProperty(
+                'visibility',
+                'hidden',
+                'important'
+            );
+        }
 
         /*
          * Die Original-SVG verwendet für die Solar-Wendel lediglich ein <use>
