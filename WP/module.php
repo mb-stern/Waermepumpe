@@ -5786,7 +5786,7 @@ window.SymconHeatPump = {
                     );
                     circle.setAttribute('cx', '0');
                     circle.setAttribute('cy', '0');
-                    circle.setAttribute('r', '20');
+                    circle.setAttribute('r', '17');
                     circle.setAttribute('fill', 'none');
                     circle.setAttribute('stroke-width', '2');
 
@@ -5801,10 +5801,11 @@ window.SymconHeatPump = {
                     );
                     value.setAttribute('id', id + 'Value');
                     value.setAttribute('x', '0');
-                    value.setAttribute('y', '5');
+                    value.setAttribute('y', '0');
                     value.setAttribute('text-anchor', 'middle');
-                    value.setAttribute('dominant-baseline', 'middle');
-                    value.setAttribute('font-size', '12');
+                    value.setAttribute('dominant-baseline', 'central');
+                    value.setAttribute('alignment-baseline', 'central');
+                    value.setAttribute('font-size', '11');
                     value.setAttribute('font-weight', '600');
 
                     group.appendChild(circle);
