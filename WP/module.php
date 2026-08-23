@@ -5593,20 +5593,22 @@ window.SymconHeatPump = {
             );
 
             [
-                'CompressorOuter',
-                'CompressorInner',
-                'EvaporatorOuter',
-                'EvaporatorInner',
-                'CondenserOuter',
-                'CondenserInner',
-                'ExpansionOuter',
-                'ExpansionInner'
-            ].forEach((name) => {
+                {name: 'CompressorOuter', direction: 'forward'},
+                {name: 'CompressorInner', direction: 'reverse'},
+                {name: 'EvaporatorOuter', direction: 'forward'},
+                {name: 'EvaporatorInner', direction: 'forward'},
+                {name: 'CondenserOuter', direction: 'forward'},
+                {name: 'CondenserInner', direction: 'forward'},
+                {name: 'ExpansionOuter', direction: 'forward'},
+                {name: 'ExpansionInner', direction: 'forward'}
+            ].forEach((definition) => {
+                const name = definition.name;
+
                 ensureFlowOverlay(
                     svg,
                     '#symconRefrigerantBridge' + name,
                     'symconFlowRefrigerantBridge' + name,
-                    'forward',
+                    definition.direction,
                     compressorRunning
                 );
 
@@ -5750,72 +5752,147 @@ window.SymconHeatPump = {
                 enabled
             ) => {
                 /*
-                 * Die Original-SVG enthält bereits genau die sichtbaren
-                 * Wasserwege:
-                 *
-                 *   #rectRadiatorN          = kompletter Heizkörper inkl. Rippen
-                 *   #pathUnderfloorHeatingN = komplette FBH-Schlange
-                 *
-                 * Diese Pfade direkt klonen. Dadurch liegt die Animation
-                 * wirklich auf dem dargestellten Heizkörper / der FBH und
-                 * nicht auf einem separat erfundenen Ersatzpfad.
+                 * Fußbodenheizung:
+                 * Die Original-Schlange ist bereits ein echter,
+                 * durchgehender Wasserweg.
                  */
-                [
-                    {
-                        selector:
-                            '#rectRadiator' + number,
-                        id:
-                            'symconFlowEmitterRadiator'
-                            + number
-                    },
-                    {
-                        selector:
-                            '#pathUnderfloorHeating' + number,
-                        id:
-                            'symconFlowEmitterFloor'
-                            + number
-                    }
-                ].forEach((item) => {
-                    const source =
-                        svg.querySelector(item.selector);
+                const floor =
+                    svg.querySelector(
+                        '#pathUnderfloorHeating' + number
+                    );
 
-                    if (!source) {
-                        return;
-                    }
-
-                    /*
-                     * Nur der tatsächlich sichtbare Emitter soll laufen.
-                     * Der andere liegt in der Original-SVG im display:none-
-                     * Container.
-                     */
-                    const parent =
-                        source.parentElement;
-                    const visible =
-                        !parent
-                        || getComputedStyle(parent).display !== 'none';
+                if (floor) {
+                    const floorParent = floor.parentElement;
+                    const floorVisible =
+                        !floorParent
+                        || getComputedStyle(floorParent).display !== 'none';
 
                     ensureFlowOverlay(
                         svg,
-                        item.selector,
-                        item.id,
+                        '#pathUnderfloorHeating' + number,
+                        'symconFlowEmitterFloor' + number,
                         'forward',
-                        enabled && visible
+                        enabled && floorVisible
                     );
 
-                    const overlay =
-                        svg.querySelector('#' + item.id);
+                    const floorOverlay =
+                        svg.querySelector(
+                            '#symconFlowEmitterFloor' + number
+                        );
 
-                    if (overlay) {
-                        overlay.classList.add(
+                    if (floorOverlay) {
+                        floorOverlay.classList.add(
                             'symcon-flow-emitter'
                         );
-                        overlay.style.setProperty(
-                            'fill',
-                            'none',
-                            'important'
-                        );
                     }
-                });
+                }
+
+                /*
+                 * Heizkörper:
+                 *
+                 * #rectRadiatorN besteht aus einem Außenrahmen plus vielen
+                 * einzelnen geschlossenen Rippen. Eine Dash-Animation darauf
+                 * kann deshalb nicht als ein durchgehender Wasserfluss
+                 * erscheinen.
+                 *
+                 * Wir legen im gleichen <g> einen einzigen zusammenhängenden
+                 * Serpentinenpfad über alle Rippen. Bei Heizkreis 2 und 3
+                 * übernimmt er automatisch den transform des Eltern-<g>.
+                 */
+                const radiator =
+                    svg.querySelector(
+                        '#rectRadiator' + number
+                    );
+
+                if (!radiator || !radiator.parentNode) {
+                    return;
+                }
+
+                const radiatorParent = radiator.parentElement;
+                const radiatorVisible =
+                    getComputedStyle(radiatorParent).display !== 'none';
+
+                let flowPath =
+                    svg.querySelector(
+                        '#symconRadiatorWaterPath' + number
+                    );
+
+                if (!flowPath) {
+                    flowPath = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'path'
+                    );
+
+                    flowPath.setAttribute(
+                        'id',
+                        'symconRadiatorWaterPath' + number
+                    );
+
+                    /*
+                     * Eintritt links oben -> durch alle Rippen ->
+                     * Austritt rechts unten.
+                     */
+                    flowPath.setAttribute(
+                        'd',
+                        'M 838 82 '
+                        + 'L 847 82 L 847 118 '
+                        + 'L 857 118 L 857 82 '
+                        + 'L 867 82 L 867 118 '
+                        + 'L 877 118 L 877 82 '
+                        + 'L 887 82 L 887 118 '
+                        + 'L 897 118 L 897 82 '
+                        + 'L 907 82 L 907 118 '
+                        + 'L 917 118 L 917 82 '
+                        + 'L 927 82 L 927 118 '
+                        + 'L 936 118'
+                    );
+
+                    flowPath.setAttribute(
+                        'fill',
+                        'none'
+                    );
+
+                    /*
+                     * Der Basis-Pfad selbst bleibt unsichtbar.
+                     * Sichtbar ist nur sein animiertes Overlay.
+                     */
+                    flowPath.style.setProperty(
+                        'stroke',
+                        'transparent',
+                        'important'
+                    );
+                    flowPath.style.setProperty(
+                        'fill',
+                        'none',
+                        'important'
+                    );
+
+                    radiatorParent.appendChild(flowPath);
+                }
+
+                ensureFlowOverlay(
+                    svg,
+                    '#symconRadiatorWaterPath' + number,
+                    'symconFlowEmitterRadiator' + number,
+                    'forward',
+                    enabled && radiatorVisible
+                );
+
+                const radiatorOverlay =
+                    svg.querySelector(
+                        '#symconFlowEmitterRadiator' + number
+                    );
+
+                if (radiatorOverlay) {
+                    radiatorOverlay.classList.add(
+                        'symcon-flow-emitter'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'fill',
+                        'none',
+                        'important'
+                    );
+                }
             };
 
             const animateCircuit = (
