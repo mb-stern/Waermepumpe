@@ -5751,7 +5751,6 @@ window.SymconHeatPump = {
             587.85
         ];
 
-        const TOP_ICON_CENTER_Y = 106.6;
 
         const applySetpointIcons = (card) => {
             if (!card || !card.content) {
@@ -6068,6 +6067,26 @@ window.SymconHeatPump = {
              * werden zusätzliche Sollwert-Icons ausgeblendet statt etwas
              * zu überdecken.
              */
+            /*
+             * Vertikale Mittellinie direkt von einem sichtbaren Original-Icon
+             * übernehmen. Dadurch sitzen unsere Zusatzicons exakt auf derselben
+             * Höhe wie die Symbole der Original-Card – unabhängig von
+             * SVG-Transformationen oder späteren Änderungen an der Card.
+             */
+            const referenceOriginal = visible
+                .filter((definition) => !definition.custom)
+                .map((definition) => svg.querySelector(definition.selector))
+                .find((element) => !!element);
+
+            const referenceCenter = referenceOriginal
+                ? centerInSettings(referenceOriginal)
+                : null;
+
+            const iconCenterY =
+                referenceCenter && Number.isFinite(referenceCenter.y)
+                    ? referenceCenter.y
+                    : 0;
+
             let slotIndex = 0;
 
             visible.forEach((definition) => {
@@ -6096,7 +6115,7 @@ window.SymconHeatPump = {
                         'translate('
                         + targetX
                         + ' '
-                        + TOP_ICON_CENTER_Y
+                        + iconCenterY
                         + ')'
                     );
                     return;
