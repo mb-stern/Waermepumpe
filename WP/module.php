@@ -4,7 +4,7 @@
  * ## Third-Party Components
  *
  * Komponente | Lizenz | Verwendung |
- * ------------|---------|------------|A
+ * ------------|---------|------------|
  * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Wärmepumpengrafik |
  */
 
@@ -5791,18 +5791,18 @@ window.SymconHeatPump = {
                     circle.setAttribute('stroke-width', '2');
 
                     /*
-                     * Bezeichnung und aktueller Wert liegen beide innerhalb
-                     * des Icons. Dadurch bleibt die Originalhöhe der oberen
-                     * Leiste erhalten.
+                     * Im Kreis steht nur das Symbol.
+                     * Der aktuelle Wert wird darunter angezeigt, damit die
+                     * Sollwert-Icons nicht gedrängt wirken.
                      */
                     const symbol = document.createElementNS(
                         'http://www.w3.org/2000/svg',
                         'text'
                     );
                     symbol.setAttribute('x', '0');
-                    symbol.setAttribute('y', '-3');
+                    symbol.setAttribute('y', '4');
                     symbol.setAttribute('text-anchor', 'middle');
-                    symbol.setAttribute('font-size', '8');
+                    symbol.setAttribute('font-size', '10');
                     symbol.setAttribute('font-weight', '600');
                     symbol.textContent = shortLabel;
 
@@ -5812,9 +5812,9 @@ window.SymconHeatPump = {
                     );
                     value.setAttribute('id', id + 'Value');
                     value.setAttribute('x', '0');
-                    value.setAttribute('y', '9');
+                    value.setAttribute('y', '31');
                     value.setAttribute('text-anchor', 'middle');
-                    value.setAttribute('font-size', '8');
+                    value.setAttribute('font-size', '10');
                     value.setAttribute('font-weight', '600');
 
                     group.appendChild(circle);
