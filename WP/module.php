@@ -2847,7 +2847,7 @@ class Waermepumpe extends IPSModuleStrict
                     'text'
                 );
                 element.setAttribute('id', id);
-                element.setAttribute('x', '680');
+                element.setAttribute('x', '590');
                 element.setAttribute('y', String(y));
                 element.setAttribute('text-anchor', 'end');
                 element.setAttribute('xml:space', 'preserve');
