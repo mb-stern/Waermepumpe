@@ -2859,7 +2859,7 @@ class Waermepumpe extends IPSModuleStrict
                  * aber direkt unterhalb der kühlen Rücklaufleitung.
                  */
                 solarReturnText.setAttribute('x', '850');
-                solarReturnText.setAttribute('y', '642');
+                solarReturnText.setAttribute('y', '634');
                 solarReturnText.setAttribute('text-anchor', 'end');
                 solarReturnText.setAttribute('xml:space', 'preserve');
                 solarReturnText.style.setProperty(
