@@ -2087,10 +2087,10 @@ class HeatPumpCard extends HTMLElement {
     this.content.style.setProperty('background-color', 'transparent', 'important');
     this.content.style.setProperty('--card-background-color', 'transparent');
 
-    const layoutTextColor = getComputedStyle(document.body).color;
-    if (layoutTextColor) {
-      this.content.style.setProperty('--primary-text-color', layoutTextColor);
-    }
+    /*
+     * Die Theme-Farbe wird später aus Symcons --content-color übernommen.
+     * Hier keine eigene body-Farbe mehr festschreiben.
+     */
 
     const texts = this.localization.svgTexts || {};
     this.setText('#textTankWWName', texts.tankWWName);
@@ -2962,13 +2962,40 @@ window.SymconHeatPump = {
         };
 
         const resolveLayoutTextColor = () => {
-            // Im HTML-SDK erbt document.body die Textfarbe des übergeordneten
-            // Symcon-Layouts nicht zuverlässig. Der Farbschemamodus dagegen wird
-            // vom Browser an die Kachel weitergereicht.
-            const dark = window.matchMedia
-                && window.matchMedia('(prefers-color-scheme: dark)').matches;
+            /*
+             * Symcon stellt dem HTML-SDK die aktuelle Designfarbe über
+             * --content-color bereit. Diese verwenden wir direkt statt
+             * einer eigenen Hell-/Dunkel-Erkennung.
+             *
+             * Damit folgt die Card automatisch dem tatsächlich gewählten
+             * Symcon-Design:
+             *   helles Layout  -> dunkle/schwarze Content-Farbe
+             *   dunkles Layout -> helle/weiße Content-Farbe
+             */
+            const candidates = [
+                document.documentElement,
+                document.body,
+                document.getElementById('wp-root')
+            ].filter(Boolean);
 
-            return dark ? '#ffffff' : '#000000';
+            for (const element of candidates) {
+                const value = getComputedStyle(element)
+                    .getPropertyValue('--content-color')
+                    .trim();
+
+                if (value) {
+                    return value;
+                }
+            }
+
+            /*
+             * Nur als Sicherheitsfallback, falls eine ältere Umgebung
+             * --content-color nicht bereitstellt.
+             */
+            const bodyColor =
+                getComputedStyle(document.body).color;
+
+            return bodyColor || '#ffffff';
         };
 
         const isBlack = (value) => {
@@ -2986,6 +3013,25 @@ window.SymconHeatPump = {
             ].includes(normalized);
         };
 
+        const isWhite = (value) => {
+            const normalized = String(value || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '');
+
+            return [
+                'white',
+                '#fff',
+                '#ffffff',
+                'rgb(255,255,255)',
+                'rgba(255,255,255,1)'
+            ].includes(normalized);
+        };
+
+        const isNeutralThemeColor = (value) => {
+            return isBlack(value) || isWhite(value);
+        };
+
         const applyThemeColors = (card) => {
             if (!card || !card.content) {
                 return;
@@ -2994,22 +3040,71 @@ window.SymconHeatPump = {
             const svg = card.content;
             const textColor = resolveLayoutTextColor();
 
-            // Hintergrund ausschließlich vom Symcon-Layout.
-            svg.style.setProperty('background', 'transparent', 'important');
-            svg.style.setProperty('background-color', 'transparent', 'important');
-            svg.style.setProperty('--card-background-color', 'transparent');
-            svg.style.setProperty('--primary-text-color', textColor);
-            svg.style.setProperty('color', textColor);
+            /*
+             * Symcon-Design direkt in die SVG weiterreichen.
+             */
+            svg.style.setProperty(
+                '--content-color',
+                textColor,
+                'important'
+            );
+            svg.style.setProperty(
+                '--primary-text-color',
+                textColor,
+                'important'
+            );
+            svg.style.setProperty(
+                'color',
+                textColor,
+                'important'
+            );
 
-            // Text grundsätzlich an den Layoutmodus koppeln.
+            svg.style.setProperty(
+                'background',
+                'transparent',
+                'important'
+            );
+            svg.style.setProperty(
+                'background-color',
+                'transparent',
+                'important'
+            );
+            svg.style.setProperty(
+                '--card-background-color',
+                'transparent'
+            );
+
+            /*
+             * Sämtliche normale Beschriftung folgt --content-color.
+             */
             svg.querySelectorAll('text, tspan').forEach((element) => {
-                element.style.setProperty('fill', textColor, 'important');
-                element.style.setProperty('color', textColor, 'important');
+                element.style.setProperty(
+                    'fill',
+                    'var(--content-color)',
+                    'important'
+                );
+                element.style.setProperty(
+                    'color',
+                    'var(--content-color)',
+                    'important'
+                );
             });
 
-            // Schwarze Linien/Symbole der Original-SVG im Dark Mode weiß machen.
-            // Im Light Mode bleiben sie schwarz.
+            /*
+             * Nur neutrale Originalfarben (weiß/schwarz) umstellen.
+             * Temperaturfarben, Speicherfarben, Kältekreisgradienten und
+             * Flussanimationen werden nicht verändert.
+             */
             svg.querySelectorAll('*').forEach((element) => {
+                if (
+                    element.classList
+                    && element.classList.contains(
+                        'symcon-flow-overlay'
+                    )
+                ) {
+                    return;
+                }
+
                 const computed = getComputedStyle(element);
 
                 const fill =
@@ -3022,12 +3117,29 @@ window.SymconHeatPump = {
                     || element.style.stroke
                     || computed.stroke;
 
-                if (isBlack(fill)) {
-                    element.style.setProperty('fill', textColor, 'important');
+                const fillText = String(fill || '');
+                const strokeText = String(stroke || '');
+
+                if (
+                    !fillText.includes('url(')
+                    && isNeutralThemeColor(fillText)
+                ) {
+                    element.style.setProperty(
+                        'fill',
+                        'var(--content-color)',
+                        'important'
+                    );
                 }
 
-                if (isBlack(stroke)) {
-                    element.style.setProperty('stroke', textColor, 'important');
+                if (
+                    !strokeText.includes('url(')
+                    && isNeutralThemeColor(strokeText)
+                ) {
+                    element.style.setProperty(
+                        'stroke',
+                        'var(--content-color)',
+                        'important'
+                    );
                 }
             });
         };
