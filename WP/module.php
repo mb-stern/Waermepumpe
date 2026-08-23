@@ -2701,6 +2701,40 @@ class Waermepumpe extends IPSModuleStrict
 
     let storedHeatingTemperatures = loadStoredHeatingTemperatures();
 
+    const normalizeTemperatureUnits = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+
+        /*
+         * Einheitliche Darstellung sämtlicher numerischer Temperaturen:
+         * immer "°C".
+         *
+         * Die Original-Card mischt je nach Element Werte mit "℃", "°C"
+         * oder ganz ohne Einheit. Wir normalisieren deshalb ausschließlich
+         * Text-Elemente mit Temp/Temperature im ID-Namen UND einem Zahlenwert.
+         * Beschriftungen wie "Vorlauftemperatur" bleiben unangetastet.
+         */
+        svg.querySelectorAll(
+            'text[id*="Temp"], text[id*="Temperature"]'
+        ).forEach((element) => {
+            const raw = String(element.textContent || '').trim();
+
+            if (!/[+-]?\d+(?:[.,]\d+)?/.test(raw)) {
+                return;
+            }
+
+            const match = raw.match(/[+-]?\d+(?:[.,]\d+)?/);
+            if (!match) {
+                return;
+            }
+
+            element.textContent = match[0] + ' °C';
+        });
+    };
+
     const applyThermalSolarVisualization = (card) => {
         if (!card || !card.content) {
             return;
@@ -2815,8 +2849,12 @@ class Waermepumpe extends IPSModuleStrict
                     'id',
                     'symconThermalSolarReturnTemp'
                 );
-                solarReturnText.setAttribute('x', '955');
-                solarReturnText.setAttribute('y', '610');
+                /*
+                 * Gleiche X-Position wie textThermalSolarFluxTemp (x=850),
+                 * direkt darunter.
+                 */
+                solarReturnText.setAttribute('x', '850');
+                solarReturnText.setAttribute('y', '580');
                 solarReturnText.setAttribute('text-anchor', 'end');
                 solarReturnText.setAttribute('xml:space', 'preserve');
                 solarReturnText.style.setProperty(
@@ -3900,6 +3938,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyHeatingReturnContinuity(this);
                         applySingleCircuitTemperatureDisplay(this);
                         applyThermalSolarVisualization(this);
+                        normalizeTemperatureUnits(this);
                     }
 
                     return result;
@@ -3935,6 +3974,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyHeatingReturnContinuity(card);
                 applySingleCircuitTemperatureDisplay(card);
                 applyThermalSolarVisualization(card);
+                normalizeTemperatureUnits(card);
             }
         } catch (error) {
             showError(
