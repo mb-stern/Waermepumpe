@@ -5043,6 +5043,52 @@ window.SymconHeatPump = {
 
             const pipe = ensureCircuitPipe();
 
+            /*
+             * Vier kurze Brücken schließen exakt die Innenlücken an den
+             * Bauteilen. Die Hauptleitung bleibt unverändert bestehen.
+             */
+            const bridgeDefinitions = [
+                {
+                    id: 'symconRefrigerantBridgeCompressor',
+                    d: 'M 364 378 L 414 378'
+                },
+                {
+                    id: 'symconRefrigerantBridgeEvaporator',
+                    d: 'M 264 462 L 264 512'
+                },
+                {
+                    id: 'symconRefrigerantBridgeCondenser',
+                    d: 'M 514 462 L 514 512'
+                },
+                {
+                    id: 'symconRefrigerantBridgeExpansion',
+                    d: 'M 369 600 L 409 600'
+                }
+            ];
+
+            const bridges = bridgeDefinitions.map((definition) => {
+                let bridge = svg.querySelector('#' + definition.id);
+
+                if (!bridge) {
+                    bridge = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'path'
+                    );
+                    bridge.setAttribute('id', definition.id);
+                    bridge.setAttribute('d', definition.d);
+                    bridge.setAttribute('fill', 'none');
+
+                    if (pipe.parentNode) {
+                        pipe.parentNode.insertBefore(
+                            bridge,
+                            pipe.nextSibling
+                        );
+                    }
+                }
+
+                return bridge;
+            });
+
             if (!currentConfig.useCustomTemperatureColors) {
                 if (outer) {
                     outer.style.removeProperty('display');
@@ -5069,6 +5115,22 @@ window.SymconHeatPump = {
                         'data-symcon-refrigerant-pipe'
                     );
                 }
+
+                bridges.forEach((bridge) => {
+                    bridge.style.setProperty(
+                        'display',
+                        'none',
+                        'important'
+                    );
+                    bridge.style.setProperty(
+                        'visibility',
+                        'hidden',
+                        'important'
+                    );
+                    bridge.removeAttribute(
+                        'data-symcon-refrigerant-pipe'
+                    );
+                });
 
                 [
                     '#pathHPModelEvaporatorSymbol001',
@@ -5311,6 +5373,48 @@ window.SymconHeatPump = {
                 '1'
             );
 
+            bridges.forEach((bridge) => {
+                bridge.style.setProperty(
+                    'display',
+                    'inline',
+                    'important'
+                );
+                bridge.style.setProperty(
+                    'visibility',
+                    'visible',
+                    'important'
+                );
+                bridge.style.setProperty(
+                    'fill',
+                    'none',
+                    'important'
+                );
+                bridge.style.setProperty(
+                    'stroke',
+                    pipeGradient,
+                    'important'
+                );
+                bridge.style.setProperty(
+                    'stroke-width',
+                    '5',
+                    'important'
+                );
+                bridge.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
+                bridge.style.setProperty(
+                    'stroke-linecap',
+                    'round',
+                    'important'
+                );
+                bridge.setAttribute(
+                    'data-symcon-refrigerant-pipe',
+                    '1'
+                );
+            });
+
             const compressorGradient =
                 createPaletteGradient(
                     'symconCompressorTemperatureGradient',
@@ -5416,6 +5520,32 @@ window.SymconHeatPump = {
                 'forward',
                 compressorRunning
             );
+
+            [
+                'Compressor',
+                'Evaporator',
+                'Condenser',
+                'Expansion'
+            ].forEach((name) => {
+                ensureFlowOverlay(
+                    svg,
+                    '#symconRefrigerantBridge' + name,
+                    'symconFlowRefrigerantBridge' + name,
+                    'forward',
+                    compressorRunning
+                );
+
+                const bridgeOverlay =
+                    svg.querySelector(
+                        '#symconFlowRefrigerantBridge' + name
+                    );
+
+                if (bridgeOverlay) {
+                    bridgeOverlay.classList.add(
+                        'symcon-flow-refrigerant'
+                    );
+                }
+            });
 
             const refrigerantOverlay =
                 svg.querySelector(
@@ -5540,6 +5670,113 @@ window.SymconHeatPump = {
                     && (heatingPump1 || heatingPump2)
             );
 
+            const ensureEmitterFlowPath = (
+                number,
+                type
+            ) => {
+                const id =
+                    'symconEmitterFlow' + type + number;
+
+                let path = svg.querySelector('#' + id);
+
+                if (path) {
+                    return path;
+                }
+
+                const sourceSelector =
+                    type === 'Floor'
+                        ? '#pathUnderfloorHeating' + number
+                        : '#rectRadiator' + number;
+
+                const source = svg.querySelector(sourceSelector);
+
+                if (!source || !source.parentNode) {
+                    return null;
+                }
+
+                path = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'path'
+                );
+                path.setAttribute('id', id);
+                path.setAttribute('fill', 'none');
+
+                if (type === 'Floor') {
+                    /*
+                     * Fußbodenheizung: exakt dieselbe Schlange wie die
+                     * sichtbare Heizleitung.
+                     */
+                    path.setAttribute(
+                        'd',
+                        source.getAttribute('d') || ''
+                    );
+                } else {
+                    /*
+                     * Heizkörper: eigener durchgehender Wasserweg durch
+                     * sämtliche Rippen statt Animation nur auf dem Rahmen.
+                     */
+                    path.setAttribute(
+                        'd',
+                        'M 845 80 '
+                        + 'L 845 120 L 855 120 L 855 80 '
+                        + 'L 865 80 L 865 120 L 875 120 L 875 80 '
+                        + 'L 885 80 L 885 120 L 895 120 L 895 80 '
+                        + 'L 905 80 L 905 120 L 915 120 L 915 80 '
+                        + 'L 925 80 L 925 120 L 930 120'
+                    );
+                }
+
+                source.parentNode.appendChild(path);
+
+                return path;
+            };
+
+            const animateEmitter = (
+                number,
+                enabled
+            ) => {
+                const radiator =
+                    ensureEmitterFlowPath(number, 'Radiator');
+                const floor =
+                    ensureEmitterFlowPath(number, 'Floor');
+
+                [
+                    {
+                        path: radiator,
+                        id:
+                            'symconFlowEmitterRadiator'
+                            + number
+                    },
+                    {
+                        path: floor,
+                        id:
+                            'symconFlowEmitterFloor'
+                            + number
+                    }
+                ].forEach((item) => {
+                    if (!item.path) {
+                        return;
+                    }
+
+                    ensureFlowOverlay(
+                        svg,
+                        '#' + item.path.id,
+                        item.id,
+                        'forward',
+                        enabled
+                    );
+
+                    const overlay =
+                        svg.querySelector('#' + item.id);
+
+                    if (overlay) {
+                        overlay.classList.add(
+                            'symcon-flow-emitter'
+                        );
+                    }
+                });
+            };
+
             const animateCircuit = (
                 number,
                 active,
@@ -5607,14 +5844,16 @@ window.SymconHeatPump = {
                 heatingPump1,
                 [
                     '#pathPipeToHeatingCircuitPump',
-                    '#pathRadiatorPipeIn1',
-                    '#rectRadiator1',
-                    '#pathUnderfloorHeating1'
+                    '#pathRadiatorPipeIn1'
                 ],
                 [
                     '#pathPipeToHP',
                     '#pathRadiatorPipeOut1'
                 ]
+            );
+            animateEmitter(
+                1,
+                !!heatingPump1 && heatingAllowed
             );
 
             animateCircuit(
@@ -5622,13 +5861,15 @@ window.SymconHeatPump = {
                 heatingPump2,
                 [
                     '#pathPipeToHeatingCircuitPump2',
-                    '#pathRadiatorPipeIn2',
-                    '#rectRadiator2',
-                    '#pathUnderfloorHeating2'
+                    '#pathRadiatorPipeIn2'
                 ],
                 [
                     '#pathRadiatorPipeOut2'
                 ]
+            );
+            animateEmitter(
+                2,
+                !!heatingPump2 && heatingAllowed
             );
 
             animateCircuit(
@@ -5636,13 +5877,15 @@ window.SymconHeatPump = {
                 heatingPump3,
                 [
                     '#pathPipeToHeatingCircuitPump3',
-                    '#pathRadiatorPipeIn3',
-                    '#rectRadiator3',
-                    '#pathUnderfloorHeating3'
+                    '#pathRadiatorPipeIn3'
                 ],
                 [
                     '#pathRadiatorPipeOut3'
                 ]
+            );
+            animateEmitter(
+                3,
+                !!heatingPump3 && heatingAllowed
             );
 
             /*
