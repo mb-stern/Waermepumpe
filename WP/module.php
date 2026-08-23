@@ -2874,11 +2874,81 @@ class Waermepumpe extends IPSModuleStrict
         };
 
         /*
-         * Kollektor, Vorlauf und Rücklauf.
+         * Solar-Vorlauf und Solar-Rücklauf.
          */
-        setFill('#rectThermalSolarPanel', panelColor);
         setStroke('#pathPipeThermalSolarHotWater', supplyColor);
         setStroke('#pathPipeThermalSolarColdWater', returnColor);
+
+        /*
+         * Solarpanel:
+         * Nicht mehr einfarbig darstellen, sondern mit einem eigenen
+         * Temperaturverlauf von Solar-Rücklauf (kühler) zur
+         * Kollektortemperatur (heißer).
+         */
+        let panelGradient = svg.querySelector(
+            '#symconLinearGradientThermalSolarPanel'
+        );
+
+        if (!panelGradient) {
+            const sourcePanelGradient = svg.querySelector('#linearGradient3');
+
+            if (sourcePanelGradient) {
+                panelGradient = sourcePanelGradient.cloneNode(true);
+                panelGradient.setAttribute(
+                    'id',
+                    'symconLinearGradientThermalSolarPanel'
+                );
+
+                panelGradient.querySelectorAll('stop').forEach(
+                    (stop, index) => {
+                        stop.setAttribute(
+                            'id',
+                            'symconThermalSolarPanelStop' + (index + 1)
+                        );
+                    }
+                );
+
+                sourcePanelGradient.parentNode.appendChild(panelGradient);
+            }
+        }
+
+        if (panelGradient && panelColor && returnColor) {
+            const panelStops = panelGradient.querySelectorAll('stop');
+
+            if (panelStops.length >= 2) {
+                panelStops[0].style.setProperty(
+                    'stop-color',
+                    returnColor,
+                    'important'
+                );
+                panelStops[0].setAttribute('stop-color', returnColor);
+
+                panelStops[panelStops.length - 1].style.setProperty(
+                    'stop-color',
+                    panelColor,
+                    'important'
+                );
+                panelStops[panelStops.length - 1].setAttribute(
+                    'stop-color',
+                    panelColor
+                );
+            }
+
+            const panel = svg.querySelector('#rectThermalSolarPanel');
+
+            if (panel) {
+                panel.style.setProperty(
+                    'fill',
+                    'url(#symconLinearGradientThermalSolarPanel)',
+                    'important'
+                );
+                panel.style.setProperty(
+                    'fill-opacity',
+                    '1',
+                    'important'
+                );
+            }
+        }
 
         /*
          * Eigener Gradient nur für den eigenständigen Solar-Wendel-Pfad.
