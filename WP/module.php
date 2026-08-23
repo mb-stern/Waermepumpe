@@ -2087,10 +2087,10 @@ class HeatPumpCard extends HTMLElement {
     this.content.style.setProperty('background-color', 'transparent', 'important');
     this.content.style.setProperty('--card-background-color', 'transparent');
 
-    const layoutTextColor = getComputedStyle(document.body).color;
-    if (layoutTextColor) {
-      this.content.style.setProperty('--primary-text-color', layoutTextColor);
-    }
+    /*
+     * Die Theme-Farbe wird später aus Symcons --content-color übernommen.
+     * Hier keine eigene body-Farbe mehr festschreiben.
+     */
 
     const texts = this.localization.svgTexts || {};
     this.setText('#textTankWWName', texts.tankWWName);
@@ -2963,90 +2963,39 @@ window.SymconHeatPump = {
 
         const resolveLayoutTextColor = () => {
             /*
-             * Nicht nur prefers-color-scheme verwenden:
-             * Symcon kann ein helles Layout anzeigen, obwohl der Browser
-             * weiterhin "dark" meldet. Genau dann blieben Linien und Texte
-             * weiß auf weiß.
+             * Symcon stellt dem HTML-SDK die aktuelle Designfarbe über
+             * --content-color bereit. Diese verwenden wir direkt statt
+             * einer eigenen Hell-/Dunkel-Erkennung.
              *
-             * Deshalb zuerst den tatsächlich sichtbaren Hintergrund der
-             * HTML-Kachel / ihrer Eltern auswerten.
+             * Damit folgt die Card automatisch dem tatsächlich gewählten
+             * Symcon-Design:
+             *   helles Layout  -> dunkle/schwarze Content-Farbe
+             *   dunkles Layout -> helle/weiße Content-Farbe
              */
-            const parseRgb = (value) => {
-                const match = String(value || '').match(
-                    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/
-                );
-
-                if (!match) {
-                    return null;
-                }
-
-                const alpha =
-                    match[4] === undefined
-                        ? 1
-                        : Number(match[4]);
-
-                if (alpha <= 0.02) {
-                    return null;
-                }
-
-                return {
-                    r: Number(match[1]),
-                    g: Number(match[2]),
-                    b: Number(match[3])
-                };
-            };
-
-            const luminance = (rgb) => {
-                const values = [
-                    rgb.r,
-                    rgb.g,
-                    rgb.b
-                ].map((channel) => {
-                    const value = channel / 255;
-
-                    return value <= 0.03928
-                        ? value / 12.92
-                        : Math.pow(
-                            (value + 0.055) / 1.055,
-                            2.4
-                        );
-                });
-
-                return (
-                    0.2126 * values[0]
-                    + 0.7152 * values[1]
-                    + 0.0722 * values[2]
-                );
-            };
-
-            let element =
+            const candidates = [
+                document.documentElement,
+                document.body,
                 document.getElementById('wp-root')
-                || document.body;
+            ].filter(Boolean);
 
-            while (element) {
-                const background =
-                    getComputedStyle(element).backgroundColor;
+            for (const element of candidates) {
+                const value = getComputedStyle(element)
+                    .getPropertyValue('--content-color')
+                    .trim();
 
-                const rgb = parseRgb(background);
-
-                if (rgb) {
-                    return luminance(rgb) > 0.45
-                        ? '#000000'
-                        : '#ffffff';
+                if (value) {
+                    return value;
                 }
-
-                element = element.parentElement;
             }
 
             /*
-             * Letzter Fallback, wenn wirklich überall transparent.
+             * Nur als Sicherheitsfallback, falls eine ältere Umgebung
+             * --content-color nicht bereitstellt.
              */
-            const dark = window.matchMedia
-                && window.matchMedia(
-                    '(prefers-color-scheme: dark)'
-                ).matches;
+            const bodyColor =
+                getComputedStyle(document.body).color;
 
-            return dark ? '#ffffff' : '#000000';
+            return bodyColor || '#ffffff';
         };
 
         const isBlack = (value) => {
@@ -3091,32 +3040,60 @@ window.SymconHeatPump = {
             const svg = card.content;
             const textColor = resolveLayoutTextColor();
 
-            // Hintergrund ausschließlich vom Symcon-Layout.
-            svg.style.setProperty('background', 'transparent', 'important');
-            svg.style.setProperty('background-color', 'transparent', 'important');
-            svg.style.setProperty('--card-background-color', 'transparent');
-            svg.style.setProperty('--primary-text-color', textColor);
-            svg.style.setProperty('color', textColor);
+            /*
+             * Symcon-Design direkt in die SVG weiterreichen.
+             */
+            svg.style.setProperty(
+                '--content-color',
+                textColor,
+                'important'
+            );
+            svg.style.setProperty(
+                '--primary-text-color',
+                textColor,
+                'important'
+            );
+            svg.style.setProperty(
+                'color',
+                textColor,
+                'important'
+            );
 
-            // Text grundsätzlich an den Layoutmodus koppeln.
+            svg.style.setProperty(
+                'background',
+                'transparent',
+                'important'
+            );
+            svg.style.setProperty(
+                'background-color',
+                'transparent',
+                'important'
+            );
+            svg.style.setProperty(
+                '--card-background-color',
+                'transparent'
+            );
+
+            /*
+             * Sämtliche normale Beschriftung folgt --content-color.
+             */
             svg.querySelectorAll('text, tspan').forEach((element) => {
-                element.style.setProperty('fill', textColor, 'important');
-                element.style.setProperty('color', textColor, 'important');
+                element.style.setProperty(
+                    'fill',
+                    'var(--content-color)',
+                    'important'
+                );
+                element.style.setProperty(
+                    'color',
+                    'var(--content-color)',
+                    'important'
+                );
             });
 
             /*
-             * Neutrale Linien/Symbole der Original-SVG an das reale Layout
-             * koppeln:
-             *
-             * dunkles Layout -> weiß
-             * helles Layout  -> schwarz
-             *
-             * Dabei sowohl Schwarz als auch Weiß als neutrale Card-Farbe
-             * erkennen. So werden auch bereits weiß gerenderte Originalteile
-             * im hellen Layout zuverlässig wieder schwarz.
-             *
-             * Temperaturfarben, Flussanimationen und Gradienten bleiben
-             * unangetastet.
+             * Nur neutrale Originalfarben (weiß/schwarz) umstellen.
+             * Temperaturfarben, Speicherfarben, Kältekreisgradienten und
+             * Flussanimationen werden nicht verändert.
              */
             svg.querySelectorAll('*').forEach((element) => {
                 if (
@@ -3149,7 +3126,7 @@ window.SymconHeatPump = {
                 ) {
                     element.style.setProperty(
                         'fill',
-                        textColor,
+                        'var(--content-color)',
                         'important'
                     );
                 }
@@ -3160,7 +3137,7 @@ window.SymconHeatPump = {
                 ) {
                     element.style.setProperty(
                         'stroke',
-                        textColor,
+                        'var(--content-color)',
                         'important'
                     );
                 }
