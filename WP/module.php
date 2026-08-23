@@ -5720,6 +5720,39 @@ window.SymconHeatPump = {
             });
         };
 
+        /*
+         * Die obere Statusleiste der Original-SVG besitzt neun fest
+         * vorgesehene Icon-Slots.
+         *
+         * Gemessen an der unveränderten Original-SVG (0.9.0):
+         *   1: 102.85
+         *   2: 174.49
+         *   3: 242.98
+         *   4: 301.14
+         *   5: 353.41
+         *   6: 412.06
+         *   7: 469.65
+         *   8: 527.56
+         *   9: 587.85
+         *
+         * Es werden ausschließlich diese Originalpositionen verwendet.
+         * Tag/Nacht gehört NICHT zu dieser Reihe und wird daher bewusst
+         * nicht verschoben.
+         */
+        const TOP_ICON_SLOTS = [
+            102.85,
+            174.49,
+            242.98,
+            301.14,
+            353.41,
+            412.06,
+            469.65,
+            527.56,
+            587.85
+        ];
+
+        const TOP_ICON_CENTER_Y = 106.6;
+
         const applySetpointIcons = (card) => {
             if (!card || !card.content) {
                 return;
@@ -5734,7 +5767,6 @@ window.SymconHeatPump = {
 
             const createIcon = (
                 id,
-                x,
                 shortLabel,
                 functionName
             ) => {
@@ -5746,10 +5778,6 @@ window.SymconHeatPump = {
                         'g'
                     );
                     group.setAttribute('id', id);
-                    group.setAttribute(
-                        'transform',
-                        'translate(' + x + ' 78)'
-                    );
 
                     const circle = document.createElementNS(
                         'http://www.w3.org/2000/svg',
@@ -5761,14 +5789,19 @@ window.SymconHeatPump = {
                     circle.setAttribute('fill', 'none');
                     circle.setAttribute('stroke-width', '2');
 
+                    /*
+                     * Bezeichnung und aktueller Wert liegen beide innerhalb
+                     * des Icons. Dadurch bleibt die Originalhöhe der oberen
+                     * Leiste erhalten.
+                     */
                     const symbol = document.createElementNS(
                         'http://www.w3.org/2000/svg',
                         'text'
                     );
                     symbol.setAttribute('x', '0');
-                    symbol.setAttribute('y', '4');
+                    symbol.setAttribute('y', '-3');
                     symbol.setAttribute('text-anchor', 'middle');
-                    symbol.setAttribute('font-size', '10');
+                    symbol.setAttribute('font-size', '8');
                     symbol.setAttribute('font-weight', '600');
                     symbol.textContent = shortLabel;
 
@@ -5778,9 +5811,10 @@ window.SymconHeatPump = {
                     );
                     value.setAttribute('id', id + 'Value');
                     value.setAttribute('x', '0');
-                    value.setAttribute('y', '29');
+                    value.setAttribute('y', '9');
                     value.setAttribute('text-anchor', 'middle');
-                    value.setAttribute('font-size', '11');
+                    value.setAttribute('font-size', '8');
+                    value.setAttribute('font-weight', '600');
 
                     group.appendChild(circle);
                     group.appendChild(symbol);
@@ -5810,13 +5844,11 @@ window.SymconHeatPump = {
             const definitions = [
                 {
                     id: 'gSymconWarmWaterSetpoint',
-                    x: 420,
                     label: 'WW',
                     functionName: 'warmWaterSetpoint'
                 },
                 {
                     id: 'gSymconHeatingCorrection',
-                    x: 475,
                     label: '±',
                     functionName: 'heatingTemperatureCorrection'
                 }
@@ -5829,7 +5861,6 @@ window.SymconHeatPump = {
 
                 const group = createIcon(
                     definition.id,
-                    definition.x,
                     definition.label,
                     definition.functionName
                 );
@@ -5858,7 +5889,8 @@ window.SymconHeatPump = {
 
                 if (valueElement) {
                     const numeric = Number(control.currentValue);
-                    const formatted = Number.isFinite(numeric)
+
+                    let formatted = Number.isFinite(numeric)
                         ? new Intl.NumberFormat('de-CH', {
                             minimumFractionDigits:
                                 Math.abs(numeric % 1) > 0 ? 1 : 0,
@@ -5866,9 +5898,233 @@ window.SymconHeatPump = {
                         }).format(numeric)
                         : String(control.currentValue ?? '');
 
+                    if (
+                        definition.functionName
+                        === 'heatingTemperatureCorrection'
+                        && Number.isFinite(numeric)
+                        && numeric > 0
+                    ) {
+                        formatted = '+' + formatted;
+                    }
+
+                    /*
+                     * Für die kompakte Icon-Darstellung Einheit kürzen.
+                     */
+                    let unit = String(control.unit || '').trim();
+
+                    if (unit === '°C') {
+                        unit = '°';
+                    }
+
                     valueElement.textContent =
-                        formatted + (control.unit ? ' ' + control.unit : '');
+                        formatted + unit;
                 }
+            });
+        };
+
+        const layoutTopIconBar = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const settings = svg.querySelector('#gSettings');
+
+            if (!settings) {
+                return;
+            }
+
+            /*
+             * ORIGINALREIHENFOLGE der SVG:
+             * Ein/Aus, Warmwasser, Heizen, Kühlen, Abtauen,
+             * Zusatzheizung, Warnung/Fehler, Party, Sparen.
+             *
+             * Unsere beiden Sollwerte kommen danach.
+             *
+             * Tag/Nacht ist eine eigene Zeile und bleibt vollständig
+             * unangetastet.
+             */
+            const definitions = [
+                {selector: '#gHPStatusOff', custom: false},
+                {selector: '#gHPStatusWW', custom: false},
+                {selector: '#gHPStatusHeating', custom: false},
+                {selector: '#gHPStatusCooling', custom: false},
+                {selector: '#gDefrost', custom: false},
+                {selector: '#gAdditionalHeating', custom: false},
+                {selector: '#gWarning', custom: false},
+                {selector: '#gHPStatusParty', custom: false},
+                {selector: '#gHPStatusSave', custom: false},
+                {selector: '#gSymconWarmWaterSetpoint', custom: true},
+                {selector: '#gSymconHeatingCorrection', custom: true}
+            ];
+
+            const isVisible = (element) => {
+                if (!element) {
+                    return false;
+                }
+
+                const style = getComputedStyle(element);
+
+                return (
+                    style.display !== 'none'
+                    && style.visibility !== 'hidden'
+                    && Number(style.opacity || 1) > 0
+                );
+            };
+
+            /*
+             * Ursprüngliche Transformationswerte der Original-SVG sichern.
+             * Vor jedem Layout werden sie zuerst vollständig zurückgesetzt,
+             * damit sich Verschiebungen niemals aufsummieren.
+             */
+            definitions.forEach((definition) => {
+                if (definition.custom) {
+                    return;
+                }
+
+                const element = svg.querySelector(definition.selector);
+
+                if (!element) {
+                    return;
+                }
+
+                if (!element.hasAttribute('data-symcon-original-transform')) {
+                    element.setAttribute(
+                        'data-symcon-original-transform',
+                        element.getAttribute('transform') || ''
+                    );
+                }
+
+                const original =
+                    element.getAttribute('data-symcon-original-transform')
+                    || '';
+
+                if (original) {
+                    element.setAttribute('transform', original);
+                } else {
+                    element.removeAttribute('transform');
+                }
+            });
+
+            /*
+             * Mittelpunkt eines Originalsymbols in den lokalen Koordinaten
+             * von #gSettings bestimmen. Das ist wichtig, weil #gSettings in
+             * einer Sonderdarstellung selbst verschoben werden kann.
+             */
+            const centerInSettings = (element) => {
+                if (
+                    !element
+                    || typeof element.getBBox !== 'function'
+                ) {
+                    return null;
+                }
+
+                try {
+                    const box = element.getBBox();
+                    const elementMatrix = element.getCTM();
+                    const settingsMatrix = settings.getCTM();
+
+                    if (!elementMatrix || !settingsMatrix) {
+                        return null;
+                    }
+
+                    const x = box.x + box.width / 2;
+                    const y = box.y + box.height / 2;
+
+                    const rootX =
+                        elementMatrix.a * x
+                        + elementMatrix.c * y
+                        + elementMatrix.e;
+                    const rootY =
+                        elementMatrix.b * x
+                        + elementMatrix.d * y
+                        + elementMatrix.f;
+
+                    const inverse = settingsMatrix.inverse();
+
+                    return {
+                        x:
+                            inverse.a * rootX
+                            + inverse.c * rootY
+                            + inverse.e,
+                        y:
+                            inverse.b * rootX
+                            + inverse.d * rootY
+                            + inverse.f
+                    };
+                } catch (error) {
+                    return null;
+                }
+            };
+
+            const visible = definitions.filter((definition) => {
+                const element = svg.querySelector(definition.selector);
+                return isVisible(element);
+            });
+
+            /*
+             * Originalsymbole haben immer Vorrang.
+             * Falls tatsächlich alle neun Original-Slots belegt sind,
+             * werden zusätzliche Sollwert-Icons ausgeblendet statt etwas
+             * zu überdecken.
+             */
+            let slotIndex = 0;
+
+            visible.forEach((definition) => {
+                const element = svg.querySelector(definition.selector);
+
+                if (!element) {
+                    return;
+                }
+
+                if (slotIndex >= TOP_ICON_SLOTS.length) {
+                    if (definition.custom) {
+                        element.style.setProperty(
+                            'display',
+                            'none',
+                            'important'
+                        );
+                    }
+                    return;
+                }
+
+                const targetX = TOP_ICON_SLOTS[slotIndex++];
+
+                if (definition.custom) {
+                    element.setAttribute(
+                        'transform',
+                        'translate('
+                        + targetX
+                        + ' '
+                        + TOP_ICON_CENTER_Y
+                        + ')'
+                    );
+                    return;
+                }
+
+                const center = centerInSettings(element);
+
+                if (!center) {
+                    return;
+                }
+
+                const deltaX = targetX - center.x;
+
+                const original =
+                    element.getAttribute('data-symcon-original-transform')
+                    || '';
+
+                /*
+                 * translate VOR der Originaltransformation:
+                 * dadurch erfolgt die Verschiebung in den lokalen
+                 * #gSettings-Koordinaten und nicht im skalierten
+                 * Koordinatensystem des einzelnen Icons.
+                 */
+                element.setAttribute(
+                    'transform',
+                    'translate(' + deltaX + ' 0)'
+                    + (original ? ' ' + original : '')
+                );
             });
         };
 
@@ -6127,6 +6383,7 @@ window.SymconHeatPump = {
                             applyThreeHeaterRods(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
+                            layoutTopIconBar(this);
                             applyFanAnimation(this);
                             applyHeatingReturnContinuity(this);
                             applySingleCircuitTemperatureDisplay(this);
