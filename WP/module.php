@@ -7124,16 +7124,21 @@ window.SymconHeatPump = {
                  * So ragen auch die ca. 34 px breiten Zusatzicons nicht aus
                  * dem vorgesehenen Bereich.
                  */
+                /*
+                 * Auf dem Handy etwas mehr Innenabstand als bisher.
+                 * Im Screenshot saß der Wasserhahn links bereits am Rahmen
+                 * und das letzte Sollwertsymbol rechts ebenfalls zu knapp.
+                 */
                 const leftX =
                     Number.isFinite(frameX)
-                        ? frameX + 24
-                        : 89;
+                        ? frameX + 38
+                        : 103;
 
                 const rightX =
                     Number.isFinite(frameX)
                     && Number.isFinite(frameWidth)
-                        ? frameX + frameWidth - 24
-                        : 516;
+                        ? frameX + frameWidth - 38
+                        : 502;
 
                 const originalDefinitions =
                     definitions.filter(
@@ -7268,11 +7273,17 @@ window.SymconHeatPump = {
                              * Eigene Sollwerticons liegen bereits auf der
                              * richtigen Statuszeilenhöhe.
                              */
+                            /*
+                             * Die beiden eigenen Kreise waren auf Mobilgeräten
+                             * zu tief. Ihre lokale Geometrie ist um y=0
+                             * aufgebaut; die Mitte der Original-Statuszeile
+                             * liegt bei etwa y=77.
+                             */
                             element.setAttribute(
                                 'transform',
                                 'translate('
                                 + targetX
-                                + ' 100)'
+                                + ' 77)'
                             );
                             return;
                         }
