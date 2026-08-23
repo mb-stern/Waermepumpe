@@ -4964,30 +4964,108 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
-            const pipe =
+            const outer =
                 svg.querySelector('#pathHPModelOuterCircle');
             const inner =
                 svg.querySelector('#pathHPModelInnerCircle');
 
-            if (!currentConfig.useCustomTemperatureColors) {
+            /*
+             * Unsere vollständige Kältekreis-Mittellinie.
+             *
+             * Die beiden Originalpfade sind zwei Konturen derselben
+             * schematischen Leitung. Je nachdem, welchen davon man allein
+             * verwendet, fehlt jeweils an Verdampfer / Verdichter /
+             * Expansionsventil die andere Hälfte.
+             *
+             * Deshalb verwenden wir im erweiterten Modus KEINEN der beiden
+             * Originalpfade als Leitung, sondern eine einzige Mittellinie,
+             * die alle vier Bauteile vollständig miteinander verbindet.
+             */
+            const ensureCircuitPipe = () => {
+                let pipe =
+                    svg.querySelector('#symconRefrigerantCircuitPipe');
+
                 if (pipe) {
-                    pipe.style.removeProperty('display');
-                    pipe.style.removeProperty('visibility');
-                    pipe.style.removeProperty('stroke');
-                    pipe.style.removeProperty('stroke-width');
-                    pipe.style.removeProperty('stroke-opacity');
-                    pipe.removeAttribute(
-                        'data-symcon-refrigerant-pipe'
-                    );
+                    return pipe;
+                }
+
+                const parent =
+                    (outer && outer.parentNode)
+                    || (inner && inner.parentNode)
+                    || svg;
+
+                pipe = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'path'
+                );
+
+                pipe.setAttribute(
+                    'id',
+                    'symconRefrigerantCircuitPipe'
+                );
+
+                /*
+                 * Eine durchgehende Leitung:
+                 * - obere Hälfte um den Verdichter
+                 * - äußere linke Hälfte um den Verdampfer
+                 * - komplette untere Führung durchs Expansionsventil
+                 * - äußere rechte Hälfte um den Kondensator
+                 *
+                 * Damit wird nicht mehr abwechselnd eine der beiden
+                 * Originalkonturen "vergessen".
+                 */
+                pipe.setAttribute(
+                    'd',
+                    'M 414 378 '
+                    + 'A 25 25 0 0 0 364 378 '
+                    + 'C 315 390 280 430 264 462 '
+                    + 'A 25 25 0 0 0 264 512 '
+                    + 'C 282 560 325 594 369 600 '
+                    + 'L 369 620 '
+                    + 'L 389 600 '
+                    + 'L 409 620 '
+                    + 'L 409 600 '
+                    + 'C 454 594 497 560 514 512 '
+                    + 'A 25 25 0 0 0 514 462 '
+                    + 'C 498 430 463 390 414 378 Z'
+                );
+
+                pipe.setAttribute('fill', 'none');
+
+                if (outer) {
+                    parent.insertBefore(pipe, outer);
+                } else {
+                    parent.appendChild(pipe);
+                }
+
+                return pipe;
+            };
+
+            const pipe = ensureCircuitPipe();
+
+            if (!currentConfig.useCustomTemperatureColors) {
+                if (outer) {
+                    outer.style.removeProperty('display');
+                    outer.style.removeProperty('visibility');
                 }
 
                 if (inner) {
                     inner.style.removeProperty('display');
                     inner.style.removeProperty('visibility');
-                    inner.style.removeProperty('stroke');
-                    inner.style.removeProperty('stroke-width');
-                    inner.style.removeProperty('stroke-opacity');
-                    inner.removeAttribute(
+                }
+
+                if (pipe) {
+                    pipe.style.setProperty(
+                        'display',
+                        'none',
+                        'important'
+                    );
+                    pipe.style.setProperty(
+                        'visibility',
+                        'hidden',
+                        'important'
+                    );
+                    pipe.removeAttribute(
                         'data-symcon-refrigerant-pipe'
                     );
                 }
@@ -4999,6 +5077,7 @@ window.SymconHeatPump = {
                     '#pathCompressor'
                 ].forEach((selector) => {
                     const element = svg.querySelector(selector);
+
                     if (element) {
                         element.style.removeProperty('stroke');
                         element.style.removeProperty('fill');
@@ -5007,6 +5086,30 @@ window.SymconHeatPump = {
 
                 return;
             }
+
+            /*
+             * Die beiden weißen Originalkonturen vollständig ausblenden.
+             * Sichtbar bleibt ausschließlich unsere einzelne 5-px-Leitung.
+             */
+            [outer, inner].forEach((element) => {
+                if (!element) {
+                    return;
+                }
+
+                element.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                element.style.setProperty(
+                    'visibility',
+                    'hidden',
+                    'important'
+                );
+                element.removeAttribute(
+                    'data-symcon-refrigerant-pipe'
+                );
+            });
 
             const evaporatorTemperature =
                 readStateNumber(
@@ -5024,34 +5127,6 @@ window.SymconHeatPump = {
 
             if (!evaporatorColor || !condenserColor) {
                 return;
-            }
-
-            /*
-             * Die ursprüngliche Doppelkontur wird im erweiterten Modus zu
-             * EINER Leitung wie die übrigen Hydraulikleitungen.
-             *
-             * Dafür verwenden wir bewusst die AUSSENkontur:
-             * Sie enthält auch
-             * - den äußeren Bogen am Verdampfer,
-             * - den oberen Abschnitt am Verdichter und
-             * - den unteren Abschnitt am Expansionsventil.
-             *
-             * Die Innenkontur wird ausgeblendet.
-             */
-            if (inner) {
-                inner.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
-                inner.style.setProperty(
-                    'visibility',
-                    'hidden',
-                    'important'
-                );
-                inner.removeAttribute(
-                    'data-symcon-refrigerant-pipe'
-                );
             }
 
             const setStroke = (selector, color) => {
@@ -5108,18 +5183,17 @@ window.SymconHeatPump = {
                         'http://www.w3.org/2000/svg',
                         'linearGradient'
                     );
+
                     gradient.setAttribute('id', id);
                     gradient.setAttribute(
                         'gradientUnits',
                         'userSpaceOnUse'
                     );
-                    /*
-                     * Linke Kaltseite -> rechte Heißseite.
-                     */
                     gradient.setAttribute('x1', '240');
                     gradient.setAttribute('y1', '0');
                     gradient.setAttribute('x2', '540');
                     gradient.setAttribute('y2', '0');
+
                     defs.appendChild(gradient);
                 }
 
@@ -5191,43 +5265,51 @@ window.SymconHeatPump = {
                 condenserTemperature
             );
 
-            if (pipe) {
-                pipe.style.setProperty(
-                    'fill',
-                    'none',
-                    'important'
-                );
-                pipe.style.setProperty(
-                    'stroke',
-                    pipeGradient,
-                    'important'
-                );
-                pipe.style.setProperty(
-                    'stroke-width',
-                    '5',
-                    'important'
-                );
-                pipe.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
-                pipe.style.setProperty(
-                    'stroke-linecap',
-                    'round',
-                    'important'
-                );
-                pipe.style.setProperty(
-                    'stroke-linejoin',
-                    'round',
-                    'important'
-                );
+            pipe.style.setProperty(
+                'display',
+                'inline',
+                'important'
+            );
+            pipe.style.setProperty(
+                'visibility',
+                'visible',
+                'important'
+            );
+            pipe.style.setProperty(
+                'fill',
+                'none',
+                'important'
+            );
+            pipe.style.setProperty(
+                'stroke',
+                pipeGradient,
+                'important'
+            );
+            pipe.style.setProperty(
+                'stroke-width',
+                '5',
+                'important'
+            );
+            pipe.style.setProperty(
+                'stroke-opacity',
+                '1',
+                'important'
+            );
+            pipe.style.setProperty(
+                'stroke-linecap',
+                'round',
+                'important'
+            );
+            pipe.style.setProperty(
+                'stroke-linejoin',
+                'round',
+                'important'
+            );
 
-                pipe.setAttribute(
-                    'data-symcon-refrigerant-pipe',
-                    '1'
-                );
-            }
+            pipe.setAttribute(
+                'data-symcon-refrigerant-pipe',
+                '1'
+            );
 
             const compressorGradient =
                 createPaletteGradient(
@@ -5329,7 +5411,7 @@ window.SymconHeatPump = {
 
             ensureFlowOverlay(
                 svg,
-                '#pathHPModelOuterCircle',
+                '#symconRefrigerantCircuitPipe',
                 'symconFlowRefrigerantMain',
                 'forward',
                 compressorRunning
@@ -5407,6 +5489,56 @@ window.SymconHeatPump = {
              * auch wenn eine Heizkreispumpe noch "aktiv" meldet.
              */
             const heatingAllowed = !valveToBoiler;
+            const heatingFlowActive =
+                heatingAllowed && anyHeatingActive;
+
+            /*
+             * GEMEINSAME HEIZLEITUNG:
+             *
+             * pathPipeToBuffer ist trotz des historischen Namens die
+             * durchgehende Vorlaufleitung vom Umschaltventil bis zum
+             * Heizkreisverteiler.
+             *
+             * pathPipeFromBuffer ist die durchgehende Rücklaufleitung vom
+             * Heizkreisverteiler zurück zur Wärmepumpe.
+             *
+             * Diese beiden Stücke müssen deshalb auch im reinen Heizbetrieb
+             * animiert werden – nicht nur bei einer Speicherpumpe.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeToBuffer',
+                'symconFlowHeatingCommonSupply',
+                'forward',
+                heatingFlowActive
+            );
+
+            /*
+             * Die SVG-Pfadrichtung von pathPipeFromBuffer geht bereits
+             * vom Heizkreis zurück zur Wärmepumpe. Deshalb FORWARD.
+             * Das korrigiert die bisher umgekehrte Rücklaufrichtung.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeFromBuffer',
+                'symconFlowHeatingCommonReturn',
+                'forward',
+                heatingFlowActive
+            );
+
+            /*
+             * Gemeinsamer vertikaler Rücklauf zwischen Heizkreis 1/2 und
+             * dem unteren Sammelpunkt. Bei Heizkreis 1 oder 2 gehört dieses
+             * Stück zwingend zur vollständigen Rücklaufkette.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeToHP2',
+                'symconFlowHeatingSharedReturn',
+                'forward',
+                heatingAllowed
+                    && (heatingPump1 || heatingPump2)
+            );
 
             const animateCircuit = (
                 number,
@@ -5475,14 +5607,12 @@ window.SymconHeatPump = {
                 heatingPump1,
                 [
                     '#pathPipeToHeatingCircuitPump',
-                    '#pathPipeHeatingSupply',
                     '#pathRadiatorPipeIn1',
                     '#rectRadiator1',
                     '#pathUnderfloorHeating1'
                 ],
                 [
                     '#pathPipeToHP',
-                    '#pathPipeHeatingReturn',
                     '#pathRadiatorPipeOut1'
                 ]
             );
@@ -5492,14 +5622,11 @@ window.SymconHeatPump = {
                 heatingPump2,
                 [
                     '#pathPipeToHeatingCircuitPump2',
-                    '#pathPipeHeatingSupply2',
                     '#pathRadiatorPipeIn2',
                     '#rectRadiator2',
                     '#pathUnderfloorHeating2'
                 ],
                 [
-                    '#pathPipeToHP2',
-                    '#pathPipeHeatingReturn2',
                     '#pathRadiatorPipeOut2'
                 ]
             );
@@ -5509,13 +5636,11 @@ window.SymconHeatPump = {
                 heatingPump3,
                 [
                     '#pathPipeToHeatingCircuitPump3',
-                    '#pathPipeHeatingSupply3',
                     '#pathRadiatorPipeIn3',
                     '#rectRadiator3',
                     '#pathUnderfloorHeating3'
                 ],
                 [
-                    '#pathPipeHeatingReturn3',
                     '#pathRadiatorPipeOut3'
                 ]
             );
@@ -5570,15 +5695,15 @@ window.SymconHeatPump = {
                 '#pathPipeToBuffer',
                 'symconFlowBufferSupply',
                 'forward',
-                storagePump && !valveToBoiler
+                storagePump && !valveToBoiler && !anyHeatingActive
             );
 
             ensureFlowOverlay(
                 svg,
                 '#pathPipeFromBuffer',
                 'symconFlowBufferReturn',
-                'reverse',
-                storagePump && !valveToBoiler
+                'forward',
+                storagePump && !valveToBoiler && !anyHeatingActive
             );
 
             ensureFlowOverlay(
