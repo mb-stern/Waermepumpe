@@ -1786,12 +1786,48 @@ HTML;
     {
         return [
             'hasOperatingStatus'           => $this->HasOperatingStatus(),
+            'heatingActive'                => $this->GetOperatingModeActive(
+                'HeatingPumpHeatingMode',
+                'OperatingStatusHeatingValues'
+            ),
+            'hotwaterActive'               => $this->GetOperatingModeActive(
+                'HeatingPumpHotWaterMode',
+                'OperatingStatusHotWaterValues'
+            ),
+            'coolingActive'                => $this->GetOperatingModeActive(
+                'HeatingPumpCoolingMode',
+                'OperatingStatusCoolingValues'
+            ),
             'heating'                      => $this->BuildControlInfo('HeatingControlVariable'),
             'hotwater'                     => $this->BuildControlInfo('HotWaterControlVariable'),
             'cooling'                      => $this->BuildControlInfo('CoolingControlVariable'),
             'warmWaterSetpoint'            => $this->BuildNumericControlInfo('WarmWaterSetpointVariable', 20.0, 80.0, 0.5),
             'heatingTemperatureCorrection' => $this->BuildNumericControlInfo('HeatingTemperatureCorrectionVariable', -10.0, 10.0, 0.5)
         ];
+    }
+
+    private function GetOperatingModeActive(
+        string $directProperty,
+        string $statusValuesProperty
+    ): bool {
+        if ($this->HasOperatingStatus()) {
+            $status = GetValue(
+                $this->ReadPropertyInteger('OperatingStatusVariable')
+            );
+
+            return $this->ValueMatchesCsv(
+                $status,
+                $this->ReadPropertyString($statusValuesProperty)
+            );
+        }
+
+        $variableId = $this->ReadPropertyInteger($directProperty);
+
+        if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
+            return false;
+        }
+
+        return $this->NormalizeBinaryValue(GetValue($variableId));
     }
 
     private function BuildControlInfo(string $property): array
@@ -3227,41 +3263,49 @@ window.SymconHeatPump = {
                 return;
             }
 
-            /*
-             * Statussymbole bestehen je nach SVG-Version aus unterschiedlich
-             * verschachtelten Pfaden. Darum sowohl die Gruppe selbst als auch
-             * sämtliche grafischen Kindelemente mit currentColor versorgen
-             * und vorhandene Fill-/Stroke-Flächen direkt überschreiben.
-             */
+            const tag = String(group.tagName || '').toLowerCase();
+
+            group.setAttribute('color', color);
+            group.setAttribute('fill', color);
+            group.setAttribute('stroke', color);
             group.style.setProperty('color', color, 'important');
+            group.style.setProperty('fill', color, 'important');
+
+            /*
+             * Warmwasser ist in der Original-SVG kein <g>, sondern ein
+             * einzelnes <use xlink:href="#gWaterTap">. Genau dieses Element
+             * muss direkt eingefärbt werden.
+             */
+            if (tag === 'use') {
+                group.style.setProperty('fill', color, 'important');
+                group.style.setProperty('stroke', color, 'important');
+                return;
+            }
 
             group.querySelectorAll(
                 'path, rect, circle, ellipse, line, polyline, polygon, use'
             ).forEach((element) => {
                 const computed = getComputedStyle(element);
-
                 const fill = String(computed.fill || '').toLowerCase();
                 const stroke = String(computed.stroke || '').toLowerCase();
 
                 if (
-                    fill
-                    && fill !== 'none'
+                    fill !== 'none'
                     && fill !== 'rgba(0, 0, 0, 0)'
                     && fill !== 'transparent'
                 ) {
+                    element.setAttribute('fill', color);
                     element.style.setProperty('fill', color, 'important');
                 }
 
                 if (
-                    stroke
-                    && stroke !== 'none'
+                    stroke !== 'none'
                     && stroke !== 'rgba(0, 0, 0, 0)'
                     && stroke !== 'transparent'
                 ) {
+                    element.setAttribute('stroke', color);
                     element.style.setProperty('stroke', color, 'important');
                 }
-
-                element.style.setProperty('color', color, 'important');
             });
         };
 
@@ -4857,23 +4901,23 @@ window.SymconHeatPump = {
 
             const svg = card.content;
 
-            /*
-             * Originalfarben der Card nicht verändern.
-             */
+            const affected = [
+                '#pathHPModelOuterCircle',
+                '#pathHPModelInnerCircle',
+                '#pathHPModelEvaporatorSymbol001',
+                '#pathHPModelEvaporatorSymbol002',
+                '#pathHPModelCondenserSymbol',
+                '#pathCompressor'
+            ];
+
             if (!currentConfig.useCustomTemperatureColors) {
-                [
-                    '#pathHPModelEvaporatorSymbol001',
-                    '#pathHPModelEvaporatorSymbol002',
-                    '#pathHPModelCondenserSymbol',
-                    '#pathCompressor'
-                ].forEach((selector) => {
+                affected.forEach((selector) => {
                     const element = svg.querySelector(selector);
                     if (element) {
                         element.style.removeProperty('stroke');
                         element.style.removeProperty('fill');
                     }
                 });
-
                 return;
             }
 
@@ -4887,29 +4931,20 @@ window.SymconHeatPump = {
             const condenserColor =
                 temperatureColor(condenserTemperature);
 
+            if (!evaporatorColor || !condenserColor) {
+                return;
+            }
+
             const setStroke = (selector, color) => {
                 const element = svg.querySelector(selector);
-                if (!element || !color) {
+                if (!element) {
                     return;
                 }
 
-                element.style.setProperty(
-                    'stroke',
-                    color,
-                    'important'
-                );
-                element.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
+                element.style.setProperty('stroke', color, 'important');
+                element.style.setProperty('stroke-opacity', '1', 'important');
             };
 
-            /*
-             * Die beiden Wärmetauscher-Symbole selbst erhalten ebenfalls die
-             * Temperaturfarbe. Beim Kühlbetrieb wird ihre Darstellung von der
-             * bereits vorhandenen Kältekreis-Umschaltung vertauscht.
-             */
             setStroke(
                 '#pathHPModelEvaporatorSymbol001',
                 evaporatorColor
@@ -4923,224 +4958,124 @@ window.SymconHeatPump = {
                 condenserColor
             );
 
-            /*
-             * Verdichter-Schnecke:
-             * Das Kältemittel kommt auf der Niederdruck-/Verdampferseite an
-             * und verlässt den Verdichter auf der heißen Hochdruckseite.
-             * Deshalb bekommt die Schnecke einen eigenen Verlauf von
-             * Verdampferfarbe zu Kondensatorfarbe.
-             *
-             * Die vorhandene Rotation von #pathCompressor bleibt unverändert
-             * und zeigt weiterhin an, ob der Verdichter läuft.
-             */
-            const compressorSpiral =
-                svg.querySelector('#pathCompressor');
-
-            if (
-                compressorSpiral
-                && evaporatorColor
-                && condenserColor
-            ) {
-                let defs = svg.querySelector('defs');
-
-                if (!defs) {
-                    defs = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'defs'
-                    );
-                    svg.insertBefore(defs, svg.firstChild);
-                }
-
-                let gradient = svg.querySelector(
-                    '#symconCompressorTemperatureGradient'
+            let defs = svg.querySelector('defs');
+            if (!defs) {
+                defs = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'defs'
                 );
+                svg.insertBefore(defs, svg.firstChild);
+            }
+
+            /*
+             * Nicht direkt Blau -> Rot interpolieren:
+             * genau das erzeugt das unerwünschte Violett.
+             *
+             * Stattdessen werden Zwischenstopps aus der konfigurierten
+             * Temperatur-Farbskala verwendet. Der Verlauf folgt damit
+             * tatsächlich den Farben aus "Temperaturfarben".
+             */
+            const createPaletteGradient = (
+                id,
+                lowTemperature,
+                highTemperature
+            ) => {
+                let gradient = svg.querySelector('#' + id);
 
                 if (!gradient) {
                     gradient = document.createElementNS(
                         'http://www.w3.org/2000/svg',
                         'linearGradient'
                     );
-                    gradient.setAttribute(
-                        'id',
-                        'symconCompressorTemperatureGradient'
-                    );
+                    gradient.setAttribute('id', id);
                     gradient.setAttribute('x1', '0%');
-                    gradient.setAttribute('y1', '100%');
+                    gradient.setAttribute('y1', '0%');
                     gradient.setAttribute('x2', '100%');
                     gradient.setAttribute('y2', '0%');
-
-                    const stopCold = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'stop'
-                    );
-                    stopCold.setAttribute('offset', '0%');
-
-                    const stopHot = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'stop'
-                    );
-                    stopHot.setAttribute('offset', '100%');
-
-                    gradient.appendChild(stopCold);
-                    gradient.appendChild(stopHot);
                     defs.appendChild(gradient);
                 }
 
-                const stops = gradient.querySelectorAll('stop');
-
-                if (stops.length >= 2) {
-                    stops[0].setAttribute(
-                        'stop-color',
-                        evaporatorColor
-                    );
-                    stops[0].style.setProperty(
-                        'stop-color',
-                        evaporatorColor,
-                        'important'
-                    );
-
-                    stops[stops.length - 1].setAttribute(
-                        'stop-color',
-                        condenserColor
-                    );
-                    stops[stops.length - 1].style.setProperty(
-                        'stop-color',
-                        condenserColor,
-                        'important'
-                    );
+                while (gradient.firstChild) {
+                    gradient.removeChild(gradient.firstChild);
                 }
 
-                compressorSpiral.style.setProperty(
-                    'stroke',
-                    'url(#symconCompressorTemperatureGradient)',
-                    'important'
-                );
-                compressorSpiral.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
-            }
+                const low = Number(lowTemperature);
+                const high = Number(highTemperature);
+                const min = Math.min(low, high);
+                const max = Math.max(low, high);
+                const span = Math.max(0.001, max - min);
+
+                const configured = getTemperatureColorStops()
+                    .filter((stop) =>
+                        Number(stop.temperature) > min
+                        && Number(stop.temperature) < max
+                    );
+
+                const stops = [
+                    {
+                        temperature: low,
+                        color: temperatureColor(low)
+                    },
+                    ...(
+                        low <= high
+                            ? configured
+                            : configured.reverse()
+                    ),
+                    {
+                        temperature: high,
+                        color: temperatureColor(high)
+                    }
+                ];
+
+                stops.forEach((item) => {
+                    const stop = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'stop'
+                    );
+
+                    const offset =
+                        Math.abs(Number(item.temperature) - low) / span;
+
+                    stop.setAttribute(
+                        'offset',
+                        Math.max(0, Math.min(1, offset)) * 100 + '%'
+                    );
+                    stop.setAttribute('stop-color', item.color);
+                    stop.style.setProperty(
+                        'stop-color',
+                        item.color,
+                        'important'
+                    );
+
+                    gradient.appendChild(stop);
+                });
+
+                return 'url(#' + id + ')';
+            };
+
+            const circuitGradient = createPaletteGradient(
+                'symconRefrigerantTemperatureGradient',
+                evaporatorTemperature,
+                condenserTemperature
+            );
 
             /*
-             * Die weißen Kältemittelleitungen der Original-SVG anhand der
-             * räumlichen Lage einfärben. Wir greifen nur echte path/line-
-             * Elemente innerhalb des Kältekreis-Gruppenbereichs an und lassen
-             * Texte, Symbole und Pumpen unangetastet.
+             * Diese beiden Pfade SIND der sichtbare Kältekreis der
+             * Original-SVG. Sie werden direkt eingefärbt; keine heuristische
+             * Suche nach "weißen" Pfaden mehr.
              */
-            const refrigerantRoot =
-                svg.querySelector('#gHeatPumpModel')
-                || svg.querySelector('#gHPModel')
-                || svg.querySelector('#gHP');
-
-            if (!refrigerantRoot) {
-                return;
-            }
-
-            const candidates =
-                refrigerantRoot.querySelectorAll('path, line, polyline');
-
-            candidates.forEach((element) => {
-                const id = String(element.id || '');
-
-                /*
-                 * Nur echte Kältemittelleitungen markieren.
-                 * Innere Symbole / Kreise / Verdichterteile dürfen NICHT als
-                 * Flusslinie geklont werden, sonst entstehen gegeneinander
-                 * laufende Kreisanimationen.
-                 */
-                const ancestorIds = [];
-                let parent = element.parentElement;
-                while (parent && parent !== refrigerantRoot) {
-                    if (parent.id) {
-                        ancestorIds.push(String(parent.id));
-                    }
-                    parent = parent.parentElement;
-                }
-
-                const structuralContext = ancestorIds.join(' ');
-
-                if (
-                    !id
-                    || id.includes('Fan')
-                    || id.includes('Compressor')
-                    || id.includes('EvaporatorSymbol')
-                    || id.includes('CondenserSymbol')
-                    || id.includes('ExpansionValve')
-                    || id.includes('Heater')
-                    || /Fan|Compressor|ExpansionValve/i.test(structuralContext)
-                ) {
+            [
+                '#pathHPModelOuterCircle',
+                '#pathHPModelInnerCircle'
+            ].forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (!element) {
                     return;
                 }
-
-                /*
-                 * Original-SVG zeichnet die Kältemittelleitungen weiß.
-                 * Nur solche weißen/hellen Leitungen übernehmen.
-                 */
-                const computed = getComputedStyle(element);
-                const stroke = String(
-                    computed.stroke || element.getAttribute('stroke') || ''
-                ).toLowerCase();
-
-                const looksWhite =
-                    stroke.includes('255, 255, 255')
-                    || stroke === '#fff'
-                    || stroke === '#ffffff'
-                    || stroke === 'white';
-
-                if (!looksWhite) {
-                    return;
-                }
-
-                let box;
-                try {
-                    box = element.getBBox();
-                } catch (error) {
-                    return;
-                }
-
-                /*
-                 * Links/unten = Niederdruckseite, rechts/oben =
-                 * Hochdruckseite. In der Mitte interpolieren wir zwischen
-                 * Verdampfer- und Kondensatorfarbe.
-                 */
-                const centerX = box.x + box.width / 2;
-                const ratio = Math.max(
-                    0,
-                    Math.min(1, (centerX - 260) / 300)
-                );
-
-                if (!evaporatorColor || !condenserColor) {
-                    return;
-                }
-
-                const hexToRgb = (hex) => {
-                    const value = parseInt(
-                        String(hex).replace('#', ''),
-                        16
-                    );
-
-                    return [
-                        (value >> 16) & 255,
-                        (value >> 8) & 255,
-                        value & 255
-                    ];
-                };
-
-                const c1 = hexToRgb(evaporatorColor);
-                const c2 = hexToRgb(condenserColor);
-
-                const color = rgbToHex(
-                    c1.map(
-                        (component, index) =>
-                            component
-                            + (c2[index] - component) * ratio
-                    )
-                );
 
                 element.style.setProperty(
                     'stroke',
-                    color,
+                    circuitGradient,
                     'important'
                 );
                 element.style.setProperty(
@@ -5148,12 +5083,31 @@ window.SymconHeatPump = {
                     '1',
                     'important'
                 );
-
                 element.setAttribute(
                     'data-symcon-refrigerant-pipe',
                     '1'
                 );
             });
+
+            const compressorGradient = createPaletteGradient(
+                'symconCompressorTemperatureGradient',
+                evaporatorTemperature,
+                condenserTemperature
+            );
+
+            const compressorSpiral = svg.querySelector('#pathCompressor');
+            if (compressorSpiral) {
+                compressorSpiral.style.setProperty(
+                    'stroke',
+                    compressorGradient,
+                    'important'
+                );
+                compressorSpiral.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
+            }
         };
 
         const applyFlowAnimations = (card) => {
@@ -6417,19 +6371,19 @@ window.SymconHeatPump = {
                 {
                     functionName: 'heating',
                     selector: '#gHPStatusHeating',
-                    entity: currentConfig.heatingPumpHeatingMode,
+                    activeKey: 'heatingActive',
                     runningColor: '#ff9500'
                 },
                 {
                     functionName: 'hotwater',
                     selector: '#gHPStatusWW',
-                    entity: currentConfig.heatingPumpHotWaterMode,
+                    activeKey: 'hotwaterActive',
                     runningColor: '#ff9500'
                 },
                 {
                     functionName: 'cooling',
                     selector: '#gHPStatusCooling',
-                    entity: currentConfig.heatingPumpCoolingMode,
+                    activeKey: 'coolingActive',
                     runningColor: '#0a84ff'
                 }
             ];
@@ -6443,8 +6397,16 @@ window.SymconHeatPump = {
 
                 const control = currentControls && currentControls[definition.functionName];
 
-                // Läuft gerade wirklich = zentrale Ist-Statusvariable.
-                const running = stateIsOn(definition.entity);
+                /*
+                 * Läuft gerade wirklich = kanonischer Datenwert aus
+                 * BuildVisualizationData(). Nicht über die Konfiguration
+                 * zurückauflösen, damit sowohl Betriebsstatus-Fallback als
+                 * auch direkt konfigurierte Bool-Variablen funktionieren.
+                 */
+                const running = !!(
+                    currentControls
+                    && currentControls[definition.activeKey] === true
+                );
 
                 const hasControl = !!(
                     control
