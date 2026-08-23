@@ -129,6 +129,8 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingControlVariable',
         'HotWaterControlVariable',
         'CoolingControlVariable',
+        'WarmWaterSetpointVariable',
+        'HeatingTemperatureCorrectionVariable',
         'FanSpeed'
     ];
 
@@ -149,6 +151,10 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('HeatingControlVariable', 0);
         $this->RegisterPropertyInteger('HotWaterControlVariable', 0);
         $this->RegisterPropertyInteger('CoolingControlVariable', 0);
+
+        // Direkt bedienbare Sollwerte in der oberen Icon-Leiste
+        $this->RegisterPropertyInteger('WarmWaterSetpointVariable', 0);
+        $this->RegisterPropertyInteger('HeatingTemperatureCorrectionVariable', 0);
 
         // Luft/Wasser: Lüfterdrehzahl > 0 hat Vorrang vor dem Status-Fallback.
         $this->RegisterPropertyInteger('FanSpeed', 0);
@@ -327,8 +333,9 @@ class Waermepumpe extends IPSModuleStrict
                 $this->UpdateVisualizationValue(
                     json_encode(
                         [
-                            'type' => 'update',
-                            'data' => $this->BuildVisualizationData()
+                            'type'     => 'update',
+                            'data'     => $this->BuildVisualizationData(),
+                            'controls' => $this->BuildControlData()
                         ],
                         JSON_THROW_ON_ERROR
                         | JSON_UNESCAPED_UNICODE
@@ -343,7 +350,7 @@ class Waermepumpe extends IPSModuleStrict
 
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        if ($Ident !== 'SetControlMode') {
+        if (!in_array($Ident, ['SetControlMode', 'SetNumericControl'], true)) {
             throw new InvalidArgumentException('Unbekannte Aktion: ' . $Ident);
         }
 
@@ -355,11 +362,18 @@ class Waermepumpe extends IPSModuleStrict
         $function = (string) ($payload['function'] ?? '');
         $value = $payload['value'] ?? null;
 
-        $propertyMap = [
-            'heating'  => 'HeatingControlVariable',
-            'hotwater' => 'HotWaterControlVariable',
-            'cooling'  => 'CoolingControlVariable'
-        ];
+        if ($Ident === 'SetControlMode') {
+            $propertyMap = [
+                'heating'  => 'HeatingControlVariable',
+                'hotwater' => 'HotWaterControlVariable',
+                'cooling'  => 'CoolingControlVariable'
+            ];
+        } else {
+            $propertyMap = [
+                'warmWaterSetpoint'            => 'WarmWaterSetpointVariable',
+                'heatingTemperatureCorrection' => 'HeatingTemperatureCorrectionVariable'
+            ];
+        }
 
         if (!isset($propertyMap[$function])) {
             throw new InvalidArgumentException('Unbekannte Steuerfunktion.');
@@ -371,25 +385,30 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         $variable = IPS_GetVariable($variableId);
-        $typedValue = $this->CastValueForVariableType($value, (int) $variable['VariableType']);
+        $typedValue = $this->CastValueForVariableType(
+            $value,
+            (int) $variable['VariableType']
+        );
 
-        $allowedValues = $this->GetProfileAssociationValues($variableId);
-        if ($allowedValues !== [] && !$this->ValueInList($typedValue, $allowedValues)) {
-            throw new InvalidArgumentException('Der gewünschte Modus ist im Variablenprofil nicht definiert.');
+        if ($Ident === 'SetControlMode') {
+            $allowedValues = $this->GetProfileAssociationValues($variableId);
+            if ($allowedValues !== [] && !$this->ValueInList($typedValue, $allowedValues)) {
+                throw new InvalidArgumentException(
+                    'Der gewünschte Modus ist im Variablenprofil nicht definiert.'
+                );
+            }
         }
 
-        $actionId = (int) ($variable['VariableCustomAction'] ?: $variable['VariableAction']);
+        $actionId = (int) (
+            $variable['VariableCustomAction']
+            ?: $variable['VariableAction']
+        );
+
         if ($actionId > 0) {
             \RequestAction($variableId, $typedValue);
         } else {
             SetValue($variableId, $typedValue);
         }
-
-        /*
-         * Kein kompletter HTML-Reload nötig.
-         * Die geänderte Variable löst VM_UPDATE aus und MessageSink()
-         * überträgt die neuen Zustände direkt an die bestehende Card.
-         */
     }
 
     public function GetVisualizationTile(): string
@@ -441,6 +460,12 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Betriebsart Heizen (Integer)', 'name' => 'HeatingControlVariable'],
                         ['caption' => 'Betriebsart Warmwasser (Integer)', 'name' => 'HotWaterControlVariable'],
                         ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable']
+                    ]),
+
+                    ['type' => 'Label', 'caption' => 'Sollwerte in der Icon-Leiste'],
+                    $this->VariableGrid([
+                        ['caption' => 'Warmwasser-Solltemperatur', 'name' => 'WarmWaterSetpointVariable'],
+                        ['caption' => 'Heiztemperaturkorrektur', 'name' => 'HeatingTemperatureCorrectionVariable']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Betriebszustände'],
@@ -1327,6 +1352,38 @@ PHP
         font-weight: 600;
     }
 
+    #wp-mode-menu .wp-numeric-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 6px 8px;
+    }
+
+    #wp-mode-menu .wp-numeric-row button {
+        width: 38px;
+        min-width: 38px;
+        text-align: center;
+        font-size: 18px;
+        padding: 6px;
+    }
+
+    #wp-mode-menu .wp-numeric-row input {
+        width: 92px;
+        box-sizing: border-box;
+        padding: 7px 6px;
+        border: 1px solid rgba(127,127,127,.45);
+        border-radius: 5px;
+        background: Canvas;
+        color: CanvasText;
+        text-align: right;
+        font: inherit;
+    }
+
+    #wp-mode-menu .wp-numeric-unit {
+        min-width: 28px;
+        opacity: .8;
+    }
+
     /*
      * Dezente Flussanimation für unsere erweiterte Temperaturdarstellung.
      * Die Original-Card bleibt unangetastet, solange eigene Farben
@@ -1714,10 +1771,12 @@ HTML;
     private function BuildControlData(): array
     {
         return [
-            'hasOperatingStatus' => $this->HasOperatingStatus(),
-            'heating'            => $this->BuildControlInfo('HeatingControlVariable'),
-            'hotwater'           => $this->BuildControlInfo('HotWaterControlVariable'),
-            'cooling'            => $this->BuildControlInfo('CoolingControlVariable')
+            'hasOperatingStatus'           => $this->HasOperatingStatus(),
+            'heating'                      => $this->BuildControlInfo('HeatingControlVariable'),
+            'hotwater'                     => $this->BuildControlInfo('HotWaterControlVariable'),
+            'cooling'                      => $this->BuildControlInfo('CoolingControlVariable'),
+            'warmWaterSetpoint'            => $this->BuildNumericControlInfo('WarmWaterSetpointVariable', 20.0, 80.0, 0.5),
+            'heatingTemperatureCorrection' => $this->BuildNumericControlInfo('HeatingTemperatureCorrectionVariable', -10.0, 10.0, 0.5)
         ];
     }
 
@@ -1764,6 +1823,58 @@ HTML;
             'currentValue' => $currentValue,
             'enabled'      => $offValues === [] ? true : !$this->ValueInList($currentValue, $offValues),
             'options'      => $options
+        ];
+    }
+
+    private function BuildNumericControlInfo(
+        string $property,
+        float $fallbackMin,
+        float $fallbackMax,
+        float $fallbackStep
+    ): array {
+        $variableId = $this->ReadPropertyInteger($property);
+
+        if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
+            return [
+                'configured'   => false,
+                'variableId'   => 0,
+                'currentValue' => null,
+                'min'          => $fallbackMin,
+                'max'          => $fallbackMax,
+                'step'         => $fallbackStep,
+                'unit'         => ''
+            ];
+        }
+
+        $min = $fallbackMin;
+        $max = $fallbackMax;
+        $step = $fallbackStep;
+        $unit = $this->GetVariableUnit($variableId);
+
+        $profileName = $this->GetVariableProfileName($variableId);
+        if ($profileName !== '' && IPS_VariableProfileExists($profileName)) {
+            $profile = IPS_GetVariableProfile($profileName);
+
+            if (isset($profile['MinValue']) && is_numeric($profile['MinValue'])) {
+                $min = (float) $profile['MinValue'];
+            }
+            if (isset($profile['MaxValue']) && is_numeric($profile['MaxValue'])) {
+                $max = (float) $profile['MaxValue'];
+            }
+            if (isset($profile['StepSize']) && is_numeric($profile['StepSize'])
+                && (float) $profile['StepSize'] > 0.0) {
+                $step = (float) $profile['StepSize'];
+            }
+        }
+
+        return [
+            'configured'   => true,
+            'variableId'   => $variableId,
+            'currentValue' => GetValue($variableId),
+            'min'          => $min,
+            'max'          => $max,
+            'step'         => $step,
+            'unit'         => $unit
         ];
     }
 
@@ -2979,6 +3090,122 @@ window.SymconHeatPump = {
             menu.style.left = Math.max(8, x) + 'px';
             menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
+        };
+
+        const openNumericMenu = (functionName, event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            const control = currentControls && currentControls[functionName];
+            if (!control || !control.configured) {
+                return;
+            }
+
+            const menu = document.getElementById('wp-mode-menu');
+            if (!menu) {
+                return;
+            }
+
+            const titles = {
+                warmWaterSetpoint: 'Warmwasser-Solltemperatur',
+                heatingTemperatureCorrection: 'Heiztemperaturkorrektur'
+            };
+
+            const min = Number(control.min);
+            const max = Number(control.max);
+            const step = Number(control.step) > 0 ? Number(control.step) : 0.5;
+            const current = Number(control.currentValue);
+
+            menu.innerHTML = '';
+
+            const title = document.createElement('div');
+            title.className = 'wp-mode-title';
+            title.textContent = titles[functionName] || functionName;
+            menu.appendChild(title);
+
+            const row = document.createElement('div');
+            row.className = 'wp-numeric-row';
+
+            const minus = document.createElement('button');
+            minus.type = 'button';
+            minus.textContent = '−';
+
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.step = String(step);
+            if (Number.isFinite(min)) input.min = String(min);
+            if (Number.isFinite(max)) input.max = String(max);
+            input.value = Number.isFinite(current) ? String(current) : '0';
+
+            const unit = document.createElement('span');
+            unit.className = 'wp-numeric-unit';
+            unit.textContent = control.unit || '';
+
+            const plus = document.createElement('button');
+            plus.type = 'button';
+            plus.textContent = '+';
+
+            const clamp = (value) => {
+                let result = value;
+                if (Number.isFinite(min)) result = Math.max(min, result);
+                if (Number.isFinite(max)) result = Math.min(max, result);
+                return Math.round(result / step) * step;
+            };
+
+            minus.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = String(
+                    clamp(Number(input.value || 0) - step)
+                );
+            });
+
+            plus.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                input.value = String(
+                    clamp(Number(input.value || 0) + step)
+                );
+            });
+
+            row.appendChild(minus);
+            row.appendChild(input);
+            row.appendChild(unit);
+            row.appendChild(plus);
+            menu.appendChild(row);
+
+            const apply = document.createElement('button');
+            apply.type = 'button';
+            apply.textContent = 'Übernehmen';
+            apply.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                const value = clamp(Number(input.value));
+                if (!Number.isFinite(value)) {
+                    return;
+                }
+
+                requestAction(
+                    'SetNumericControl',
+                    JSON.stringify({
+                        function: functionName,
+                        value
+                    })
+                );
+
+                closeModeMenu();
+            });
+            menu.appendChild(apply);
+
+            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
+            const y = Math.min(event.clientY + 8, window.innerHeight - 220);
+            menu.style.left = Math.max(8, x) + 'px';
+            menu.style.top = Math.max(8, y) + 'px';
+            menu.style.display = 'block';
+
+            input.focus();
+            input.select();
         };
 
         const setIconColor = (group, color) => {
@@ -5493,6 +5720,158 @@ window.SymconHeatPump = {
             });
         };
 
+        const applySetpointIcons = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const settings = svg.querySelector('#gSettings');
+
+            if (!settings) {
+                return;
+            }
+
+            const createIcon = (
+                id,
+                x,
+                shortLabel,
+                functionName
+            ) => {
+                let group = svg.querySelector('#' + id);
+
+                if (!group) {
+                    group = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'g'
+                    );
+                    group.setAttribute('id', id);
+                    group.setAttribute(
+                        'transform',
+                        'translate(' + x + ' 78)'
+                    );
+
+                    const circle = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'circle'
+                    );
+                    circle.setAttribute('cx', '0');
+                    circle.setAttribute('cy', '0');
+                    circle.setAttribute('r', '17');
+                    circle.setAttribute('fill', 'none');
+                    circle.setAttribute('stroke-width', '2');
+
+                    const symbol = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'text'
+                    );
+                    symbol.setAttribute('x', '0');
+                    symbol.setAttribute('y', '4');
+                    symbol.setAttribute('text-anchor', 'middle');
+                    symbol.setAttribute('font-size', '10');
+                    symbol.setAttribute('font-weight', '600');
+                    symbol.textContent = shortLabel;
+
+                    const value = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'text'
+                    );
+                    value.setAttribute('id', id + 'Value');
+                    value.setAttribute('x', '0');
+                    value.setAttribute('y', '29');
+                    value.setAttribute('text-anchor', 'middle');
+                    value.setAttribute('font-size', '11');
+
+                    group.appendChild(circle);
+                    group.appendChild(symbol);
+                    group.appendChild(value);
+                    settings.appendChild(group);
+
+                    group.style.setProperty(
+                        'cursor',
+                        'pointer',
+                        'important'
+                    );
+                    group.style.setProperty(
+                        'pointer-events',
+                        'all',
+                        'important'
+                    );
+
+                    group.addEventListener(
+                        'click',
+                        (event) => openNumericMenu(functionName, event)
+                    );
+                }
+
+                return group;
+            };
+
+            const definitions = [
+                {
+                    id: 'gSymconWarmWaterSetpoint',
+                    x: 420,
+                    label: 'WW',
+                    functionName: 'warmWaterSetpoint'
+                },
+                {
+                    id: 'gSymconHeatingCorrection',
+                    x: 475,
+                    label: '±',
+                    functionName: 'heatingTemperatureCorrection'
+                }
+            ];
+
+            definitions.forEach((definition) => {
+                const control =
+                    currentControls
+                    && currentControls[definition.functionName];
+
+                const group = createIcon(
+                    definition.id,
+                    definition.x,
+                    definition.label,
+                    definition.functionName
+                );
+
+                const visible = !!(
+                    control
+                    && control.configured
+                );
+
+                group.style.setProperty(
+                    'display',
+                    visible ? 'inline' : 'none',
+                    'important'
+                );
+
+                if (!visible) {
+                    return;
+                }
+
+                const color = resolveLayoutTextColor();
+                setIconColor(group, color);
+
+                const valueElement = svg.querySelector(
+                    '#' + definition.id + 'Value'
+                );
+
+                if (valueElement) {
+                    const numeric = Number(control.currentValue);
+                    const formatted = Number.isFinite(numeric)
+                        ? new Intl.NumberFormat('de-CH', {
+                            minimumFractionDigits:
+                                Math.abs(numeric % 1) > 0 ? 1 : 0,
+                            maximumFractionDigits: 1
+                        }).format(numeric)
+                        : String(control.currentValue ?? '');
+
+                    valueElement.textContent =
+                        formatted + (control.unit ? ' ' + control.unit : '');
+                }
+            });
+        };
+
         const applyControlIcons = (card) => {
             if (!card || !card.content) {
                 return;
@@ -5722,6 +6101,7 @@ window.SymconHeatPump = {
                             applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
                             applyControlIcons(this);
+                            applySetpointIcons(this);
                             applyFanAnimation(this);
                             applyHeatingReturnContinuity(this);
                             applySingleCircuitTemperatureDisplay(this);
