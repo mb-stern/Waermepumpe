@@ -6055,9 +6055,34 @@ window.SymconHeatPump = {
             fan.style.animationDuration = duration.toFixed(2) + 's';
         };
 
-        document.addEventListener('click', (event) => {
-            const menu = document.getElementById('wp-mode-menu');
-            if (menu && menu.style.display === 'block' && !menu.contains(event.target)) {
+        /*
+         * Einheitliches Schließverhalten für ALLE Popups.
+         *
+         * Capture-Modus ist hier wichtig: Einige SVG-Elemente der Card
+         * stoppen ihre Klick-Events selbst. Mit pointerdown + capture wird
+         * ein Klick außerhalb des Menüs trotzdem sicher erkannt.
+         */
+        document.addEventListener(
+            'pointerdown',
+            (event) => {
+                const menu = document.getElementById('wp-mode-menu');
+
+                if (
+                    menu
+                    && menu.style.display === 'block'
+                    && !menu.contains(event.target)
+                ) {
+                    closeModeMenu();
+                }
+            },
+            true
+        );
+
+        /*
+         * Zusätzlich lassen sich alle Menüs mit Escape schließen.
+         */
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
                 closeModeMenu();
             }
         });
