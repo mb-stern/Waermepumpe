@@ -7029,47 +7029,47 @@ window.SymconHeatPump = {
                 {
                     selector: '#gHPStatusOff',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[0]
+                    originalX: 101.371
                 },
                 {
                     selector: '#gHPStatusWW',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[1]
+                    originalX: 158.047
                 },
                 {
                     selector: '#gHPStatusHeating',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[2]
+                    originalX: 212.235
                 },
                 {
                     selector: '#gHPStatusCooling',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[3]
+                    originalX: 258.245
                 },
                 {
                     selector: '#gDefrost',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[4]
+                    originalX: 299.602
                 },
                 {
                     selector: '#gAdditionalHeating',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[5]
+                    originalX: 346.000
                 },
                 {
                     selector: '#gWarning',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[6]
+                    originalX: 391.560
                 },
                 {
                     selector: '#gHPStatusParty',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[7]
+                    originalX: 437.380
                 },
                 {
                     selector: '#gHPStatusSave',
                     custom: false,
-                    originalX: TOP_ICON_SLOTS[8]
+                    originalX: 485.077
                 },
                 {
                     selector: '#gSymconWarmWaterSetpoint',
@@ -7190,7 +7190,7 @@ window.SymconHeatPump = {
              * Gleicher Innenabstand links und rechts.
              * Damit kleben weder Wasserhahn noch letztes Symbol am Rahmen.
              */
-            const horizontalPadding = 32;
+            const horizontalPadding = 36;
             const leftX =
                 frameX + horizontalPadding;
             const rightX =
@@ -7249,6 +7249,11 @@ window.SymconHeatPump = {
                     )
                     || '';
 
+                /*
+                 * originalX ist der tatsächlich gemessene Mittelpunkt des
+                 * jeweiligen Symbols in der unveränderten Original-SVG.
+                 * Dadurch werden alle Originalicons exakt auf targetX gesetzt.
+                 */
                 const deltaX =
                     targetX - Number(definition.originalX);
 
