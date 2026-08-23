@@ -1325,18 +1325,39 @@ PHP
     }
 
     #wp-mode-menu {
-        position: fixed;
-        z-index: 9999;
         display: none;
-        min-width: 190px;
-        max-width: 300px;
-        padding: 6px;
-        border-radius: 8px;
-        background: color-mix(in srgb, Canvas 94%, transparent);
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+        position: fixed;
+        z-index: 2147483647;
+        box-sizing: border-box;
+        width: min(360px, calc(100vw - 24px));
+        max-height: min(70vh, 520px);
+        overflow-y: auto;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(127,127,127,.35);
+        background: Canvas;
         color: CanvasText;
+        box-shadow: 0 8px 28px rgba(0,0,0,.28);
         font: 14px Arial, sans-serif;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
     }
+
+    /*
+     * Auf genügend breiten Desktop-Ansichten darf das Menü kompakt
+     * mittig erscheinen. Auf dem Handy bleibt es als Bottom-Sheet unten.
+     */
+    @media (min-width: 700px) {
+        #wp-mode-menu {
+            top: 50%;
+            bottom: auto;
+            transform: translate(-50%, -50%);
+        }
+    }
+
 
     #wp-mode-menu .wp-mode-title {
         padding: 6px 8px;
@@ -3188,6 +3209,40 @@ window.SymconHeatPump = {
                 .includes(String(item.value ?? '').trim().toLowerCase());
         };
 
+        const disableOriginalSettingsLink = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const link = svg.querySelector('#linkSettings');
+
+            if (!link || !link.parentNode) {
+                return;
+            }
+
+            /*
+             * Die Original-SVG legt die komplette Statusleiste in
+             * <a id="linkSettings" href="#"> ... </a>.
+             *
+             * Auf dem Handy erzeugt Symcon/WebView daraus eine zusätzliche
+             * Link-/Pfeilfläche. Ein preventDefault auf touchend ist aber
+             * ebenfalls falsch, weil dadurch der nachfolgende click auf
+             * unseren Icons unterdrückt werden kann.
+             *
+             * Lösung: den <a>-Wrapper komplett entfernen, die Kinder aber
+             * unverändert an derselben Stelle im SVG belassen.
+             */
+            const parent = link.parentNode;
+
+            while (link.firstChild) {
+                parent.insertBefore(link.firstChild, link);
+            }
+
+            parent.removeChild(link);
+        };
+
+
         const closeModeMenu = () => {
             const menu = document.getElementById('wp-mode-menu');
             if (menu) {
@@ -3266,10 +3321,6 @@ window.SymconHeatPump = {
                 menu.appendChild(button);
             });
 
-            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
-            const y = Math.min(event.clientY + 8, window.innerHeight - 260);
-            menu.style.left = Math.max(8, x) + 'px';
-            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
         };
 
@@ -3379,14 +3430,24 @@ window.SymconHeatPump = {
             });
             menu.appendChild(apply);
 
-            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
-            const y = Math.min(event.clientY + 8, window.innerHeight - 220);
-            menu.style.left = Math.max(8, x) + 'px';
-            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
 
-            input.focus();
-            input.select();
+            /*
+             * Auf Desktop Feld direkt fokussieren.
+             * Auf Touch-Geräten nicht automatisch fokussieren, weil sonst
+             * WebView/Browser zusätzliche Eingabe-/Pfeilflächen öffnen kann.
+             */
+            const touchDevice =
+                ('ontouchstart' in window)
+                || (
+                    navigator.maxTouchPoints
+                    && navigator.maxTouchPoints > 0
+                );
+
+            if (!touchDevice) {
+                input.focus();
+                input.select();
+            }
         };
 
 
@@ -6851,9 +6912,13 @@ window.SymconHeatPump = {
                         'important'
                     );
 
-                    group.addEventListener(
-                        'click',
-                        (event) => openNumericMenu(functionName, event)
+                    bindTap(
+                        group,
+                        (event) =>
+                            openNumericMenu(
+                                functionName,
+                                event
+                            )
                     );
                 }
 
@@ -7097,9 +7162,12 @@ window.SymconHeatPump = {
                 : null;
 
             const iconCenterY =
-                referenceCenter && Number.isFinite(referenceCenter.y)
+                referenceCenter
+                && Number.isFinite(referenceCenter.y)
+                && referenceCenter.y > 40
+                && referenceCenter.y < 180
                     ? referenceCenter.y
-                    : 0;
+                    : 100;
 
             let slotIndex = 0;
 
@@ -7142,13 +7210,41 @@ window.SymconHeatPump = {
                     .map((center) => center.x)
                     .sort((a, b) => a - b);
 
-                const firstX = originalCenters.length > 0
+                /*
+                 * Desktop/Browser: weiterhin exakt die bisherige dynamische
+                 * Messung verwenden.
+                 *
+                 * Mobile WebViews liefern bei SVG getCTM()/getBBox()
+                 * gelegentlich für alle Icons praktisch denselben X-Wert.
+                 * Dann landen alle Symbole übereinander und man sieht nur
+                 * noch eines.
+                 *
+                 * Nur in DIESEM Fehlerfall verwenden wir die bereits aus
+                 * der Original-SVG gemessenen Slotpositionen als Fallback.
+                 */
+                const measuredSpread =
+                    originalCenters.length > 1
+                        ? originalCenters[
+                            originalCenters.length - 1
+                        ] - originalCenters[0]
+                        : 0;
+
+                const measurementValid =
+                    originalCenters.length >= 2
+                    && Number.isFinite(measuredSpread)
+                    && measuredSpread > 200;
+
+                const firstX = measurementValid
                     ? originalCenters[0]
                     : TOP_ICON_SLOTS[0];
 
-                const lastX = originalCenters.length > 1
-                    ? originalCenters[originalCenters.length - 1]
-                    : firstX;
+                const lastX = measurementValid
+                    ? originalCenters[
+                        originalCenters.length - 1
+                    ]
+                    : TOP_ICON_SLOTS[
+                        TOP_ICON_SLOTS.length - 1
+                    ];
 
                 const visibleCount = Math.min(
                     visible.length,
@@ -7201,6 +7297,50 @@ window.SymconHeatPump = {
                     + (original ? ' ' + original : '')
                 );
             });
+        };
+
+        const bindTap = (element, handler) => {
+            if (!element || element.dataset.symconTapBound) {
+                return;
+            }
+
+            element.dataset.symconTapBound = '1';
+
+            let pointerHandled = false;
+
+            if (window.PointerEvent) {
+                element.addEventListener(
+                    'pointerup',
+                    (event) => {
+                        if (
+                            event.pointerType === 'touch'
+                            || event.pointerType === 'pen'
+                        ) {
+                            pointerHandled = true;
+                            event.preventDefault();
+                            event.stopPropagation();
+                            handler(event);
+
+                            window.setTimeout(() => {
+                                pointerHandled = false;
+                            }, 400);
+                        }
+                    }
+                );
+            }
+
+            element.addEventListener(
+                'click',
+                (event) => {
+                    if (pointerHandled) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
+
+                    handler(event);
+                }
+            );
         };
 
         const applyControlIcons = (card) => {
@@ -7269,8 +7409,12 @@ window.SymconHeatPump = {
                     && control.options.length > 0
                 );
 
+                const configuredMode =
+                    !!currentConfig[definition.dataKey];
+
                 const visible =
-                    hasControl
+                    configuredMode
+                    || hasControl
                     || (
                         currentControls
                         && currentControls.hasOperatingStatus
@@ -7411,8 +7555,8 @@ window.SymconHeatPump = {
                     if (!group.dataset.symconControlBound) {
                         group.dataset.symconControlBound = '1';
 
-                        group.addEventListener(
-                            'click',
+                        bindTap(
+                            group,
                             (event) =>
                                 openModeMenu(
                                     definition.functionName,
@@ -7587,6 +7731,7 @@ window.SymconHeatPump = {
                             applyHeatingCircuitTemperatureColors(this);
                             applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
+                            disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
                             layoutTopIconBar(this);
