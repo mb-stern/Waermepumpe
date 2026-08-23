@@ -5874,15 +5874,10 @@ window.SymconHeatPump = {
             const svg = card.content;
 
             /*
-             * WICHTIG:
-             * Keine frei berechneten Positionen mehr.
-             *
-             * Die Heat-Pump-Card besitzt für ihre obere Leiste bereits
-             * vorgesehene Icon-Positionen. Genau diese Original-Slots werden
-             * verwendet. Dadurch bleiben die Symbole immer innerhalb der von
-             * der SVG vorgesehenen Leiste.
+             * Logische und reproduzierbare Reihenfolge der kompletten
+             * oberen Icon-Leiste.
              */
-            const originalDefinitions = [
+            const definitions = [
                 ['#gHPStatusOff', 'power'],
                 ['#gHPStatusWW', 'hotwater'],
                 ['#gHPStatusHeating', 'heating'],
@@ -5893,10 +5888,7 @@ window.SymconHeatPump = {
                 ['#gTimeSymbolNight', 'night'],
                 ['#gWarning', 'warning'],
                 ['#gAdditionalHeating', 'additionalHeating'],
-                ['#gDefrost', 'defrost']
-            ];
-
-            const customDefinitions = [
+                ['#gDefrost', 'defrost'],
                 ['#gSymconWarmWaterSetpoint', 'warmWaterSetpoint'],
                 ['#gSymconHeatingCorrection', 'heatingTemperatureCorrection']
             ];
@@ -5915,146 +5907,46 @@ window.SymconHeatPump = {
                 );
             };
 
-            const getRootCenterX = (element) => {
-                if (!element || typeof element.getBBox !== 'function') {
-                    return null;
-                }
-
-                try {
-                    const box = element.getBBox();
-                    const matrix = element.getCTM();
-
-                    if (!matrix) {
-                        return null;
-                    }
-
-                    const x = box.x + box.width / 2;
-                    const y = box.y + box.height / 2;
-
-                    return matrix.a * x + matrix.c * y + matrix.e;
-                } catch (error) {
-                    return null;
-                }
-            };
-
             /*
-             * Originalzustand jedes SVG-Icons einmal sichern.
-             * Vor jeder neuen Anordnung wird dieser wiederhergestellt.
+             * Tag und Nacht sind alternative Darstellungen derselben
+             * Funktion. Es wird nur das aktuell sichtbare Element verwendet.
              */
-            originalDefinitions.forEach(([selector]) => {
-                const element = svg.querySelector(selector);
+            const visibleIcons = definitions
+                .map(([selector, key]) => ({
+                    element: svg.querySelector(selector),
+                    key
+                }))
+                .filter((entry) => isVisible(entry.element));
 
-                if (!element) {
-                    return;
-                }
-
-                if (!element.hasAttribute('data-symcon-original-transform')) {
-                    element.setAttribute(
-                        'data-symcon-original-transform',
-                        element.getAttribute('transform') || ''
-                    );
-                }
-
-                element.setAttribute(
-                    'transform',
-                    element.getAttribute('data-symcon-original-transform') || ''
-                );
-            });
-
-            /*
-             * Die Original-Slotpositionen direkt aus der SVG ermitteln.
-             * Tag/Nacht können denselben bzw. sehr ähnlichen Platz belegen.
-             * Daher werden nahezu identische X-Positionen zusammengefasst.
-             */
-            const rawSlots = originalDefinitions
-                .map(([selector]) => svg.querySelector(selector))
-                .filter(Boolean)
-                .map(getRootCenterX)
-                .filter((x) => Number.isFinite(x))
-                .sort((a, b) => a - b);
-
-            const slots = [];
-
-            rawSlots.forEach((x) => {
-                const duplicate = slots.some(
-                    (existing) => Math.abs(existing - x) < 8
-                );
-
-                if (!duplicate) {
-                    slots.push(x);
-                }
-            });
-
-            if (slots.length === 0) {
+            if (visibleIcons.length === 0) {
                 return;
             }
 
             /*
-             * Sichtbare Icons in der gewünschten logischen Reihenfolge.
-             * Es werden ausschließlich vorhandene Original-Slots verwendet.
+             * Die Original-Leiste reicht ungefähr von x=55 bis x=395.
+             * Bei wenigen Symbolen bleiben wir linksbündig mit angenehmem
+             * Standardabstand. Bei vielen Symbolen wird der Abstand
+             * automatisch verkleinert, damit alles in die Leiste passt.
              */
-            const visibleEntries = [
-                ...originalDefinitions,
-                ...customDefinitions
-            ]
-                .map(([selector, key]) => ({
-                    selector,
-                    key,
-                    element: svg.querySelector(selector)
-                }))
-                .filter((entry) => isVisible(entry.element));
+            const startX = 55;
+            const endX = 395;
+            const preferredGap = 44;
 
-            /*
-             * Wenn mehr Symbole sichtbar sind als Original-Slots vorhanden
-             * sind, bleiben Originalsymbole an ihrer Originalposition.
-             * Zusätzliche Symcon-Icons werden dann lieber ausgeblendet als
-             * andere Elemente zu überdecken.
-             */
-            const originalVisible = visibleEntries.filter(
-                (entry) => !entry.selector.startsWith('#gSymcon')
-            );
-            const customVisible = visibleEntries.filter(
-                (entry) => entry.selector.startsWith('#gSymcon')
-            );
+            const gap = visibleIcons.length <= 1
+                ? 0
+                : Math.min(
+                    preferredGap,
+                    (endX - startX) / (visibleIcons.length - 1)
+                );
 
-            const availableCount =
-                Math.max(0, slots.length - originalVisible.length);
-
-            customVisible.forEach((entry, index) => {
-                if (index >= availableCount) {
-                    entry.element.style.setProperty(
-                        'display',
-                        'none',
-                        'important'
-                    );
-                }
-            });
-
-            const finalEntries = [
-                ...originalVisible,
-                ...customVisible.slice(0, availableCount)
-            ];
-
-            /*
-             * Sichtbare Symbole auf die ORIGINALEN SVG-Slots verteilen.
-             * Keine eigenen Koordinaten, keine neuen Abstände.
-             */
-            finalEntries.forEach((entry, index) => {
+            visibleIcons.forEach((entry, index) => {
                 const element = entry.element;
-                const targetX = slots[index];
-
-                if (!Number.isFinite(targetX)) {
-                    return;
-                }
 
                 /*
-                 * Bei Originalsymbolen zuerst die ursprüngliche Transformation
-                 * verwenden. Unsere Symcon-Icons starten ohne Originaltransform.
+                 * Originalposition einmal sichern. Danach berechnen wir nur
+                 * eine zusätzliche Translation. So bleiben Skalierung,
+                 * Rotation und interne Geometrie der Original-Icons erhalten.
                  */
-                const originalTransform =
-                    element.getAttribute('data-symcon-original-transform')
-                    || '';
-
                 if (!element.hasAttribute('data-symcon-original-transform')) {
                     element.setAttribute(
                         'data-symcon-original-transform',
@@ -6062,24 +5954,26 @@ window.SymconHeatPump = {
                     );
                 }
 
-                element.setAttribute(
-                    'transform',
-                    element.getAttribute('data-symcon-original-transform') || ''
-                );
-
-                const currentX = getRootCenterX(element);
-
-                if (!Number.isFinite(currentX)) {
+                let box;
+                try {
+                    box = element.getBBox();
+                } catch (error) {
                     return;
                 }
 
-                const deltaX = targetX - currentX;
+                const targetX = startX + gap * index;
+                const centerX = box.x + box.width / 2;
+                const deltaX = targetX - centerX;
+
+                const originalTransform =
+                    element.getAttribute('data-symcon-original-transform')
+                    || '';
 
                 element.setAttribute(
                     'transform',
                     (
-                        element.getAttribute('data-symcon-original-transform')
-                            ? element.getAttribute('data-symcon-original-transform') + ' '
+                        originalTransform
+                            ? originalTransform + ' '
                             : ''
                     )
                     + 'translate(' + deltaX + ' 0)'
