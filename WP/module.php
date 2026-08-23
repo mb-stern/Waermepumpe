@@ -1440,6 +1440,15 @@ PHP
         stroke: rgba(255,255,255,.62) !important;
         stroke-dasharray: 3 9 !important;
     }
+
+    /*
+     * Heizkörper/Fußbodenheizung: Flusspunkte klar erkennbar,
+     * aber weiterhin schmaler als die farbige Leitung.
+     */
+    .symcon-flow-overlay.symcon-flow-emitter {
+        stroke-width: 1.45 !important;
+        stroke-dasharray: 3 8 !important;
+    }
 </style>
 
 <div id="wp-root">
@@ -4955,27 +4964,30 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
-            const outer =
-                svg.querySelector('#pathHPModelOuterCircle');
             const pipe =
+                svg.querySelector('#pathHPModelOuterCircle');
+            const inner =
                 svg.querySelector('#pathHPModelInnerCircle');
 
             if (!currentConfig.useCustomTemperatureColors) {
-                if (outer) {
-                    outer.style.removeProperty('display');
-                    outer.style.removeProperty('visibility');
-                    outer.style.removeProperty('stroke');
-                    outer.style.removeProperty('stroke-width');
-                    outer.removeAttribute(
-                        'data-symcon-refrigerant-pipe'
-                    );
-                }
-
                 if (pipe) {
+                    pipe.style.removeProperty('display');
+                    pipe.style.removeProperty('visibility');
                     pipe.style.removeProperty('stroke');
                     pipe.style.removeProperty('stroke-width');
                     pipe.style.removeProperty('stroke-opacity');
                     pipe.removeAttribute(
+                        'data-symcon-refrigerant-pipe'
+                    );
+                }
+
+                if (inner) {
+                    inner.style.removeProperty('display');
+                    inner.style.removeProperty('visibility');
+                    inner.style.removeProperty('stroke');
+                    inner.style.removeProperty('stroke-width');
+                    inner.style.removeProperty('stroke-opacity');
+                    inner.removeAttribute(
                         'data-symcon-refrigerant-pipe'
                     );
                 }
@@ -5016,22 +5028,28 @@ window.SymconHeatPump = {
 
             /*
              * Die ursprüngliche Doppelkontur wird im erweiterten Modus zu
-             * EINER Leitung wie die übrigen Hydraulikleitungen:
-             * - Außenkontur unsichtbar
-             * - Innenkontur = 5 px Rohr
+             * EINER Leitung wie die übrigen Hydraulikleitungen.
+             *
+             * Dafür verwenden wir bewusst die AUSSENkontur:
+             * Sie enthält auch
+             * - den äußeren Bogen am Verdampfer,
+             * - den oberen Abschnitt am Verdichter und
+             * - den unteren Abschnitt am Expansionsventil.
+             *
+             * Die Innenkontur wird ausgeblendet.
              */
-            if (outer) {
-                outer.style.setProperty(
+            if (inner) {
+                inner.style.setProperty(
                     'display',
                     'none',
                     'important'
                 );
-                outer.style.setProperty(
+                inner.style.setProperty(
                     'visibility',
                     'hidden',
                     'important'
                 );
-                outer.removeAttribute(
+                inner.removeAttribute(
                     'data-symcon-refrigerant-pipe'
                 );
             }
@@ -5311,7 +5329,7 @@ window.SymconHeatPump = {
 
             ensureFlowOverlay(
                 svg,
-                '#pathHPModelInnerCircle',
+                '#pathHPModelOuterCircle',
                 'symconFlowRefrigerantMain',
                 'forward',
                 compressorRunning
@@ -5399,25 +5417,56 @@ window.SymconHeatPump = {
                 const enabled = !!active && heatingAllowed;
 
                 supplySelectors.forEach((selector, index) => {
+                    const overlayId =
+                        'symconFlowHeatingSupply'
+                        + number + '_' + index;
+
                     ensureFlowOverlay(
                         svg,
                         selector,
-                        'symconFlowHeatingSupply'
-                            + number + '_' + index,
+                        overlayId,
                         'forward',
                         enabled
                     );
+
+                    if (
+                        selector.includes('Radiator')
+                        || selector.includes('Underfloor')
+                    ) {
+                        const overlay =
+                            svg.querySelector('#' + overlayId);
+
+                        if (overlay) {
+                            overlay.classList.add(
+                                'symcon-flow-emitter'
+                            );
+                        }
+                    }
                 });
 
                 returnSelectors.forEach((selector, index) => {
+                    const overlayId =
+                        'symconFlowHeatingReturn'
+                        + number + '_' + index;
+
                     ensureFlowOverlay(
                         svg,
                         selector,
-                        'symconFlowHeatingReturn'
-                            + number + '_' + index,
-                        'reverse',
+                        overlayId,
+                        'forward',
                         enabled
                     );
+
+                    if (selector.includes('Radiator')) {
+                        const overlay =
+                            svg.querySelector('#' + overlayId);
+
+                        if (overlay) {
+                            overlay.classList.add(
+                                'symcon-flow-emitter'
+                            );
+                        }
+                    }
                 });
             };
 
@@ -5428,6 +5477,7 @@ window.SymconHeatPump = {
                     '#pathPipeToHeatingCircuitPump',
                     '#pathPipeHeatingSupply',
                     '#pathRadiatorPipeIn1',
+                    '#rectRadiator1',
                     '#pathUnderfloorHeating1'
                 ],
                 [
@@ -5444,6 +5494,7 @@ window.SymconHeatPump = {
                     '#pathPipeToHeatingCircuitPump2',
                     '#pathPipeHeatingSupply2',
                     '#pathRadiatorPipeIn2',
+                    '#rectRadiator2',
                     '#pathUnderfloorHeating2'
                 ],
                 [
@@ -5460,6 +5511,7 @@ window.SymconHeatPump = {
                     '#pathPipeToHeatingCircuitPump3',
                     '#pathPipeHeatingSupply3',
                     '#pathRadiatorPipeIn3',
+                    '#rectRadiator3',
                     '#pathUnderfloorHeating3'
                 ],
                 [
