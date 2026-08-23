@@ -1297,6 +1297,8 @@ PHP
         align-items: center;
         justify-content: center;
         padding: 8px 8px 48px;
+        background: transparent !important;
+        color: var(--content-color);
     }
 
     #wp-compact-view svg {
@@ -3284,6 +3286,53 @@ window.SymconHeatPump = {
             const compactSvg =
                 document.createElementNS(ns, 'svg');
 
+            /*
+             * Die Original-SVG definiert einen großen Teil ihrer Optik in
+             * einem eigenen <style>-Element. Beim bisherigen Clone des
+             * gSettings-Blocks fehlte dieses Stylesheet komplett – daher
+             * andere Hintergrund-/Textfarben in der Kompaktansicht.
+             */
+            sourceSvg.querySelectorAll(':scope > style')
+                .forEach((styleElement) => {
+                    compactSvg.appendChild(
+                        styleElement.cloneNode(true)
+                    );
+                });
+
+            const compactTextColor =
+                resolveLayoutTextColor();
+
+            compactSvg.style.setProperty(
+                '--content-color',
+                compactTextColor,
+                'important'
+            );
+            compactSvg.style.setProperty(
+                '--primary-text-color',
+                compactTextColor,
+                'important'
+            );
+            compactSvg.style.setProperty(
+                '--card-background-color',
+                'transparent',
+                'important'
+            );
+            compactSvg.style.setProperty(
+                'background',
+                'transparent',
+                'important'
+            );
+            compactSvg.style.setProperty(
+                'background-color',
+                'transparent',
+                'important'
+            );
+            compactSvg.style.setProperty(
+                'color',
+                compactTextColor,
+                'important'
+            );
+
             compactSvg.setAttribute(
                 'viewBox',
                 '45 35 515 305'
@@ -3319,6 +3368,33 @@ window.SymconHeatPump = {
 
             const settingsClone =
                 sourceSettings.cloneNode(true);
+
+            /*
+             * cloneNode() kopiert data-* Attribute, aber keine Eventlistener.
+             * Dadurch war z.B. data-symcon-tap-bound="1" vorhanden und
+             * bindTap() glaubte, das geklonte Icon sei bereits gebunden.
+             * Resultat: Popups reagierten in der Kompaktansicht nicht.
+             */
+            settingsClone
+                .querySelectorAll(
+                    '[data-symcon-tap-bound],'
+                    + '[data-symcon-control-bound]'
+                )
+                .forEach((element) => {
+                    element.removeAttribute(
+                        'data-symcon-tap-bound'
+                    );
+                    element.removeAttribute(
+                        'data-symcon-control-bound'
+                    );
+                });
+
+            settingsClone.removeAttribute(
+                'data-symcon-tap-bound'
+            );
+            settingsClone.removeAttribute(
+                'data-symcon-control-bound'
+            );
 
             const copiedIds = new Set(
                 Array.from(
@@ -3383,6 +3459,26 @@ window.SymconHeatPump = {
 
             compactSvg.appendChild(settingsClone);
             host.appendChild(compactSvg);
+
+            /*
+             * Nach dem Einhängen die Symcon-Themefarbe auch auf die geklonte
+             * Ansicht anwenden. Damit entspricht hell/dunkel exakt der
+             * Vollansicht.
+             */
+            settingsClone
+                .querySelectorAll('text, tspan')
+                .forEach((element) => {
+                    element.style.setProperty(
+                        'fill',
+                        'var(--content-color)',
+                        'important'
+                    );
+                    element.style.setProperty(
+                        'color',
+                        'var(--content-color)',
+                        'important'
+                    );
+                });
 
             /*
              * Die kopierten Symbole bekommen eigene Touch-/Popup-Handler,
