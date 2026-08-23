@@ -5358,21 +5358,38 @@ window.SymconHeatPump = {
              * Bei Boilerstellung läuft der Fluss ausschließlich über diesen
              * Zweig. Der Boiler-Wendel selbst wird ebenfalls animiert.
              */
+            /*
+             * Boiler-Wendel:
+             * Die SVG-Pfadrichtung läuft entgegengesetzt zur gewünschten
+             * hydraulischen Flussrichtung, deshalb hier bewusst "reverse".
+             */
             ensureFlowOverlay(
                 svg,
                 '#pathPipeHotWaterToTank',
                 'symconFlowBoilerCoil',
-                'forward',
-                valveToBoiler
-            );
-
-            ensureFlowOverlay(
-                svg,
-                '#pathPipeToCirculatingPump',
-                'symconFlowBoilerReturn',
                 'reverse',
                 valveToBoiler
             );
+
+            /*
+             * Keine Flussanimation auf der Warmwasserleitung vom Boiler
+             * zum Wasserhahn / zur Zapfstelle.
+             * Ein eventuell noch vorhandenes Overlay aus einer früheren
+             * Aktualisierung wird explizit ausgeblendet.
+             */
+            const faucetFlow = svg.querySelector('#symconFlowBoilerReturn');
+            if (faucetFlow) {
+                faucetFlow.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                faucetFlow.style.setProperty(
+                    'visibility',
+                    'hidden',
+                    'important'
+                );
+            }
 
             /*
              * ------------------------------------------------------------
