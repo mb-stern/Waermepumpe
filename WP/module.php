@@ -4,7 +4,7 @@
  * ## Third-Party Components
  *
  * Komponente | Lizenz | Verwendung |
- * ------------|---------|------------|
+ * ------------|---------|------------|A
  * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Wärmepumpengrafik |
  */
 
@@ -5735,9 +5735,9 @@ window.SymconHeatPump = {
          *   8: 527.56
          *   9: 587.85
          *
-         * Der erste und letzte Original-Slot bilden die Grenzen der Leiste.
-         * Alle sichtbaren Icons werden innerhalb dieses Originalbereichs mit
-         * exakt gleichem Abstand verteilt.
+         * Die tatsächliche Breite der Icon-Leiste wird zur Laufzeit direkt
+         * aus den Originalpositionen der Card ermittelt. Alle sichtbaren Icons
+         * werden innerhalb genau dieses Bereichs gleichmäßig verteilt.
          * Tag/Nacht gehört NICHT zu dieser Reihe und wird daher bewusst
          * nicht verschoben.
          */
@@ -6110,12 +6110,34 @@ window.SymconHeatPump = {
                 }
 
                 /*
-                 * Ersten und letzten Originalplatz als Grenzen verwenden,
-                 * dazwischen aber ALLE sichtbaren Icons exakt gleichmäßig
-                 * verteilen.
+                 * NICHT die komplette Kopfbreite verwenden.
+                 *
+                 * Die effektive Icon-Spalte wird direkt aus den ursprünglichen
+                 * Positionen der Original-Icons bestimmt. Damit entspricht die
+                 * nutzbare Breite exakt dem Bereich, den die Card selbst für
+                 * ihre obere Symbolleiste vorgesehen hat.
                  */
-                const firstX = TOP_ICON_SLOTS[0];
-                const lastX = TOP_ICON_SLOTS[TOP_ICON_SLOTS.length - 1];
+                const originalCenters = definitions
+                    .filter((item) => !item.custom)
+                    .map((item) => svg.querySelector(item.selector))
+                    .filter(Boolean)
+                    .map((item) => centerInSettings(item))
+                    .filter(
+                        (center) =>
+                            center
+                            && Number.isFinite(center.x)
+                    )
+                    .map((center) => center.x)
+                    .sort((a, b) => a - b);
+
+                const firstX = originalCenters.length > 0
+                    ? originalCenters[0]
+                    : TOP_ICON_SLOTS[0];
+
+                const lastX = originalCenters.length > 1
+                    ? originalCenters[originalCenters.length - 1]
+                    : firstX;
+
                 const visibleCount = Math.min(
                     visible.length,
                     TOP_ICON_SLOTS.length
