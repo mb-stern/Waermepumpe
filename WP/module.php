@@ -2832,6 +2832,9 @@ class Waermepumpe extends IPSModuleStrict
             return;
         }
 
+        // Kollektortemperatur bleibt weiterhin als Messwert der Card erhalten.
+        // Für die Farbrichtung des Panels sind aber Solar-Vorlauf und
+        // Solar-Rücklauf maßgebend.
         const panelTemperature =
             readStateNumber(currentConfig.thermalSolarPanelTemp);
 
@@ -2849,7 +2852,8 @@ class Waermepumpe extends IPSModuleStrict
             ?? readStateNumber(currentConfig.tankTempWWMiddle)
             ?? readStateNumber(currentConfig.tankTempWWUp);
 
-        const panelColor = temperatureColor(panelTemperature);
+        void panelTemperature;
+
         const supplyColor = temperatureColor(supplyTemperature);
         const returnColor = temperatureColor(returnTemperature);
 
@@ -2874,26 +2878,37 @@ class Waermepumpe extends IPSModuleStrict
         };
 
         /*
-         * Solar-Vorlauf und Solar-Rücklauf.
+         * Solarleitungen:
+         * - pathPipeThermalSolarHotWater ist der heiße Vorlauf vom Panel
+         *   zum Boiler.
+         * - pathPipeThermalSolarColdWater ist der kühlere Rücklauf vom
+         *   Boiler zurück zum Panel.
          */
         setStroke('#pathPipeThermalSolarHotWater', supplyColor);
         setStroke('#pathPipeThermalSolarColdWater', returnColor);
 
         /*
          * Solarpanel:
-         * Nicht mehr einfarbig darstellen, sondern mit einem eigenen
-         * Temperaturverlauf von Solar-Rücklauf (kühler) zur
-         * Kollektortemperatur (heißer).
+         * Die Originalgeometrie läuft von links (heißer Ausgang/Vorlauf)
+         * nach rechts (kühler Eingang/Rücklauf).
+         *
+         * Daher muss der Panelverlauf zwingend sein:
+         *   links  = Solar-Vorlauffarbe
+         *   rechts = Solar-Rücklauffarbe
+         *
+         * Die Kollektortemperatur bleibt ein eigener Messwert und wird NICHT
+         * mehr als Endfarbe des Panels verwendet.
          */
         let panelGradient = svg.querySelector(
             '#symconLinearGradientThermalSolarPanel'
         );
 
         if (!panelGradient) {
-            const sourcePanelGradient = svg.querySelector('#linearGradient3');
+            const originalPanelGradient =
+                svg.querySelector('#linearGradient3');
 
-            if (sourcePanelGradient) {
-                panelGradient = sourcePanelGradient.cloneNode(true);
+            if (originalPanelGradient) {
+                panelGradient = originalPanelGradient.cloneNode(true);
                 panelGradient.setAttribute(
                     'id',
                     'symconLinearGradientThermalSolarPanel'
@@ -2908,29 +2923,32 @@ class Waermepumpe extends IPSModuleStrict
                     }
                 );
 
-                sourcePanelGradient.parentNode.appendChild(panelGradient);
+                originalPanelGradient.parentNode.appendChild(panelGradient);
             }
         }
 
-        if (panelGradient && panelColor && returnColor) {
+        if (panelGradient && supplyColor && returnColor) {
             const panelStops = panelGradient.querySelectorAll('stop');
 
             if (panelStops.length >= 2) {
                 panelStops[0].style.setProperty(
                     'stop-color',
-                    returnColor,
+                    supplyColor,
                     'important'
                 );
-                panelStops[0].setAttribute('stop-color', returnColor);
+                panelStops[0].setAttribute(
+                    'stop-color',
+                    supplyColor
+                );
 
                 panelStops[panelStops.length - 1].style.setProperty(
                     'stop-color',
-                    panelColor,
+                    returnColor,
                     'important'
                 );
                 panelStops[panelStops.length - 1].setAttribute(
                     'stop-color',
-                    panelColor
+                    returnColor
                 );
             }
 
