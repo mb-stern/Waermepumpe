@@ -4598,7 +4598,8 @@ window.SymconHeatPump = {
                 [
                     '#pathHPModelEvaporatorSymbol001',
                     '#pathHPModelEvaporatorSymbol002',
-                    '#pathHPModelCondenserSymbol'
+                    '#pathHPModelCondenserSymbol',
+                    '#pathCompressor'
                 ].forEach((selector) => {
                     const element = svg.querySelector(selector);
                     if (element) {
@@ -4655,6 +4656,105 @@ window.SymconHeatPump = {
                 '#pathHPModelCondenserSymbol',
                 condenserColor
             );
+
+            /*
+             * Verdichter-Schnecke:
+             * Das Kältemittel kommt auf der Niederdruck-/Verdampferseite an
+             * und verlässt den Verdichter auf der heißen Hochdruckseite.
+             * Deshalb bekommt die Schnecke einen eigenen Verlauf von
+             * Verdampferfarbe zu Kondensatorfarbe.
+             *
+             * Die vorhandene Rotation von #pathCompressor bleibt unverändert
+             * und zeigt weiterhin an, ob der Verdichter läuft.
+             */
+            const compressorSpiral =
+                svg.querySelector('#pathCompressor');
+
+            if (
+                compressorSpiral
+                && evaporatorColor
+                && condenserColor
+            ) {
+                let defs = svg.querySelector('defs');
+
+                if (!defs) {
+                    defs = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'defs'
+                    );
+                    svg.insertBefore(defs, svg.firstChild);
+                }
+
+                let gradient = svg.querySelector(
+                    '#symconCompressorTemperatureGradient'
+                );
+
+                if (!gradient) {
+                    gradient = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'linearGradient'
+                    );
+                    gradient.setAttribute(
+                        'id',
+                        'symconCompressorTemperatureGradient'
+                    );
+                    gradient.setAttribute('x1', '0%');
+                    gradient.setAttribute('y1', '100%');
+                    gradient.setAttribute('x2', '100%');
+                    gradient.setAttribute('y2', '0%');
+
+                    const stopCold = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'stop'
+                    );
+                    stopCold.setAttribute('offset', '0%');
+
+                    const stopHot = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'stop'
+                    );
+                    stopHot.setAttribute('offset', '100%');
+
+                    gradient.appendChild(stopCold);
+                    gradient.appendChild(stopHot);
+                    defs.appendChild(gradient);
+                }
+
+                const stops = gradient.querySelectorAll('stop');
+
+                if (stops.length >= 2) {
+                    stops[0].setAttribute(
+                        'stop-color',
+                        evaporatorColor
+                    );
+                    stops[0].style.setProperty(
+                        'stop-color',
+                        evaporatorColor,
+                        'important'
+                    );
+
+                    stops[stops.length - 1].setAttribute(
+                        'stop-color',
+                        condenserColor
+                    );
+                    stops[stops.length - 1].style.setProperty(
+                        'stop-color',
+                        condenserColor,
+                        'important'
+                    );
+                }
+
+                compressorSpiral.style.setProperty(
+                    'stroke',
+                    'url(#symconCompressorTemperatureGradient)',
+                    'important'
+                );
+                compressorSpiral.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
+            }
 
             /*
              * Die weißen Kältemittelleitungen der Original-SVG anhand der
