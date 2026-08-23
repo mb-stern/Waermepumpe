@@ -7103,13 +7103,45 @@ window.SymconHeatPump = {
                 && window.matchMedia('(max-width: 699px)').matches;
 
             if (mobileLayout) {
+                /*
+                 * Auf dem Handy keine SVG-Messung verwenden.
+                 * Stattdessen die Statuszeile innerhalb des tatsächlich
+                 * vorgesehenen Rahmens #rectSettings verteilen.
+                 */
+                const frame =
+                    svg.querySelector('#rectSettings');
+
+                const frameX = frame
+                    ? Number(frame.getAttribute('x'))
+                    : 65.353;
+
+                const frameWidth = frame
+                    ? Number(frame.getAttribute('width'))
+                    : 474.29;
+
+                /*
+                 * Sicherheitsabstand zu den beiden Rahmenkanten.
+                 * So ragen auch die ca. 34 px breiten Zusatzicons nicht aus
+                 * dem vorgesehenen Bereich.
+                 */
+                const leftX =
+                    Number.isFinite(frameX)
+                        ? frameX + 24
+                        : 89;
+
+                const rightX =
+                    Number.isFinite(frameX)
+                    && Number.isFinite(frameWidth)
+                        ? frameX + frameWidth - 24
+                        : 516;
+
                 const originalDefinitions =
                     definitions.filter(
                         (definition) => !definition.custom
                     );
 
                 /*
-                 * Originale wirklich unangetastet lassen.
+                 * Originaltransform zuerst zurücksetzen.
                  */
                 originalDefinitions.forEach((definition) => {
                     const element =
@@ -7136,35 +7168,20 @@ window.SymconHeatPump = {
                 });
 
                 /*
-                 * Belegte Original-Slots anhand der sichtbaren Originalicons.
+                 * Sichtbare Icons in der bereits festgelegten Reihenfolge.
+                 * Originalicons haben immer Vorrang.
                  */
-                const occupied = new Set();
-
-                originalDefinitions.forEach(
-                    (definition, index) => {
-                        const element =
-                            svg.querySelector(
-                                definition.selector
-                            );
-
-                        if (isVisible(element)) {
-                            occupied.add(index);
-                        }
-                    }
-                );
-
-                const freeSlots = TOP_ICON_SLOTS
-                    .map((x, index) => ({x, index}))
-                    .filter(
-                        (slot) => !occupied.has(slot.index)
+                const visibleOriginals =
+                    originalDefinitions.filter(
+                        (definition) =>
+                            isVisible(
+                                svg.querySelector(
+                                    definition.selector
+                                )
+                            )
                     );
 
-                /*
-                 * Eigene Sollwerticons möglichst rechts in noch freie
-                 * Original-Slots setzen. Keine Originalicons werden dafür
-                 * verschoben.
-                 */
-                const customDefinitions =
+                const visibleCustoms =
                     definitions.filter(
                         (definition) =>
                             definition.custom
@@ -7175,40 +7192,134 @@ window.SymconHeatPump = {
                             )
                     );
 
-                const chosenSlots =
-                    freeSlots.slice(
-                        Math.max(
-                            0,
-                            freeSlots.length
-                            - customDefinitions.length
-                        )
+                /*
+                 * Die Original-Card stellt neun Plätze bereit.
+                 * Wenn diese bereits durch Originalstatus belegt sind,
+                 * werden Zusatzicons wie bisher ausgeblendet.
+                 */
+                const availableCustomCount =
+                    Math.max(
+                        0,
+                        TOP_ICON_SLOTS.length
+                        - visibleOriginals.length
                     );
 
-                customDefinitions.forEach(
+                visibleCustoms.forEach((definition, index) => {
+                    const element =
+                        svg.querySelector(definition.selector);
+
+                    if (!element) {
+                        return;
+                    }
+
+                    if (index >= availableCustomCount) {
+                        element.style.setProperty(
+                            'display',
+                            'none',
+                            'important'
+                        );
+                    }
+                });
+
+                const shownCustoms =
+                    visibleCustoms.slice(
+                        0,
+                        availableCustomCount
+                    );
+
+                const visibleMobile = [
+                    ...visibleOriginals,
+                    ...shownCustoms
+                ];
+
+                if (visibleMobile.length === 0) {
+                    return;
+                }
+
+                const gap =
+                    visibleMobile.length > 1
+                        ? (
+                            rightX - leftX
+                        ) / (
+                            visibleMobile.length - 1
+                        )
+                        : 0;
+
+                visibleMobile.forEach(
                     (definition, index) => {
                         const element =
                             svg.querySelector(
                                 definition.selector
                             );
 
-                        const slot = chosenSlots[index];
-
-                        if (!element || !slot) {
-                            if (element) {
-                                element.style.setProperty(
-                                    'display',
-                                    'none',
-                                    'important'
-                                );
-                            }
+                        if (!element) {
                             return;
                         }
+
+                        const targetX =
+                            visibleMobile.length > 1
+                                ? leftX + gap * index
+                                : (
+                                    leftX + rightX
+                                ) / 2;
+
+                        if (definition.custom) {
+                            /*
+                             * Eigene Sollwerticons liegen bereits auf der
+                             * richtigen Statuszeilenhöhe.
+                             */
+                            element.setAttribute(
+                                'transform',
+                                'translate('
+                                + targetX
+                                + ' 100)'
+                            );
+                            return;
+                        }
+
+                        /*
+                         * Für Originalicons keine getBBox/getCTM-Messung.
+                         * Ihre bekannten Original-Mittelpunkte aus
+                         * TOP_ICON_SLOTS reichen für die horizontale
+                         * Verschiebung zuverlässig aus.
+                         */
+                        const originalIndex =
+                            definitions.findIndex(
+                                (item) =>
+                                    item.selector
+                                    === definition.selector
+                            );
+
+                        const originalX =
+                            TOP_ICON_SLOTS[
+                                Math.max(
+                                    0,
+                                    Math.min(
+                                        TOP_ICON_SLOTS.length - 1,
+                                        originalIndex
+                                    )
+                                )
+                            ];
+
+                        const deltaX =
+                            targetX - originalX;
+
+                        const original =
+                            element.getAttribute(
+                                'data-symcon-original-transform'
+                            )
+                            || '';
 
                         element.setAttribute(
                             'transform',
                             'translate('
-                            + slot.x
-                            + ' 100)'
+                            + deltaX
+                            + ' 0)'
+                            + (
+                                original
+                                    ? ' ' + original
+                                    : ''
+                            )
                         );
                     }
                 );
