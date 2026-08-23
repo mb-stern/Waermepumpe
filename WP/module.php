@@ -7266,6 +7266,51 @@ window.SymconHeatPump = {
             });
         };
 
+        const bindTap = (element, handler) => {
+            if (!element || element.dataset.symconTapBound) {
+                return;
+            }
+
+            element.dataset.symconTapBound = '1';
+
+            let pointerHandled = false;
+
+            if (window.PointerEvent) {
+                element.addEventListener(
+                    'pointerup',
+                    (event) => {
+                        if (
+                            event.pointerType === 'touch'
+                            || event.pointerType === 'pen'
+                        ) {
+                            pointerHandled = true;
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            handler(event);
+
+                            window.setTimeout(() => {
+                                pointerHandled = false;
+                            }, 400);
+                        }
+                    }
+                );
+            }
+
+            element.addEventListener(
+                'click',
+                (event) => {
+                    if (pointerHandled) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
+
+                    handler(event);
+                }
+            );
+        };
+
         const applyControlIcons = (card) => {
             if (!card || !card.content) {
                 return;
