@@ -111,6 +111,20 @@ class Waermepumpe extends IPSModuleStrict
         'ThermalSolarFluxTemp',
         'ThermalSolarReturnTemp',
 
+        'AdditionalValue000',
+        'AdditionalValue001',
+        'AdditionalValue002',
+        'AdditionalValue003',
+        'AdditionalValue004',
+        'AdditionalValue005',
+        'AdditionalValue006',
+        'AdditionalValue007',
+        'AdditionalValue008',
+        'AdditionalValue009',
+        'AdditionalValue010',
+        'AdditionalValue011',
+        'AdditionalValue012',
+
         'OperatingStatusVariable',
         'HeatingControlVariable',
         'HotWaterControlVariable',
@@ -254,6 +268,34 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ThermalSolarPanelTemp', 0);
         $this->RegisterPropertyInteger('ThermalSolarFluxTemp', 0);
         $this->RegisterPropertyInteger('ThermalSolarReturnTemp', 0);
+
+        // Frei belegbare Zusatzwerte der SVG (000 ... 012)
+        $this->RegisterPropertyString('AdditionalLabel000', '');
+        $this->RegisterPropertyInteger('AdditionalValue000', 0);
+        $this->RegisterPropertyString('AdditionalLabel001', '');
+        $this->RegisterPropertyInteger('AdditionalValue001', 0);
+        $this->RegisterPropertyString('AdditionalLabel002', '');
+        $this->RegisterPropertyInteger('AdditionalValue002', 0);
+        $this->RegisterPropertyString('AdditionalLabel003', '');
+        $this->RegisterPropertyInteger('AdditionalValue003', 0);
+        $this->RegisterPropertyString('AdditionalLabel004', '');
+        $this->RegisterPropertyInteger('AdditionalValue004', 0);
+        $this->RegisterPropertyString('AdditionalLabel005', '');
+        $this->RegisterPropertyInteger('AdditionalValue005', 0);
+        $this->RegisterPropertyString('AdditionalLabel006', '');
+        $this->RegisterPropertyInteger('AdditionalValue006', 0);
+        $this->RegisterPropertyString('AdditionalLabel007', '');
+        $this->RegisterPropertyInteger('AdditionalValue007', 0);
+        $this->RegisterPropertyString('AdditionalLabel008', '');
+        $this->RegisterPropertyInteger('AdditionalValue008', 0);
+        $this->RegisterPropertyString('AdditionalLabel009', '');
+        $this->RegisterPropertyInteger('AdditionalValue009', 0);
+        $this->RegisterPropertyString('AdditionalLabel010', '');
+        $this->RegisterPropertyInteger('AdditionalValue010', 0);
+        $this->RegisterPropertyString('AdditionalLabel011', '');
+        $this->RegisterPropertyInteger('AdditionalValue011', 0);
+        $this->RegisterPropertyString('AdditionalLabel012', '');
+        $this->RegisterPropertyInteger('AdditionalValue012', 0);
 
         // HTML-SDK Visualisierung
         $this->SetVisualizationType(1);
@@ -741,6 +783,213 @@ PHP
                     $this->VariableRow('Solar Rücklauf', 'ThermalSolarReturnTemp', '', '')
                 ]
             ]
+,
+
+            [
+                'type'    => 'ExpansionPanel',
+                'caption' => 'Zusatzwerte',
+                'items'   => [
+                    [
+                        'type' => 'Label',
+                        'caption' => 'Bis zu 13 zusätzliche Werte an den vorgesehenen Positionen der Grafik anzeigen.'
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel000',
+                                'caption' => 'Bezeichnung 1'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue000',
+                                'caption' => 'Variable 1'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel001',
+                                'caption' => 'Bezeichnung 2'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue001',
+                                'caption' => 'Variable 2'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel002',
+                                'caption' => 'Bezeichnung 3'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue002',
+                                'caption' => 'Variable 3'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel003',
+                                'caption' => 'Bezeichnung 4'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue003',
+                                'caption' => 'Variable 4'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel004',
+                                'caption' => 'Bezeichnung 5'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue004',
+                                'caption' => 'Variable 5'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel005',
+                                'caption' => 'Bezeichnung 6'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue005',
+                                'caption' => 'Variable 6'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel006',
+                                'caption' => 'Bezeichnung 7'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue006',
+                                'caption' => 'Variable 7'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel007',
+                                'caption' => 'Bezeichnung 8'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue007',
+                                'caption' => 'Variable 8'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel008',
+                                'caption' => 'Bezeichnung 9'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue008',
+                                'caption' => 'Variable 9'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel009',
+                                'caption' => 'Bezeichnung 10'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue009',
+                                'caption' => 'Variable 10'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel010',
+                                'caption' => 'Bezeichnung 11'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue010',
+                                'caption' => 'Variable 11'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel011',
+                                'caption' => 'Bezeichnung 12'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue011',
+                                'caption' => 'Variable 12'
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'AdditionalLabel012',
+                                'caption' => 'Bezeichnung 13'
+                            ],
+                            [
+                                'type' => 'SelectVariable',
+                                'name' => 'AdditionalValue012',
+                                'caption' => 'Variable 13'
+                            ]
+                        ]
+                    ]
+                ]
+            ]
         ];
 
         return json_encode(
@@ -1180,7 +1429,34 @@ HTML;
             'thermalSolarPumpSpeed'      => $this->DataKey('ThermalSolarPumpSpeed', 'thermalSolarPumpSpeed'),
             'thermalSolarPanelTemp'      => $this->DataKey('ThermalSolarPanelTemp', 'thermalSolarPanelTemp'),
             'thermalSolarFluxTemp'       => $this->DataKey('ThermalSolarFluxTemp', 'thermalSolarFluxTemp'),
-            'thermalSolarReturnTemp'     => $this->DataKey('ThermalSolarReturnTemp', 'thermalSolarReturnTemp')
+            'thermalSolarReturnTemp'     => $this->DataKey('ThermalSolarReturnTemp', 'thermalSolarReturnTemp'),
+
+            'additionalLabel000'          => $this->ReadPropertyString('AdditionalLabel000'),
+            'additionalValue000'          => $this->DataKey('AdditionalValue000', 'additionalValue000'),
+            'additionalLabel001'          => $this->ReadPropertyString('AdditionalLabel001'),
+            'additionalValue001'          => $this->DataKey('AdditionalValue001', 'additionalValue001'),
+            'additionalLabel002'          => $this->ReadPropertyString('AdditionalLabel002'),
+            'additionalValue002'          => $this->DataKey('AdditionalValue002', 'additionalValue002'),
+            'additionalLabel003'          => $this->ReadPropertyString('AdditionalLabel003'),
+            'additionalValue003'          => $this->DataKey('AdditionalValue003', 'additionalValue003'),
+            'additionalLabel004'          => $this->ReadPropertyString('AdditionalLabel004'),
+            'additionalValue004'          => $this->DataKey('AdditionalValue004', 'additionalValue004'),
+            'additionalLabel005'          => $this->ReadPropertyString('AdditionalLabel005'),
+            'additionalValue005'          => $this->DataKey('AdditionalValue005', 'additionalValue005'),
+            'additionalLabel006'          => $this->ReadPropertyString('AdditionalLabel006'),
+            'additionalValue006'          => $this->DataKey('AdditionalValue006', 'additionalValue006'),
+            'additionalLabel007'          => $this->ReadPropertyString('AdditionalLabel007'),
+            'additionalValue007'          => $this->DataKey('AdditionalValue007', 'additionalValue007'),
+            'additionalLabel008'          => $this->ReadPropertyString('AdditionalLabel008'),
+            'additionalValue008'          => $this->DataKey('AdditionalValue008', 'additionalValue008'),
+            'additionalLabel009'          => $this->ReadPropertyString('AdditionalLabel009'),
+            'additionalValue009'          => $this->DataKey('AdditionalValue009', 'additionalValue009'),
+            'additionalLabel010'          => $this->ReadPropertyString('AdditionalLabel010'),
+            'additionalValue010'          => $this->DataKey('AdditionalValue010', 'additionalValue010'),
+            'additionalLabel011'          => $this->ReadPropertyString('AdditionalLabel011'),
+            'additionalValue011'          => $this->DataKey('AdditionalValue011', 'additionalValue011'),
+            'additionalLabel012'          => $this->ReadPropertyString('AdditionalLabel012'),
+            'additionalValue012'          => $this->DataKey('AdditionalValue012', 'additionalValue012')
         ];
     }
 
@@ -1245,7 +1521,21 @@ HTML;
             'thermalSolarPumpSpeed'      => 'ThermalSolarPumpSpeed',
             'thermalSolarPanelTemp'      => 'ThermalSolarPanelTemp',
             'thermalSolarFluxTemp'       => 'ThermalSolarFluxTemp',
-            'thermalSolarReturnTemp'     => 'ThermalSolarReturnTemp'
+            'thermalSolarReturnTemp'     => 'ThermalSolarReturnTemp',
+
+            'additionalValue000'          => 'AdditionalValue000',
+            'additionalValue001'          => 'AdditionalValue001',
+            'additionalValue002'          => 'AdditionalValue002',
+            'additionalValue003'          => 'AdditionalValue003',
+            'additionalValue004'          => 'AdditionalValue004',
+            'additionalValue005'          => 'AdditionalValue005',
+            'additionalValue006'          => 'AdditionalValue006',
+            'additionalValue007'          => 'AdditionalValue007',
+            'additionalValue008'          => 'AdditionalValue008',
+            'additionalValue009'          => 'AdditionalValue009',
+            'additionalValue010'          => 'AdditionalValue010',
+            'additionalValue011'          => 'AdditionalValue011',
+            'additionalValue012'          => 'AdditionalValue012'
         ];
 
         foreach ($map as $key => $property) {
@@ -3530,6 +3820,52 @@ window.SymconHeatPump = {
 
         let storedHeatingTemperatures = loadStoredHeatingTemperatures();
 
+        const applyAdditionalValues = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+
+            for (let index = 0; index < 13; index++) {
+                const suffix = String(index).padStart(3, '0');
+                const labelKey = 'additionalLabel' + suffix;
+                const valueKey = 'additionalValue' + suffix;
+
+                const labelElement =
+                    svg.querySelector('#textLabel' + suffix);
+                const valueElement =
+                    svg.querySelector('#textValue' + suffix);
+
+                const label = String(
+                    currentConfig[labelKey] || ''
+                ).trim();
+
+                const entity = currentConfig[valueKey] || '';
+                const value = entity
+                    ? formatStateForSvg(entity)
+                    : '';
+
+                if (labelElement) {
+                    labelElement.textContent = label;
+                    labelElement.style.setProperty(
+                        'display',
+                        label ? 'inline' : 'none',
+                        'important'
+                    );
+                }
+
+                if (valueElement) {
+                    valueElement.textContent = value;
+                    valueElement.style.setProperty(
+                        'display',
+                        value ? 'inline' : 'none',
+                        'important'
+                    );
+                }
+            }
+        };
+
         const normalizeTemperatureUnits = (card) => {
             if (!card || !card.content) {
                 return;
@@ -4776,6 +5112,7 @@ window.SymconHeatPump = {
                             applyHeatingReturnContinuity(this);
                             applySingleCircuitTemperatureDisplay(this);
                             applyThermalSolarVisualization(this);
+                            applyAdditionalValues(this);
                             normalizeTemperatureUnits(this);
                         }
 
