@@ -1325,39 +1325,18 @@ PHP
     }
 
     #wp-mode-menu {
-        display: none;
         position: fixed;
-        z-index: 2147483647;
-        box-sizing: border-box;
-        width: min(360px, calc(100vw - 24px));
-        max-height: min(70vh, 520px);
-        overflow-y: auto;
-        left: 50%;
-        bottom: 12px;
-        transform: translateX(-50%);
-        padding: 8px;
-        border-radius: 12px;
-        border: 1px solid rgba(127,127,127,.35);
-        background: Canvas;
+        z-index: 9999;
+        display: none;
+        min-width: 190px;
+        max-width: 300px;
+        padding: 6px;
+        border-radius: 8px;
+        background: color-mix(in srgb, Canvas 94%, transparent);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
         color: CanvasText;
-        box-shadow: 0 8px 28px rgba(0,0,0,.28);
         font: 14px Arial, sans-serif;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
     }
-
-    /*
-     * Auf genügend breiten Desktop-Ansichten darf das Menü kompakt
-     * mittig erscheinen. Auf dem Handy bleibt es als Bottom-Sheet unten.
-     */
-    @media (min-width: 700px) {
-        #wp-mode-menu {
-            top: 50%;
-            bottom: auto;
-            transform: translate(-50%, -50%);
-        }
-    }
-
 
     #wp-mode-menu .wp-mode-title {
         padding: 6px 8px;
@@ -3209,42 +3188,6 @@ window.SymconHeatPump = {
                 .includes(String(item.value ?? '').trim().toLowerCase());
         };
 
-        const disableOriginalSettingsLink = (card) => {
-            if (!card || !card.content) {
-                return;
-            }
-
-            const link = card.content.querySelector('#linkSettings');
-
-            if (!link) {
-                return;
-            }
-
-            /*
-             * gSettings is wrapped by the original card in:
-             *   <a id="linkSettings" href="#">
-             *
-             * Mobile WebViews/Symcon can interpret that as a separate
-             * navigation surface (the additional arrow area).
-             * We use our own controls, so the original link must be inert.
-             */
-            link.removeAttribute('href');
-            link.removeAttribute('xlink:href');
-            link.style.setProperty('cursor', 'default', 'important');
-
-            if (!link.dataset.symconNeutralized) {
-                link.dataset.symconNeutralized = '1';
-
-                link.addEventListener('click', (event) => {
-                    event.preventDefault();
-                });
-
-                link.addEventListener('touchend', (event) => {
-                    event.preventDefault();
-                }, {passive: false});
-            }
-        };
-
         const closeModeMenu = () => {
             const menu = document.getElementById('wp-mode-menu');
             if (menu) {
@@ -3323,6 +3266,10 @@ window.SymconHeatPump = {
                 menu.appendChild(button);
             });
 
+            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
+            const y = Math.min(event.clientY + 8, window.innerHeight - 260);
+            menu.style.left = Math.max(8, x) + 'px';
+            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
         };
 
@@ -3432,6 +3379,10 @@ window.SymconHeatPump = {
             });
             menu.appendChild(apply);
 
+            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
+            const y = Math.min(event.clientY + 8, window.innerHeight - 220);
+            menu.style.left = Math.max(8, x) + 'px';
+            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
 
             input.focus();
@@ -6997,20 +6948,25 @@ window.SymconHeatPump = {
             }
 
             /*
-             * Feste Originalreihenfolge und Originalmittelpunkte der SVG.
-             * Diese Koordinaten sind unabhängig von Desktop/Handy und
-             * vermeiden getBBox()/getCTM()-Unterschiede mobiler WebViews.
+             * ORIGINALREIHENFOLGE der SVG:
+             * Ein/Aus, Warmwasser, Heizen, Kühlen, Abtauen,
+             * Zusatzheizung, Warnung/Fehler, Party, Sparen.
+             *
+             * Unsere beiden Sollwerte kommen danach.
+             *
+             * Tag/Nacht ist eine eigene Zeile und bleibt vollständig
+             * unangetastet.
              */
             const definitions = [
-                {selector: '#gHPStatusOff', custom: false, originalX: TOP_ICON_SLOTS[0]},
-                {selector: '#gHPStatusWW', custom: false, originalX: TOP_ICON_SLOTS[1]},
-                {selector: '#gHPStatusHeating', custom: false, originalX: TOP_ICON_SLOTS[2]},
-                {selector: '#gHPStatusCooling', custom: false, originalX: TOP_ICON_SLOTS[3]},
-                {selector: '#gDefrost', custom: false, originalX: TOP_ICON_SLOTS[4]},
-                {selector: '#gAdditionalHeating', custom: false, originalX: TOP_ICON_SLOTS[5]},
-                {selector: '#gWarning', custom: false, originalX: TOP_ICON_SLOTS[6]},
-                {selector: '#gHPStatusParty', custom: false, originalX: TOP_ICON_SLOTS[7]},
-                {selector: '#gHPStatusSave', custom: false, originalX: TOP_ICON_SLOTS[8]},
+                {selector: '#gHPStatusOff', custom: false},
+                {selector: '#gHPStatusWW', custom: false},
+                {selector: '#gHPStatusHeating', custom: false},
+                {selector: '#gHPStatusCooling', custom: false},
+                {selector: '#gDefrost', custom: false},
+                {selector: '#gAdditionalHeating', custom: false},
+                {selector: '#gWarning', custom: false},
+                {selector: '#gHPStatusParty', custom: false},
+                {selector: '#gHPStatusSave', custom: false},
                 {selector: '#gSymconWarmWaterSetpoint', custom: true},
                 {selector: '#gSymconHeatingCorrection', custom: true}
             ];
@@ -7030,7 +6986,9 @@ window.SymconHeatPump = {
             };
 
             /*
-             * Originaltransform sichern und bei jedem Lauf zurücksetzen.
+             * Ursprüngliche Transformationswerte der Original-SVG sichern.
+             * Vor jedem Layout werden sie zuerst vollständig zurückgesetzt,
+             * damit sich Verschiebungen niemals aufsummieren.
              */
             definitions.forEach((definition) => {
                 if (definition.custom) {
@@ -7061,46 +7019,98 @@ window.SymconHeatPump = {
                 }
             });
 
+            /*
+             * Mittelpunkt eines Originalsymbols in den lokalen Koordinaten
+             * von #gSettings bestimmen. Das ist wichtig, weil #gSettings in
+             * einer Sonderdarstellung selbst verschoben werden kann.
+             */
+            const centerInSettings = (element) => {
+                if (
+                    !element
+                    || typeof element.getBBox !== 'function'
+                ) {
+                    return null;
+                }
+
+                try {
+                    const box = element.getBBox();
+                    const elementMatrix = element.getCTM();
+                    const settingsMatrix = settings.getCTM();
+
+                    if (!elementMatrix || !settingsMatrix) {
+                        return null;
+                    }
+
+                    const x = box.x + box.width / 2;
+                    const y = box.y + box.height / 2;
+
+                    const rootX =
+                        elementMatrix.a * x
+                        + elementMatrix.c * y
+                        + elementMatrix.e;
+                    const rootY =
+                        elementMatrix.b * x
+                        + elementMatrix.d * y
+                        + elementMatrix.f;
+
+                    const inverse = settingsMatrix.inverse();
+
+                    return {
+                        x:
+                            inverse.a * rootX
+                            + inverse.c * rootY
+                            + inverse.e,
+                        y:
+                            inverse.b * rootX
+                            + inverse.d * rootY
+                            + inverse.f
+                    };
+                } catch (error) {
+                    return null;
+                }
+            };
+
             const visible = definitions.filter((definition) => {
-                return isVisible(
-                    svg.querySelector(definition.selector)
-                );
+                const element = svg.querySelector(definition.selector);
+                return isVisible(element);
             });
 
-            const visibleCount = Math.min(
-                visible.length,
-                TOP_ICON_SLOTS.length
-            );
-
-            if (visibleCount === 0) {
-                return;
-            }
-
             /*
-             * Immer die echte, bekannte Icon-Spalte der Original-SVG
-             * verwenden. Keine Laufzeitmessung mehr.
+             * Originalsymbole haben immer Vorrang.
+             * Falls tatsächlich alle neun Original-Slots belegt sind,
+             * werden zusätzliche Sollwert-Icons ausgeblendet statt etwas
+             * zu überdecken.
              */
-            const firstX = TOP_ICON_SLOTS[0];
-            const lastX = TOP_ICON_SLOTS[TOP_ICON_SLOTS.length - 1];
-            const equalGap = visibleCount > 1
-                ? (lastX - firstX) / (visibleCount - 1)
-                : 0;
-
             /*
-             * Vertikale Position der beiden eigenen Sollwertsymbole ist in
-             * der SVG bereits auf die Statuszeile abgestimmt.
+             * Vertikale Mittellinie direkt von einem sichtbaren Original-Icon
+             * übernehmen. Dadurch sitzen unsere Zusatzicons exakt auf derselben
+             * Höhe wie die Symbole der Original-Card – unabhängig von
+             * SVG-Transformationen oder späteren Änderungen an der Card.
              */
-            const customCenterY = 0;
+            const referenceOriginal = visible
+                .filter((definition) => !definition.custom)
+                .map((definition) => svg.querySelector(definition.selector))
+                .find((element) => !!element);
 
-            visible.forEach((definition, index) => {
-                const element =
-                    svg.querySelector(definition.selector);
+            const referenceCenter = referenceOriginal
+                ? centerInSettings(referenceOriginal)
+                : null;
+
+            const iconCenterY =
+                referenceCenter && Number.isFinite(referenceCenter.y)
+                    ? referenceCenter.y
+                    : 0;
+
+            let slotIndex = 0;
+
+            visible.forEach((definition) => {
+                const element = svg.querySelector(definition.selector);
 
                 if (!element) {
                     return;
                 }
 
-                if (index >= TOP_ICON_SLOTS.length) {
+                if (slotIndex >= TOP_ICON_SLOTS.length) {
                     if (definition.custom) {
                         element.style.setProperty(
                             'display',
@@ -7111,37 +7121,80 @@ window.SymconHeatPump = {
                     return;
                 }
 
-                const targetX = visibleCount > 1
-                    ? firstX + equalGap * index
+                /*
+                 * NICHT die komplette Kopfbreite verwenden.
+                 *
+                 * Die effektive Icon-Spalte wird direkt aus den ursprünglichen
+                 * Positionen der Original-Icons bestimmt. Damit entspricht die
+                 * nutzbare Breite exakt dem Bereich, den die Card selbst für
+                 * ihre obere Symbolleiste vorgesehen hat.
+                 */
+                const originalCenters = definitions
+                    .filter((item) => !item.custom)
+                    .map((item) => svg.querySelector(item.selector))
+                    .filter(Boolean)
+                    .map((item) => centerInSettings(item))
+                    .filter(
+                        (center) =>
+                            center
+                            && Number.isFinite(center.x)
+                    )
+                    .map((center) => center.x)
+                    .sort((a, b) => a - b);
+
+                const firstX = originalCenters.length > 0
+                    ? originalCenters[0]
+                    : TOP_ICON_SLOTS[0];
+
+                const lastX = originalCenters.length > 1
+                    ? originalCenters[originalCenters.length - 1]
                     : firstX;
 
+                const visibleCount = Math.min(
+                    visible.length,
+                    TOP_ICON_SLOTS.length
+                );
+
+                const equalGap = visibleCount > 1
+                    ? (lastX - firstX) / (visibleCount - 1)
+                    : 0;
+
+                const targetX = visibleCount > 1
+                    ? firstX + equalGap * slotIndex
+                    : firstX;
+
+                slotIndex++;
+
                 if (definition.custom) {
-                    /*
-                     * Eigene Symbole sind um (0/0) aufgebaut und werden
-                     * direkt an die Zielposition gesetzt.
-                     */
                     element.setAttribute(
                         'transform',
                         'translate('
                         + targetX
                         + ' '
-                        + customCenterY
+                        + iconCenterY
                         + ')'
                     );
                     return;
                 }
 
-                const originalX = Number(definition.originalX);
-                const deltaX = Number.isFinite(originalX)
-                    ? targetX - originalX
-                    : 0;
+                const center = centerInSettings(element);
+
+                if (!center) {
+                    return;
+                }
+
+                const deltaX = targetX - center.x;
 
                 const original =
-                    element.getAttribute(
-                        'data-symcon-original-transform'
-                    )
+                    element.getAttribute('data-symcon-original-transform')
                     || '';
 
+                /*
+                 * translate VOR der Originaltransformation:
+                 * dadurch erfolgt die Verschiebung in den lokalen
+                 * #gSettings-Koordinaten und nicht im skalierten
+                 * Koordinatensystem des einzelnen Icons.
+                 */
                 element.setAttribute(
                     'transform',
                     'translate(' + deltaX + ' 0)'
@@ -7216,12 +7269,8 @@ window.SymconHeatPump = {
                     && control.options.length > 0
                 );
 
-                const configuredMode =
-                    !!currentConfig[definition.dataKey];
-
                 const visible =
-                    configuredMode
-                    || hasControl
+                    hasControl
                     || (
                         currentControls
                         && currentControls.hasOperatingStatus
@@ -7538,7 +7587,6 @@ window.SymconHeatPump = {
                             applyHeatingCircuitTemperatureColors(this);
                             applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
-                            disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
                             layoutTopIconBar(this);
