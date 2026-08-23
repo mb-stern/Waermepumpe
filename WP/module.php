@@ -1326,6 +1326,39 @@ PHP
         background: rgba(127,127,127,.34);
         font-weight: 600;
     }
+
+    /*
+     * Dezente Flussanimation für unsere erweiterte Temperaturdarstellung.
+     * Die Original-Card bleibt unangetastet, solange eigene Farben
+     * deaktiviert sind.
+     */
+    @keyframes symcon-flow-forward {
+        from { stroke-dashoffset: 0; }
+        to   { stroke-dashoffset: -24; }
+    }
+
+    @keyframes symcon-flow-reverse {
+        from { stroke-dashoffset: 0; }
+        to   { stroke-dashoffset: 24; }
+    }
+
+    .symcon-flow-overlay {
+        pointer-events: none;
+        fill: none !important;
+        stroke: rgba(255,255,255,.68) !important;
+        stroke-width: 2.2 !important;
+        stroke-dasharray: 4 8 !important;
+        stroke-linecap: round !important;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .symcon-flow-forward {
+        animation: symcon-flow-forward 1.4s linear infinite;
+    }
+
+    .symcon-flow-reverse {
+        animation: symcon-flow-reverse 1.4s linear infinite;
+    }
 </style>
 
 <div id="wp-root">
@@ -4493,6 +4526,413 @@ window.SymconHeatPump = {
             });
         };
 
+        const ensureFlowOverlay = (
+            svg,
+            selector,
+            overlayId,
+            direction = 'forward',
+            active = true
+        ) => {
+            const source = svg.querySelector(selector);
+
+            if (!source) {
+                return;
+            }
+
+            let overlay = svg.querySelector('#' + overlayId);
+
+            if (!overlay) {
+                overlay = source.cloneNode(false);
+                overlay.setAttribute('id', overlayId);
+                overlay.removeAttribute('style');
+
+                if (source.parentNode) {
+                    source.parentNode.insertBefore(
+                        overlay,
+                        source.nextSibling
+                    );
+                }
+            }
+
+            overlay.setAttribute(
+                'class',
+                'symcon-flow-overlay '
+                + (direction === 'reverse'
+                    ? 'symcon-flow-reverse'
+                    : 'symcon-flow-forward')
+            );
+
+            overlay.style.setProperty(
+                'display',
+                active ? 'inline' : 'none',
+                'important'
+            );
+            overlay.style.setProperty(
+                'visibility',
+                active ? 'visible' : 'hidden',
+                'important'
+            );
+        };
+
+        const removeFlowOverlays = (svg) => {
+            svg.querySelectorAll('.symcon-flow-overlay').forEach(
+                (element) => {
+                    if (element && element.parentNode) {
+                        element.parentNode.removeChild(element);
+                    }
+                }
+            );
+        };
+
+        const applyRefrigerantTemperatureColors = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+
+            /*
+             * Originalfarben der Card nicht verändern.
+             */
+            if (!currentConfig.useCustomTemperatureColors) {
+                [
+                    '#pathHPModelEvaporatorSymbol001',
+                    '#pathHPModelEvaporatorSymbol002',
+                    '#pathHPModelCondenserSymbol'
+                ].forEach((selector) => {
+                    const element = svg.querySelector(selector);
+                    if (element) {
+                        element.style.removeProperty('stroke');
+                        element.style.removeProperty('fill');
+                    }
+                });
+
+                return;
+            }
+
+            const evaporatorTemperature =
+                readStateNumber(currentConfig.evaporatorTemperature);
+            const condenserTemperature =
+                readStateNumber(currentConfig.condenserTemperature);
+
+            const evaporatorColor =
+                temperatureColor(evaporatorTemperature);
+            const condenserColor =
+                temperatureColor(condenserTemperature);
+
+            const setStroke = (selector, color) => {
+                const element = svg.querySelector(selector);
+                if (!element || !color) {
+                    return;
+                }
+
+                element.style.setProperty(
+                    'stroke',
+                    color,
+                    'important'
+                );
+                element.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
+            };
+
+            /*
+             * Die beiden Wärmetauscher-Symbole selbst erhalten ebenfalls die
+             * Temperaturfarbe. Beim Kühlbetrieb wird ihre Darstellung von der
+             * bereits vorhandenen Kältekreis-Umschaltung vertauscht.
+             */
+            setStroke(
+                '#pathHPModelEvaporatorSymbol001',
+                evaporatorColor
+            );
+            setStroke(
+                '#pathHPModelEvaporatorSymbol002',
+                evaporatorColor
+            );
+            setStroke(
+                '#pathHPModelCondenserSymbol',
+                condenserColor
+            );
+
+            /*
+             * Die weißen Kältemittelleitungen der Original-SVG anhand der
+             * räumlichen Lage einfärben. Wir greifen nur echte path/line-
+             * Elemente innerhalb des Kältekreis-Gruppenbereichs an und lassen
+             * Texte, Symbole und Pumpen unangetastet.
+             */
+            const refrigerantRoot =
+                svg.querySelector('#gHeatPumpModel')
+                || svg.querySelector('#gHPModel')
+                || svg.querySelector('#gHP');
+
+            if (!refrigerantRoot) {
+                return;
+            }
+
+            const candidates =
+                refrigerantRoot.querySelectorAll('path, line, polyline');
+
+            candidates.forEach((element) => {
+                const id = String(element.id || '');
+
+                if (
+                    !id
+                    || id.includes('Fan')
+                    || id.includes('Compressor')
+                    || id.includes('EvaporatorSymbol')
+                    || id.includes('CondenserSymbol')
+                    || id.includes('ExpansionValve')
+                    || id.includes('Heater')
+                ) {
+                    return;
+                }
+
+                /*
+                 * Original-SVG zeichnet die Kältemittelleitungen weiß.
+                 * Nur solche weißen/hellen Leitungen übernehmen.
+                 */
+                const computed = getComputedStyle(element);
+                const stroke = String(
+                    computed.stroke || element.getAttribute('stroke') || ''
+                ).toLowerCase();
+
+                const looksWhite =
+                    stroke.includes('255, 255, 255')
+                    || stroke === '#fff'
+                    || stroke === '#ffffff'
+                    || stroke === 'white';
+
+                if (!looksWhite) {
+                    return;
+                }
+
+                let box;
+                try {
+                    box = element.getBBox();
+                } catch (error) {
+                    return;
+                }
+
+                /*
+                 * Links/unten = Niederdruckseite, rechts/oben =
+                 * Hochdruckseite. In der Mitte interpolieren wir zwischen
+                 * Verdampfer- und Kondensatorfarbe.
+                 */
+                const centerX = box.x + box.width / 2;
+                const ratio = Math.max(
+                    0,
+                    Math.min(1, (centerX - 260) / 300)
+                );
+
+                if (!evaporatorColor || !condenserColor) {
+                    return;
+                }
+
+                const hexToRgb = (hex) => {
+                    const value = parseInt(
+                        String(hex).replace('#', ''),
+                        16
+                    );
+
+                    return [
+                        (value >> 16) & 255,
+                        (value >> 8) & 255,
+                        value & 255
+                    ];
+                };
+
+                const c1 = hexToRgb(evaporatorColor);
+                const c2 = hexToRgb(condenserColor);
+
+                const color = rgbToHex(
+                    c1.map(
+                        (component, index) =>
+                            component
+                            + (c2[index] - component) * ratio
+                    )
+                );
+
+                element.style.setProperty(
+                    'stroke',
+                    color,
+                    'important'
+                );
+                element.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
+
+                element.setAttribute(
+                    'data-symcon-refrigerant-pipe',
+                    '1'
+                );
+            });
+        };
+
+        const applyFlowAnimations = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+
+            /*
+             * Flussanimation ausschließlich bei eigenen Temperaturfarben.
+             * Im Standardmodus bleibt die Original-Card vollständig
+             * unverändert.
+             */
+            if (!currentConfig.useCustomTemperatureColors) {
+                removeFlowOverlays(svg);
+                return;
+            }
+
+            const compressorRunning =
+                stateIsOn(currentConfig.compressorRunning);
+
+            const heatingPump1 =
+                stateIsOn(currentConfig.heatingCircuitPumpRunning);
+            const heatingPump2 =
+                stateIsOn(currentConfig.heatingCircuitPumpRunning2);
+            const heatingPump3 =
+                stateIsOn(currentConfig.heatingCircuitPumpRunning3);
+
+            const storagePump =
+                stateIsOn(currentConfig.storageChargingPumpRunning);
+
+            const solarPump =
+                stateIsOn(currentConfig.thermalSolarPump);
+
+            const valveToBoiler =
+                !!currentConfig.wwHeatingValve
+                && stateIsOn(currentConfig.wwHeatingValve);
+
+            /*
+             * Kältekreis: nur bei laufendem Verdichter.
+             */
+            svg.querySelectorAll(
+                '[data-symcon-refrigerant-pipe="1"]'
+            ).forEach((pipe, index) => {
+                const id =
+                    'symconFlowRefrigerant' + index;
+
+                if (!pipe.id) {
+                    pipe.id =
+                        'symconRefrigerantPipe' + index;
+                }
+
+                ensureFlowOverlay(
+                    svg,
+                    '#' + pipe.id,
+                    id,
+                    index % 2 === 0 ? 'forward' : 'reverse',
+                    compressorRunning
+                );
+            });
+
+            /*
+             * Heizkreis 1-3: Vorlauf und Rücklauf gegensinnig.
+             */
+            [
+                [1, heatingPump1],
+                [2, heatingPump2],
+                [3, heatingPump3]
+            ].forEach(([number, active]) => {
+                const suffix = number === 1 ? '' : String(number);
+
+                ensureFlowOverlay(
+                    svg,
+                    '#pathPipeToHeatingCircuitPump' + suffix,
+                    'symconFlowHeatingSupply' + number,
+                    'forward',
+                    active && !valveToBoiler
+                );
+
+                ensureFlowOverlay(
+                    svg,
+                    '#pathPipeToHP' + suffix,
+                    'symconFlowHeatingReturn' + number,
+                    'reverse',
+                    active && !valveToBoiler
+                );
+            });
+
+            /*
+             * Boiler-/Speicherladung.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeHotWaterToTank',
+                'symconFlowBoilerCoil',
+                'forward',
+                valveToBoiler
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeToCirculatingPump',
+                'symconFlowBoilerReturn',
+                'reverse',
+                valveToBoiler
+            );
+
+            /*
+             * Pufferspeicher.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeToBuffer',
+                'symconFlowBufferSupply',
+                'forward',
+                storagePump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeFromBuffer',
+                'symconFlowBufferReturn',
+                'reverse',
+                storagePump
+            );
+
+            /*
+             * Solarthermie inkl. Wendel.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeThermalSolarHotWater',
+                'symconFlowSolarSupply',
+                'forward',
+                solarPump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeThermalSolarColdWater',
+                'symconFlowSolarReturn',
+                'reverse',
+                solarPump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#symconThermalSolarTankCoil',
+                'symconFlowSolarCoil',
+                'forward',
+                solarPump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#symconThermalSolarHotConnector',
+                'symconFlowSolarConnector',
+                'forward',
+                solarPump
+            );
+        };
+
         const applySingleCircuitTemperatureDisplay = (card) => {
             if (!card || !card.content) {
                 return;
@@ -5174,6 +5614,7 @@ window.SymconHeatPump = {
                             applyTerminology(this);
                             applyThemeColors(this);
                             applyRefrigerantCircuitMode(this);
+                            applyRefrigerantTemperatureColors(this);
                             applyOptionalStatusVisibility(this);
                             applyWWValvePipeGeometry(this);
                             restoreOriginalTemperatureColors(this);
@@ -5188,6 +5629,7 @@ window.SymconHeatPump = {
                             applyAdditionalValues(this);
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
+                            applyFlowAnimations(this);
                         }
 
                         return result;
