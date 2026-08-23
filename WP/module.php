@@ -534,8 +534,8 @@ class Waermepumpe extends IPSModuleStrict
                     [
                         'type' => 'Button',
                         'caption' => 'Eigene Farben auf Standardvorlage zurücksetzen',
-                        'onClick' => <<<'JS'
-const defaults = [
+                        'onClick' => <<<'PHP'
+$defaults = [
     [15, 26316],
     [20, 2730472],
     [25, 3782101],
@@ -548,12 +548,15 @@ const defaults = [
     [60, 16711680]
 ];
 
-defaults.forEach((item, index) => {
-    const number = index + 1;
-    setValue('TemperaturePoint' + number, item[0]);
-    setValue('TemperatureColor' + number, item[1]);
-});
-JS
+foreach ($defaults as $index => $item) {
+    $number = $index + 1;
+    IPS_SetProperty($id, 'TemperaturePoint' . $number, $item[0]);
+    IPS_SetProperty($id, 'TemperatureColor' . $number, $item[1]);
+}
+
+IPS_ApplyChanges($id);
+echo 'Temperaturfarben wurden auf die Standardvorlage zurückgesetzt.';
+PHP
                     ],
                     [
                         'type' => 'RowLayout',
