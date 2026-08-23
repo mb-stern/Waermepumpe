@@ -191,7 +191,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TemperaturePoint3', 25);
         $this->RegisterPropertyInteger('TemperatureColor3', 3790293);       // #39D5D5
         $this->RegisterPropertyInteger('TemperaturePoint4', 30);
-        $this->RegisterPropertyInteger('TemperatureColor4', 12114250);       // #B8D94A
+        $this->RegisterPropertyInteger('TemperatureColor4', 16765286);       // #FFD166
         $this->RegisterPropertyInteger('TemperaturePoint5', 35);
         $this->RegisterPropertyInteger('TemperatureColor5', 16769126);       // #FFE066
         $this->RegisterPropertyInteger('TemperaturePoint6', 40);
@@ -539,7 +539,7 @@ $defaults = [
     [15, 26316],
     [20, 2730472],
     [25, 3782101],
-    [30, 12114250],
+    [30, 16765286],
     [35, 16769126],
     [40, 16761395],
     [45, 16750616],
@@ -1992,7 +1992,7 @@ window.SymconHeatPump = {
                 {temperature: 15, color: 26316},
                 {temperature: 20, color: 2730472},
                 {temperature: 25, color: 3790293},
-                {temperature: 30, color: 12114250},
+                {temperature: 30, color: 16765286},
                 {temperature: 35, color: 16769126},
                 {temperature: 40, color: 16761395},
                 {temperature: 45, color: 16750616},
@@ -2020,7 +2020,7 @@ window.SymconHeatPump = {
                 [0, 102, 204],
                 [41, 169, 232],
                 [57, 213, 213],
-                [184, 217, 74],
+                [255, 209, 102],
                 [255, 224, 102],
                 [255, 194, 51],
                 [255, 152, 24],
