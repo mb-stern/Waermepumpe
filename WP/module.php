@@ -7203,7 +7203,16 @@ window.SymconHeatPump = {
              * Die Trennlinie liegt bei ungefähr y=100.
              * Somit ist y=75 die gemeinsame Mitte aller Statusicons.
              */
-            const iconCenterY = 75;
+            /*
+             * Reale gemeinsame Y-Mitte der Original-Statussymbole,
+             * aus der unveränderten Original-SVG ermittelt.
+             *
+             * Die Originalicons liegen im Mittel bei y ~= 84.
+             * Unsere beiden Sollwerticons werden deshalb exakt dort
+             * zentriert und nicht mehr auf der geometrisch nur vermuteten
+             * Rahmenmitte y=75.
+             */
+            const iconCenterY = 84;
 
             const gap =
                 shown.length > 1
