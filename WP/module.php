@@ -1281,10 +1281,39 @@ PHP
     }
 
     #wp-root {
+        position: relative;
         width: 100%;
         height: 100%;
         box-sizing: border-box;
         overflow: hidden;
+    }
+
+    #wp-view-toggle {
+        position: absolute;
+        left: 50%;
+        right: auto;
+        bottom: 10px;
+        transform: translateX(-50%);
+        z-index: 10000;
+        min-width: 38px;
+        height: 30px;
+        padding: 0 10px;
+        border: 1px solid rgba(127,127,127,.25);
+        border-radius: 6px;
+        background: rgba(255,255,255,.07);
+        color: var(--content-color, #fff);
+        font: 600 18px Arial, sans-serif;
+        line-height: 28px;
+        text-align: center;
+        cursor: pointer;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
+
+    #wp-view-toggle:active {
+        transform: translateX(-50%) scale(.96);
+        opacity: .65;
     }
 
     #wp-error {
@@ -1475,6 +1504,12 @@ PHP
 <div id="wp-root">
     <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
+    <button
+        id="wp-view-toggle"
+        type="button"
+        title="Ansicht umschalten"
+        aria-label="Ansicht umschalten"
+    >⇄</button>
     <div id="wp-mode-menu"></div>
 </div>
 
@@ -2480,6 +2515,29 @@ window.SymconHeatPump = {
         let embeddedLocalization = payload.localization || {};
         let currentData = payload.data || {};
 
+        /*
+         * Umschaltansicht wie beim Energiefluss-Modul:
+         * full    = komplette Wärmepumpengrafik
+         * compact = nur die obere Status-/Temperaturansicht
+         *
+         * Die Auswahl wird lokal im Browser/Handy gespeichert.
+         */
+        const VIEW_STORAGE_KEY = 'symcon-waermepumpe-view';
+        let currentView = 'full';
+
+        try {
+            const storedView =
+                window.localStorage.getItem(VIEW_STORAGE_KEY);
+
+            if (
+                storedView === 'compact'
+                || storedView === 'full'
+            ) {
+                currentView = storedView;
+            }
+        } catch (error) {
+            // LocalStorage ist optional.
+        }
 
         const errorBox = document.getElementById('wp-error');
 
@@ -3163,6 +3221,154 @@ window.SymconHeatPump = {
                     );
                 }
             });
+        };
+
+        const applyViewMode = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const toggle =
+                document.getElementById('wp-view-toggle');
+
+            /*
+             * Original-viewBox genau einmal sichern.
+             */
+            if (!svg.dataset.symconOriginalViewBox) {
+                const existing =
+                    svg.getAttribute('viewBox');
+
+                if (existing) {
+                    svg.dataset.symconOriginalViewBox = existing;
+                }
+            }
+
+            if (currentView === 'compact') {
+                /*
+                 * Nur den oberen Originalbereich anzeigen.
+                 *
+                 * rectSettings:
+                 * x=65.353, y=50, width=474.29, height=274.29
+                 *
+                 * Mit etwas Rand oben/seitlich, damit der Rahmen vollständig
+                 * sichtbar bleibt. Alles darunter wird durch den viewBox
+                 * automatisch abgeschnitten – wir verändern keine SVG-Gruppen.
+                 */
+                svg.setAttribute(
+                    'viewBox',
+                    '45 35 515 305'
+                );
+                svg.setAttribute(
+                    'preserveAspectRatio',
+                    'xMidYMid meet'
+                );
+
+                if (toggle) {
+                    toggle.textContent = '⇄';
+                    toggle.title = 'Komplette Ansicht';
+                    toggle.setAttribute(
+                        'aria-label',
+                        'Komplette Ansicht'
+                    );
+                }
+            } else {
+                const original =
+                    svg.dataset.symconOriginalViewBox;
+
+                if (original) {
+                    svg.setAttribute(
+                        'viewBox',
+                        original
+                    );
+                } else {
+                    svg.removeAttribute('viewBox');
+                }
+
+                svg.setAttribute(
+                    'preserveAspectRatio',
+                    'xMidYMid meet'
+                );
+
+                if (toggle) {
+                    toggle.textContent = '⇄';
+                    toggle.title = 'Kompakte Ansicht';
+                    toggle.setAttribute(
+                        'aria-label',
+                        'Kompakte Ansicht'
+                    );
+                }
+            }
+        };
+
+        const setupViewToggle = () => {
+            const toggle =
+                document.getElementById('wp-view-toggle');
+
+            if (!toggle || toggle.dataset.symconBound) {
+                return;
+            }
+
+            toggle.dataset.symconBound = '1';
+
+            const switchView = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                currentView =
+                    currentView === 'compact'
+                        ? 'full'
+                        : 'compact';
+
+                try {
+                    window.localStorage.setItem(
+                        VIEW_STORAGE_KEY,
+                        currentView
+                    );
+                } catch (error) {
+                    // LocalStorage ist optional.
+                }
+
+                const card =
+                    document.getElementById('wp-card');
+
+                applyViewMode(card);
+            };
+
+            if (window.PointerEvent) {
+                toggle.addEventListener(
+                    'pointerup',
+                    (event) => {
+                        if (
+                            event.pointerType === 'touch'
+                            || event.pointerType === 'pen'
+                        ) {
+                            switchView(event);
+                        }
+                    }
+                );
+            }
+
+            toggle.addEventListener(
+                'click',
+                (event) => {
+                    /*
+                     * Bei Touch wird der Klick nach pointerup teilweise
+                     * zusätzlich erzeugt. Dann nicht doppelt umschalten.
+                     */
+                    if (
+                        event.detail === 0
+                        && (
+                            'ontouchstart' in window
+                            || navigator.maxTouchPoints > 0
+                        )
+                    ) {
+                        return;
+                    }
+
+                    switchView(event);
+                }
+            );
         };
 
         const rebuildCard = () => {
@@ -7725,6 +7931,7 @@ window.SymconHeatPump = {
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
                             applyFlowAnimations(this);
+                            applyViewMode(this);
 
                             /*
                              * Ganz zuletzt: Aktivfarben der oberen Statusleiste.
@@ -7809,6 +8016,7 @@ window.SymconHeatPump = {
             }
         }
 
+        setupViewToggle();
         applyCardData();
   }
 };
