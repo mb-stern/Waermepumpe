@@ -220,6 +220,10 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TemperatureColor10', 16711680);       // #FF0000
 
         // Heizkreis 1
+        // Sonderdarstellung bei genau einem Heizkreis:
+        // Heizkreiswerte bei Warmwasserbereitung einfrieren und aktuelle
+        // Vor-/Rücklauftemperatur am Warmwasserspeicher anzeigen.
+        $this->RegisterPropertyBoolean('SingleCircuitHotWaterTemperatureSwitch', true);
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
         $this->RegisterPropertyInteger('HeatingCircuitPumpRunning1', 0);
         $this->RegisterPropertyInteger('SupplyTemperatureHeating1', 0);
@@ -1020,7 +1024,17 @@ PHP
         return [
             'type'    => 'ExpansionPanel',
             'caption' => 'Heizkreis ' . $suffix,
-            'items'   => [
+            'items'   => array_merge(
+                $number === 1
+                    ? [
+                        [
+                            'type' => 'CheckBox',
+                            'name' => 'SingleCircuitHotWaterTemperatureSwitch',
+                            'caption' => 'Heizen des Warmwasserspeichers integrieren'
+                        ]
+                    ]
+                    : [],
+                [
                 [
                     'type'    => 'Select',
                     'name'    => 'HeatingCircuitType' . $suffix,
@@ -1043,7 +1057,8 @@ PHP
                     '',
                     ''
                 )
-            ]
+                ]
+            )
         ];
     }
 
@@ -1374,6 +1389,7 @@ HTML;
             'tankTempWWMiddle'           => $this->DataKey('TankTempWWMiddle', 'tankTempWWMiddle'),
             'tankTempWWDown'             => $this->DataKey('TankTempWWDown', 'tankTempWWDown'),
 
+            'singleCircuitHotWaterTemperatureSwitch' => $this->ReadPropertyBoolean('SingleCircuitHotWaterTemperatureSwitch'),
             'heatingCircuitType1'        => $this->ReadPropertyString('HeatingCircuitType1'),
             'heatingCircuitPumpRunning'  => $this->DataKey('HeatingCircuitPumpRunning1', 'heatingCircuitPumpRunning'),
             'supplyTemperatureHeating'   => $this->DataKey('SupplyTemperatureHeating1', 'supplyTemperatureHeating'),
@@ -4444,6 +4460,24 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
+
+            /*
+             * Diese Sonderfunktion kann in Heizkreis 1 abgeschaltet werden.
+             * Aus = normale Card-Darstellung ohne Einfrieren und ohne die
+             * zusätzlichen Vor-/Rücklaufwerte am Warmwasserspeicher.
+             */
+            if (!currentConfig.singleCircuitHotWaterTemperatureSwitch) {
+                [
+                    '#symconBoilerSupplyTemperature',
+                    '#symconBoilerRefluxTemperature'
+                ].forEach((selector) => {
+                    const element = svg.querySelector(selector);
+                    if (element && element.parentNode) {
+                        element.parentNode.removeChild(element);
+                    }
+                });
+                return;
+            }
 
             /*
              * Diese Erweiterung gilt bewusst nur bei genau EINEM Heizkreis.
