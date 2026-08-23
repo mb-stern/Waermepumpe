@@ -5513,35 +5513,25 @@ window.SymconHeatPump = {
                     && currentControls.heatingActive === true
                 );
 
+            /*
+             * Ein konfigurierter Heizkreis gilt als aktiv, sobald
+             * - der Heizbetrieb aktiv ist ODER
+             * - seine Heizkreispumpe aktiv meldet.
+             *
+             * Eine vorhandene, aber gerade false meldende Pumpenvariable
+             * darf den sichtbaren Heizfluss nicht mehr blockieren.
+             */
             const circuit1Active =
                 circuit1Configured
-                && (
-                    heatingPump1
-                    || (
-                        !currentConfig.heatingCircuitPumpRunning
-                        && heatingModeActive
-                    )
-                );
+                && (heatingModeActive || heatingPump1);
 
             const circuit2Active =
                 circuit2Configured
-                && (
-                    heatingPump2
-                    || (
-                        !currentConfig.heatingCircuitPumpRunning2
-                        && heatingModeActive
-                    )
-                );
+                && (heatingModeActive || heatingPump2);
 
             const circuit3Active =
                 circuit3Configured
-                && (
-                    heatingPump3
-                    || (
-                        !currentConfig.heatingCircuitPumpRunning3
-                        && heatingModeActive
-                    )
-                );
+                && (heatingModeActive || heatingPump3);
 
             const anyHeatingActive =
                 circuit1Active
@@ -5593,7 +5583,7 @@ window.SymconHeatPump = {
             );
 
             [
-                {name: 'CompressorOuter', direction: 'forward'},
+                {name: 'CompressorOuter', direction: 'reverse'},
                 {name: 'CompressorInner', direction: 'reverse'},
                 {name: 'EvaporatorOuter', direction: 'forward'},
                 {name: 'EvaporatorInner', direction: 'forward'},
@@ -5772,7 +5762,7 @@ window.SymconHeatPump = {
                         '#pathUnderfloorHeating' + number,
                         'symconFlowEmitterFloor' + number,
                         'forward',
-                        enabled && floorVisible
+                        !!enabled && floorVisible
                     );
 
                     const floorOverlay =
@@ -5784,6 +5774,12 @@ window.SymconHeatPump = {
                         floorOverlay.classList.add(
                             'symcon-flow-emitter'
                         );
+
+                        if (floorOverlay.parentNode) {
+                            floorOverlay.parentNode.appendChild(
+                                floorOverlay
+                            );
+                        }
                     }
                 }
 
@@ -5870,12 +5866,20 @@ window.SymconHeatPump = {
                     radiatorParent.appendChild(flowPath);
                 }
 
+                /*
+                 * Pfad ganz nach vorne holen, damit er nicht durch
+                 * Heizkörperfüllung oder andere SVG-Elemente verdeckt wird.
+                 */
+                if (flowPath.parentNode) {
+                    flowPath.parentNode.appendChild(flowPath);
+                }
+
                 ensureFlowOverlay(
                     svg,
                     '#symconRadiatorWaterPath' + number,
                     'symconFlowEmitterRadiator' + number,
                     'forward',
-                    enabled && radiatorVisible
+                    !!enabled && radiatorVisible
                 );
 
                 const radiatorOverlay =
@@ -5892,6 +5896,12 @@ window.SymconHeatPump = {
                         'none',
                         'important'
                     );
+
+                    if (radiatorOverlay.parentNode) {
+                        radiatorOverlay.parentNode.appendChild(
+                            radiatorOverlay
+                        );
+                    }
                 }
             };
 
