@@ -1325,18 +1325,39 @@ PHP
     }
 
     #wp-mode-menu {
-        position: fixed;
-        z-index: 9999;
         display: none;
-        min-width: 190px;
-        max-width: 300px;
-        padding: 6px;
-        border-radius: 8px;
-        background: color-mix(in srgb, Canvas 94%, transparent);
-        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+        position: fixed;
+        z-index: 2147483647;
+        box-sizing: border-box;
+        width: min(360px, calc(100vw - 24px));
+        max-height: min(70vh, 520px);
+        overflow-y: auto;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid rgba(127,127,127,.35);
+        background: Canvas;
         color: CanvasText;
+        box-shadow: 0 8px 28px rgba(0,0,0,.28);
         font: 14px Arial, sans-serif;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
     }
+
+    /*
+     * Auf genügend breiten Desktop-Ansichten darf das Menü kompakt
+     * mittig erscheinen. Auf dem Handy bleibt es als Bottom-Sheet unten.
+     */
+    @media (min-width: 700px) {
+        #wp-mode-menu {
+            top: 50%;
+            bottom: auto;
+            transform: translate(-50%, -50%);
+        }
+    }
+
 
     #wp-mode-menu .wp-mode-title {
         padding: 6px 8px;
@@ -3188,6 +3209,40 @@ window.SymconHeatPump = {
                 .includes(String(item.value ?? '').trim().toLowerCase());
         };
 
+        const disableOriginalSettingsLink = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const link = svg.querySelector('#linkSettings');
+
+            if (!link || !link.parentNode) {
+                return;
+            }
+
+            /*
+             * Die Original-SVG legt die komplette Statusleiste in
+             * <a id="linkSettings" href="#"> ... </a>.
+             *
+             * Auf dem Handy erzeugt Symcon/WebView daraus eine zusätzliche
+             * Link-/Pfeilfläche. Ein preventDefault auf touchend ist aber
+             * ebenfalls falsch, weil dadurch der nachfolgende click auf
+             * unseren Icons unterdrückt werden kann.
+             *
+             * Lösung: den <a>-Wrapper komplett entfernen, die Kinder aber
+             * unverändert an derselben Stelle im SVG belassen.
+             */
+            const parent = link.parentNode;
+
+            while (link.firstChild) {
+                parent.insertBefore(link.firstChild, link);
+            }
+
+            parent.removeChild(link);
+        };
+
+
         const closeModeMenu = () => {
             const menu = document.getElementById('wp-mode-menu');
             if (menu) {
@@ -3266,10 +3321,6 @@ window.SymconHeatPump = {
                 menu.appendChild(button);
             });
 
-            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
-            const y = Math.min(event.clientY + 8, window.innerHeight - 260);
-            menu.style.left = Math.max(8, x) + 'px';
-            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
         };
 
@@ -3379,14 +3430,24 @@ window.SymconHeatPump = {
             });
             menu.appendChild(apply);
 
-            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
-            const y = Math.min(event.clientY + 8, window.innerHeight - 220);
-            menu.style.left = Math.max(8, x) + 'px';
-            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
 
-            input.focus();
-            input.select();
+            /*
+             * Auf Desktop Feld direkt fokussieren.
+             * Auf Touch-Geräten nicht automatisch fokussieren, weil sonst
+             * WebView/Browser zusätzliche Eingabe-/Pfeilflächen öffnen kann.
+             */
+            const touchDevice =
+                ('ontouchstart' in window)
+                || (
+                    navigator.maxTouchPoints
+                    && navigator.maxTouchPoints > 0
+                );
+
+            if (!touchDevice) {
+                input.focus();
+                input.select();
+            }
         };
 
 
@@ -6543,6 +6604,50 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
+
+            /*
+             * Aktive elektrische Heizstäbe pulsieren dezent zwischen
+             * Orange und Rot. Nur die Darstellung wird animiert; die
+             * vorhandene Aktivierungs-/Schwellwertlogik bleibt unverändert.
+             */
+            let heaterRodStyle =
+                svg.querySelector('#symconHeaterRodPulseStyle');
+
+            if (!heaterRodStyle) {
+                heaterRodStyle = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'style'
+                );
+                heaterRodStyle.setAttribute(
+                    'id',
+                    'symconHeaterRodPulseStyle'
+                );
+                heaterRodStyle.textContent = `
+                    @keyframes symconHeaterRodPulse {
+                        0%, 100% {
+                            stroke: #ff9800;
+                            filter:
+                                drop-shadow(0 0 1.5px rgba(0,0,0,.95))
+                                drop-shadow(0 0 1px rgba(255,152,0,.35));
+                        }
+                        50% {
+                            stroke: #f04444;
+                            filter:
+                                drop-shadow(0 0 1.5px rgba(0,0,0,.95))
+                                drop-shadow(0 0 3px rgba(240,68,68,.55));
+                        }
+                    }
+
+                    .symcon-heater-rod-active {
+                        animation:
+                            symconHeaterRodPulse 1.8s ease-in-out infinite;
+                    }
+                `;
+                svg.insertBefore(
+                    heaterRodStyle,
+                    svg.firstChild
+                );
+            }
             const tankGroup = svg.querySelector('#gTankWW');
             const original = svg.querySelector('#pathHeaterRodWW');
 
@@ -6664,6 +6769,9 @@ window.SymconHeatPump = {
                 const exists = index < heaterRodCount;
 
                 if (!exists) {
+                    rodInfo.element.classList.remove(
+                        'symcon-heater-rod-active'
+                    );
                     rodInfo.element.style.setProperty('display', 'none', 'important');
                     rodInfo.element.style.setProperty('visibility', 'hidden', 'important');
                     return;
@@ -6673,20 +6781,31 @@ window.SymconHeatPump = {
 
                 rodInfo.element.style.setProperty('display', 'block', 'important');
                 rodInfo.element.style.setProperty('visibility', 'visible', 'important');
-                rodInfo.element.style.setProperty(
-                    'stroke',
-                    active ? rodInfo.activeColor : 'rgba(255,255,255,0.55)',
-                    'important'
-                );
-
-                /*
-                 * Kontur erhöht den Kontrast auch bei rotem/orangem Speicher.
-                 */
-                rodInfo.element.style.setProperty(
-                    'filter',
-                    'drop-shadow(0 0 1.5px rgba(0,0,0,0.95))',
-                    'important'
-                );
+                if (active) {
+                    /*
+                     * Keine Inline-Stroke-Farbe mit !important setzen:
+                     * die Farbe kommt bei aktivem Stab aus der Pulsanimation.
+                     */
+                    rodInfo.element.style.removeProperty('stroke');
+                    rodInfo.element.style.removeProperty('filter');
+                    rodInfo.element.classList.add(
+                        'symcon-heater-rod-active'
+                    );
+                } else {
+                    rodInfo.element.classList.remove(
+                        'symcon-heater-rod-active'
+                    );
+                    rodInfo.element.style.setProperty(
+                        'stroke',
+                        'rgba(255,255,255,0.55)',
+                        'important'
+                    );
+                    rodInfo.element.style.setProperty(
+                        'filter',
+                        'drop-shadow(0 0 1.5px rgba(0,0,0,0.95))',
+                        'important'
+                    );
+                }
             });
         };
 
@@ -6793,9 +6912,13 @@ window.SymconHeatPump = {
                         'important'
                     );
 
-                    group.addEventListener(
-                        'click',
-                        (event) => openNumericMenu(functionName, event)
+                    bindTap(
+                        group,
+                        (event) =>
+                            openNumericMenu(
+                                functionName,
+                                event
+                            )
                     );
                 }
 
@@ -6884,33 +7007,78 @@ window.SymconHeatPump = {
 
             const svg = card.content;
             const settings = svg.querySelector('#gSettings');
+            const frame = svg.querySelector('#rectSettings');
 
-            if (!settings) {
+            if (!settings || !frame) {
                 return;
             }
 
             /*
-             * ORIGINALREIHENFOLGE der SVG:
-             * Ein/Aus, Warmwasser, Heizen, Kühlen, Abtauen,
-             * Zusatzheizung, Warnung/Fehler, Party, Sparen.
+             * EINHEITLICHES LAYOUT FÜR DESKTOP UND HANDY
+             * ------------------------------------------------------------
+             * Keine getBBox-/getCTM-Messung mehr.
+             * Keine Mobile-Sonderbehandlung mehr.
+             * Keine Abhängigkeit von Fenster- oder Bildschirmbreite.
              *
-             * Unsere beiden Sollwerte kommen danach.
-             *
-             * Tag/Nacht ist eine eigene Zeile und bleibt vollständig
-             * unangetastet.
+             * Sämtliche Icons werden ausschließlich in den festen
+             * Koordinaten der Original-SVG angeordnet. Die SVG skaliert
+             * danach selbst auf Desktop oder Handy.
              */
+
             const definitions = [
-                {selector: '#gHPStatusOff', custom: false},
-                {selector: '#gHPStatusWW', custom: false},
-                {selector: '#gHPStatusHeating', custom: false},
-                {selector: '#gHPStatusCooling', custom: false},
-                {selector: '#gDefrost', custom: false},
-                {selector: '#gAdditionalHeating', custom: false},
-                {selector: '#gWarning', custom: false},
-                {selector: '#gHPStatusParty', custom: false},
-                {selector: '#gHPStatusSave', custom: false},
-                {selector: '#gSymconWarmWaterSetpoint', custom: true},
-                {selector: '#gSymconHeatingCorrection', custom: true}
+                {
+                    selector: '#gHPStatusOff',
+                    custom: false,
+                    originalX: 101.371
+                },
+                {
+                    selector: '#gHPStatusWW',
+                    custom: false,
+                    originalX: 158.047
+                },
+                {
+                    selector: '#gHPStatusHeating',
+                    custom: false,
+                    originalX: 212.235
+                },
+                {
+                    selector: '#gHPStatusCooling',
+                    custom: false,
+                    originalX: 258.245
+                },
+                {
+                    selector: '#gDefrost',
+                    custom: false,
+                    originalX: 299.602
+                },
+                {
+                    selector: '#gAdditionalHeating',
+                    custom: false,
+                    originalX: 346.000
+                },
+                {
+                    selector: '#gWarning',
+                    custom: false,
+                    originalX: 391.560
+                },
+                {
+                    selector: '#gHPStatusParty',
+                    custom: false,
+                    originalX: 437.380
+                },
+                {
+                    selector: '#gHPStatusSave',
+                    custom: false,
+                    originalX: 485.077
+                },
+                {
+                    selector: '#gSymconWarmWaterSetpoint',
+                    custom: true
+                },
+                {
+                    selector: '#gSymconHeatingCorrection',
+                    custom: true
+                }
             ];
 
             const isVisible = (element) => {
@@ -6928,186 +7096,147 @@ window.SymconHeatPump = {
             };
 
             /*
-             * Ursprüngliche Transformationswerte der Original-SVG sichern.
-             * Vor jedem Layout werden sie zuerst vollständig zurückgesetzt,
-             * damit sich Verschiebungen niemals aufsummieren.
+             * Originaltransformationen genau einmal sichern.
              */
             definitions.forEach((definition) => {
                 if (definition.custom) {
                     return;
                 }
 
-                const element = svg.querySelector(definition.selector);
+                const element =
+                    svg.querySelector(definition.selector);
 
-                if (!element) {
-                    return;
-                }
-
-                if (!element.hasAttribute('data-symcon-original-transform')) {
+                if (
+                    element
+                    && !element.hasAttribute(
+                        'data-symcon-original-transform'
+                    )
+                ) {
                     element.setAttribute(
                         'data-symcon-original-transform',
                         element.getAttribute('transform') || ''
                     );
                 }
-
-                const original =
-                    element.getAttribute('data-symcon-original-transform')
-                    || '';
-
-                if (original) {
-                    element.setAttribute('transform', original);
-                } else {
-                    element.removeAttribute('transform');
-                }
             });
 
             /*
-             * Mittelpunkt eines Originalsymbols in den lokalen Koordinaten
-             * von #gSettings bestimmen. Das ist wichtig, weil #gSettings in
-             * einer Sonderdarstellung selbst verschoben werden kann.
+             * Alle aktuell sichtbaren Icons in der gewünschten Reihenfolge.
              */
-            const centerInSettings = (element) => {
-                if (
-                    !element
-                    || typeof element.getBBox !== 'function'
-                ) {
-                    return null;
-                }
-
-                try {
-                    const box = element.getBBox();
-                    const elementMatrix = element.getCTM();
-                    const settingsMatrix = settings.getCTM();
-
-                    if (!elementMatrix || !settingsMatrix) {
-                        return null;
-                    }
-
-                    const x = box.x + box.width / 2;
-                    const y = box.y + box.height / 2;
-
-                    const rootX =
-                        elementMatrix.a * x
-                        + elementMatrix.c * y
-                        + elementMatrix.e;
-                    const rootY =
-                        elementMatrix.b * x
-                        + elementMatrix.d * y
-                        + elementMatrix.f;
-
-                    const inverse = settingsMatrix.inverse();
-
-                    return {
-                        x:
-                            inverse.a * rootX
-                            + inverse.c * rootY
-                            + inverse.e,
-                        y:
-                            inverse.b * rootX
-                            + inverse.d * rootY
-                            + inverse.f
-                    };
-                } catch (error) {
-                    return null;
-                }
-            };
-
             const visible = definitions.filter((definition) => {
-                const element = svg.querySelector(definition.selector);
-                return isVisible(element);
+                return isVisible(
+                    svg.querySelector(definition.selector)
+                );
             });
 
             /*
-             * Originalsymbole haben immer Vorrang.
-             * Falls tatsächlich alle neun Original-Slots belegt sind,
-             * werden zusätzliche Sollwert-Icons ausgeblendet statt etwas
-             * zu überdecken.
+             * Die Original-Card besitzt neun Plätze.
+             * Originalsymbole haben Vorrang. Zusätzliche Sollwertsymbole
+             * werden nur verwendet, solange noch Platz vorhanden ist.
              */
-            /*
-             * Vertikale Mittellinie direkt von einem sichtbaren Original-Icon
-             * übernehmen. Dadurch sitzen unsere Zusatzicons exakt auf derselben
-             * Höhe wie die Symbole der Original-Card – unabhängig von
-             * SVG-Transformationen oder späteren Änderungen an der Card.
-             */
-            const referenceOriginal = visible
-                .filter((definition) => !definition.custom)
-                .map((definition) => svg.querySelector(definition.selector))
-                .find((element) => !!element);
+            const visibleOriginals =
+                visible.filter(
+                    (definition) => !definition.custom
+                );
 
-            const referenceCenter = referenceOriginal
-                ? centerInSettings(referenceOriginal)
-                : null;
+            const visibleCustoms =
+                visible.filter(
+                    (definition) => definition.custom
+                );
 
-            const iconCenterY =
-                referenceCenter && Number.isFinite(referenceCenter.y)
-                    ? referenceCenter.y
-                    : 0;
+            const freeCustomSlots = Math.max(
+                0,
+                TOP_ICON_SLOTS.length
+                - visibleOriginals.length
+            );
 
-            let slotIndex = 0;
-
-            visible.forEach((definition) => {
-                const element = svg.querySelector(definition.selector);
+            visibleCustoms.forEach((definition, index) => {
+                const element =
+                    svg.querySelector(definition.selector);
 
                 if (!element) {
                     return;
                 }
 
-                if (slotIndex >= TOP_ICON_SLOTS.length) {
-                    if (definition.custom) {
-                        element.style.setProperty(
-                            'display',
-                            'none',
-                            'important'
-                        );
-                    }
+                if (index >= freeCustomSlots) {
+                    element.style.setProperty(
+                        'display',
+                        'none',
+                        'important'
+                    );
+                }
+            });
+
+            const shownCustoms =
+                visibleCustoms.slice(0, freeCustomSlots);
+
+            const shown = [
+                ...visibleOriginals,
+                ...shownCustoms
+            ];
+
+            if (shown.length === 0) {
+                return;
+            }
+
+            /*
+             * Tatsächlicher Rahmen der Statusleiste.
+             */
+            const frameX =
+                Number(frame.getAttribute('x')) || 65.353;
+            const frameWidth =
+                Number(frame.getAttribute('width')) || 474.29;
+
+            /*
+             * Gleicher Innenabstand links und rechts.
+             * Damit kleben weder Wasserhahn noch letztes Symbol am Rahmen.
+             */
+            const horizontalPadding = 36;
+            const leftX =
+                frameX + horizontalPadding;
+            const rightX =
+                frameX + frameWidth - horizontalPadding;
+
+            /*
+             * Vertikale Mitte der ORIGINALEN Statuszeile.
+             *
+             * rectSettings beginnt bei y=50.
+             * Die Trennlinie liegt bei ungefähr y=100.
+             * Somit ist y=75 die gemeinsame Mitte aller Statusicons.
+             */
+            /*
+             * Reale gemeinsame Y-Mitte der Original-Statussymbole,
+             * aus der unveränderten Original-SVG ermittelt.
+             *
+             * Die Originalicons liegen im Mittel bei y ~= 84.
+             * Unsere beiden Sollwerticons werden deshalb exakt dort
+             * zentriert und nicht mehr auf der geometrisch nur vermuteten
+             * Rahmenmitte y=75.
+             */
+            const iconCenterY = 84;
+
+            const gap =
+                shown.length > 1
+                    ? (rightX - leftX) / (shown.length - 1)
+                    : 0;
+
+            shown.forEach((definition, index) => {
+                const element =
+                    svg.querySelector(definition.selector);
+
+                if (!element) {
                     return;
                 }
 
-                /*
-                 * NICHT die komplette Kopfbreite verwenden.
-                 *
-                 * Die effektive Icon-Spalte wird direkt aus den ursprünglichen
-                 * Positionen der Original-Icons bestimmt. Damit entspricht die
-                 * nutzbare Breite exakt dem Bereich, den die Card selbst für
-                 * ihre obere Symbolleiste vorgesehen hat.
-                 */
-                const originalCenters = definitions
-                    .filter((item) => !item.custom)
-                    .map((item) => svg.querySelector(item.selector))
-                    .filter(Boolean)
-                    .map((item) => centerInSettings(item))
-                    .filter(
-                        (center) =>
-                            center
-                            && Number.isFinite(center.x)
-                    )
-                    .map((center) => center.x)
-                    .sort((a, b) => a - b);
-
-                const firstX = originalCenters.length > 0
-                    ? originalCenters[0]
-                    : TOP_ICON_SLOTS[0];
-
-                const lastX = originalCenters.length > 1
-                    ? originalCenters[originalCenters.length - 1]
-                    : firstX;
-
-                const visibleCount = Math.min(
-                    visible.length,
-                    TOP_ICON_SLOTS.length
-                );
-
-                const equalGap = visibleCount > 1
-                    ? (lastX - firstX) / (visibleCount - 1)
-                    : 0;
-
-                const targetX = visibleCount > 1
-                    ? firstX + equalGap * slotIndex
-                    : firstX;
-
-                slotIndex++;
+                const targetX =
+                    shown.length > 1
+                        ? leftX + gap * index
+                        : (leftX + rightX) / 2;
 
                 if (definition.custom) {
+                    /*
+                     * Unsere Sollwerticons sind um (0/0) aufgebaut.
+                     * Deshalb direkt auf die gemeinsame Mitte setzen.
+                     */
                     element.setAttribute(
                         'transform',
                         'translate('
@@ -7119,30 +7248,81 @@ window.SymconHeatPump = {
                     return;
                 }
 
-                const center = centerInSettings(element);
-
-                if (!center) {
-                    return;
-                }
-
-                const deltaX = targetX - center.x;
-
+                /*
+                 * Originalicons horizontal verschieben, ihre originale
+                 * vertikale Geometrie aber vollständig beibehalten.
+                 */
                 const original =
-                    element.getAttribute('data-symcon-original-transform')
+                    element.getAttribute(
+                        'data-symcon-original-transform'
+                    )
                     || '';
 
                 /*
-                 * translate VOR der Originaltransformation:
-                 * dadurch erfolgt die Verschiebung in den lokalen
-                 * #gSettings-Koordinaten und nicht im skalierten
-                 * Koordinatensystem des einzelnen Icons.
+                 * originalX ist der tatsächlich gemessene Mittelpunkt des
+                 * jeweiligen Symbols in der unveränderten Original-SVG.
+                 * Dadurch werden alle Originalicons exakt auf targetX gesetzt.
                  */
+                const deltaX =
+                    targetX - Number(definition.originalX);
+
                 element.setAttribute(
                     'transform',
-                    'translate(' + deltaX + ' 0)'
-                    + (original ? ' ' + original : '')
+                    'translate('
+                    + deltaX
+                    + ' 0)'
+                    + (
+                        original
+                            ? ' ' + original
+                            : ''
+                    )
                 );
             });
+        };
+
+        const bindTap = (element, handler) => {
+            if (!element || element.dataset.symconTapBound) {
+                return;
+            }
+
+            element.dataset.symconTapBound = '1';
+
+            let pointerHandled = false;
+
+            if (window.PointerEvent) {
+                element.addEventListener(
+                    'pointerup',
+                    (event) => {
+                        if (
+                            event.pointerType === 'touch'
+                            || event.pointerType === 'pen'
+                        ) {
+                            pointerHandled = true;
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            handler(event);
+
+                            window.setTimeout(() => {
+                                pointerHandled = false;
+                            }, 400);
+                        }
+                    }
+                );
+            }
+
+            element.addEventListener(
+                'click',
+                (event) => {
+                    if (pointerHandled) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        return;
+                    }
+
+                    handler(event);
+                }
+            );
         };
 
         const applyControlIcons = (card) => {
@@ -7211,8 +7391,12 @@ window.SymconHeatPump = {
                     && control.options.length > 0
                 );
 
+                const configuredMode =
+                    !!currentConfig[definition.dataKey];
+
                 const visible =
-                    hasControl
+                    configuredMode
+                    || hasControl
                     || (
                         currentControls
                         && currentControls.hasOperatingStatus
@@ -7353,8 +7537,8 @@ window.SymconHeatPump = {
                     if (!group.dataset.symconControlBound) {
                         group.dataset.symconControlBound = '1';
 
-                        group.addEventListener(
-                            'click',
+                        bindTap(
+                            group,
                             (event) =>
                                 openModeMenu(
                                     definition.functionName,
@@ -7529,6 +7713,7 @@ window.SymconHeatPump = {
                             applyHeatingCircuitTemperatureColors(this);
                             applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
+                            disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
                             layoutTopIconBar(this);
