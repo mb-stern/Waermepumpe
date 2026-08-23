@@ -830,7 +830,7 @@ class Waermepumpe extends IPSModuleStrict
          */
         $localization = [
             'svgTexts' => [
-                'tankWWName'             => 'Warmwasserspeicher',
+                'tankWWName'             => 'Warmwasser',
                 'tankHPName'             => 'Pufferspeicher',
                 'evaporator'             => 'Verdampfer',
                 'condenser'              => 'Kondensator',
