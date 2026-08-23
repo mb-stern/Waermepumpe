@@ -2739,6 +2739,22 @@ class Waermepumpe extends IPSModuleStrict
                 );
             }
 
+            const existingHotConnector =
+                svg.querySelector('#symconThermalSolarHotConnector');
+
+            if (existingHotConnector) {
+                existingHotConnector.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                existingHotConnector.style.setProperty(
+                    'visibility',
+                    'hidden',
+                    'important'
+                );
+            }
+
             return;
         }
 
@@ -2795,6 +2811,69 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         /*
+         * Kurzes heißes Verbindungsstück zwischen Solar-Vorlauf und
+         * Solar-Wendel. In der Original-SVG kann dieser Bereich durch die
+         * später gezeichnete Boilerfläche optisch unterbrochen werden.
+         *
+         * Deshalb als eigener Pfad direkt in gTankWW und damit oberhalb der
+         * Speicherfüllung zeichnen.
+         */
+        let solarHotConnector =
+            svg.querySelector('#symconThermalSolarHotConnector');
+
+        if (!solarHotConnector && tankGroup) {
+            solarHotConnector = document.createElementNS(
+                'http://www.w3.org/2000/svg',
+                'path'
+            );
+            solarHotConnector.setAttribute(
+                'id',
+                'symconThermalSolarHotConnector'
+            );
+
+            /*
+             * Eintritt der Solar-Wendel liegt bei y=540.
+             * Das kurze Stück verbindet Boilerwand (x=745) mit dem
+             * vorhandenen Solar-Vorlauf/Wendelanschluss (x=791).
+             */
+            solarHotConnector.setAttribute(
+                'd',
+                'M 745 540 H 791'
+            );
+            solarHotConnector.setAttribute('fill', 'none');
+
+            tankGroup.appendChild(solarHotConnector);
+        }
+
+        if (solarHotConnector) {
+            solarHotConnector.style.setProperty(
+                'display',
+                'inline',
+                'important'
+            );
+            solarHotConnector.style.setProperty(
+                'visibility',
+                'visible',
+                'important'
+            );
+            solarHotConnector.style.setProperty(
+                'stroke-width',
+                '5',
+                'important'
+            );
+            solarHotConnector.style.setProperty(
+                'stroke-opacity',
+                '1',
+                'important'
+            );
+            solarHotConnector.style.setProperty(
+                'fill',
+                'none',
+                'important'
+            );
+        }
+
+        /*
          * Bei abgeschalteten eigenen Temperaturfarben bleibt die originale
          * Farbgebung der Heat-Pump-Card bestehen.
          */
@@ -2825,6 +2904,14 @@ class Waermepumpe extends IPSModuleStrict
                 solarCoil.style.setProperty(
                     'stroke-opacity',
                     '1',
+                    'important'
+                );
+            }
+
+            if (solarHotConnector) {
+                solarHotConnector.style.setProperty(
+                    'stroke',
+                    '#ff0000',
                     'important'
                 );
             }
@@ -2886,6 +2973,7 @@ class Waermepumpe extends IPSModuleStrict
          */
         setStroke('#pathPipeThermalSolarHotWater', supplyColor);
         setStroke('#pathPipeThermalSolarColdWater', returnColor);
+        setStroke('#symconThermalSolarHotConnector', supplyColor);
 
         /*
          * Solarpanel:
