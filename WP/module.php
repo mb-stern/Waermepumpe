@@ -3228,12 +3228,13 @@ window.SymconHeatPump = {
             }
 
             /*
-             * Statussymbole bestehen je nach SVG-Version aus unterschiedlich
-             * verschachtelten Pfaden. Darum sowohl die Gruppe selbst als auch
-             * sämtliche grafischen Kindelemente mit currentColor versorgen
-             * und vorhandene Fill-/Stroke-Flächen direkt überschreiben.
+             * Die Statussymbole der Original-SVG verwenden je nach Symbol
+             * Farbe auf der Gruppe selbst ODER direkt auf einzelnen Pfaden.
+             * Deshalb die Farbe auf beiden Ebenen setzen.
              */
             group.style.setProperty('color', color, 'important');
+            group.style.setProperty('fill', color, 'important');
+            group.style.setProperty('stroke', color, 'important');
 
             group.querySelectorAll(
                 'path, rect, circle, ellipse, line, polyline, polygon, use'
@@ -3243,25 +3244,40 @@ window.SymconHeatPump = {
                 const fill = String(computed.fill || '').toLowerCase();
                 const stroke = String(computed.stroke || '').toLowerCase();
 
+                /*
+                 * Vorhandene Füllungen direkt überschreiben. Reine
+                 * Stroke-Symbole bleiben ungefüllt, wenn fill="none" gesetzt
+                 * ist.
+                 */
                 if (
-                    fill
-                    && fill !== 'none'
+                    fill !== 'none'
                     && fill !== 'rgba(0, 0, 0, 0)'
                     && fill !== 'transparent'
                 ) {
-                    element.style.setProperty('fill', color, 'important');
+                    element.style.setProperty(
+                        'fill',
+                        color,
+                        'important'
+                    );
                 }
 
                 if (
-                    stroke
-                    && stroke !== 'none'
+                    stroke !== 'none'
                     && stroke !== 'rgba(0, 0, 0, 0)'
                     && stroke !== 'transparent'
                 ) {
-                    element.style.setProperty('stroke', color, 'important');
+                    element.style.setProperty(
+                        'stroke',
+                        color,
+                        'important'
+                    );
                 }
 
-                element.style.setProperty('color', color, 'important');
+                element.style.setProperty(
+                    'color',
+                    color,
+                    'important'
+                );
             });
         };
 
@@ -6417,19 +6433,19 @@ window.SymconHeatPump = {
                 {
                     functionName: 'heating',
                     selector: '#gHPStatusHeating',
-                    entity: currentConfig.heatingPumpHeatingMode,
+                    entity: 'heatingPumpHeatingMode',
                     runningColor: '#ff9500'
                 },
                 {
                     functionName: 'hotwater',
                     selector: '#gHPStatusWW',
-                    entity: currentConfig.heatingPumpHotWaterMode,
+                    entity: 'heatingPumpHotWaterMode',
                     runningColor: '#ff9500'
                 },
                 {
                     functionName: 'cooling',
                     selector: '#gHPStatusCooling',
-                    entity: currentConfig.heatingPumpCoolingMode,
+                    entity: 'heatingPumpCoolingMode',
                     runningColor: '#0a84ff'
                 }
             ];
@@ -6443,7 +6459,12 @@ window.SymconHeatPump = {
 
                 const control = currentControls && currentControls[definition.functionName];
 
-                // Läuft gerade wirklich = zentrale Ist-Statusvariable.
+                /*
+                 * Läuft gerade wirklich = kanonischer Datenwert aus
+                 * BuildVisualizationData(). Nicht über die Konfiguration
+                 * zurückauflösen, damit sowohl Betriebsstatus-Fallback als
+                 * auch direkt konfigurierte Bool-Variablen funktionieren.
+                 */
                 const running = stateIsOn(definition.entity);
 
                 const hasControl = !!(
