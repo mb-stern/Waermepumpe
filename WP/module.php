@@ -5735,7 +5735,9 @@ window.SymconHeatPump = {
          *   8: 527.56
          *   9: 587.85
          *
-         * Es werden ausschließlich diese Originalpositionen verwendet.
+         * Der erste und letzte Original-Slot bilden die Grenzen der Leiste.
+         * Alle sichtbaren Icons werden innerhalb dieses Originalbereichs mit
+         * exakt gleichem Abstand verteilt.
          * Tag/Nacht gehört NICHT zu dieser Reihe und wird daher bewusst
          * nicht verschoben.
          */
@@ -6107,7 +6109,27 @@ window.SymconHeatPump = {
                     return;
                 }
 
-                const targetX = TOP_ICON_SLOTS[slotIndex++];
+                /*
+                 * Ersten und letzten Originalplatz als Grenzen verwenden,
+                 * dazwischen aber ALLE sichtbaren Icons exakt gleichmäßig
+                 * verteilen.
+                 */
+                const firstX = TOP_ICON_SLOTS[0];
+                const lastX = TOP_ICON_SLOTS[TOP_ICON_SLOTS.length - 1];
+                const visibleCount = Math.min(
+                    visible.length,
+                    TOP_ICON_SLOTS.length
+                );
+
+                const equalGap = visibleCount > 1
+                    ? (lastX - firstX) / (visibleCount - 1)
+                    : 0;
+
+                const targetX = visibleCount > 1
+                    ? firstX + equalGap * slotIndex
+                    : firstX;
+
+                slotIndex++;
 
                 if (definition.custom) {
                     element.setAttribute(
