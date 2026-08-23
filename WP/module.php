@@ -184,18 +184,26 @@ class Waermepumpe extends IPSModuleStrict
 
         // Einheitlicher Temperatur-Farbverlauf für Heizkreis, Speicher und Wärmetauscher
         $this->RegisterPropertyBoolean('UseCustomTemperatureColors', false);
-        $this->RegisterPropertyInteger('TemperaturePoint1', 20);
+        $this->RegisterPropertyInteger('TemperaturePoint1', 15);
         $this->RegisterPropertyInteger('TemperatureColor1', 26316);       // #0066CC
-        $this->RegisterPropertyInteger('TemperaturePoint2', 30);
-        $this->RegisterPropertyInteger('TemperatureColor2', 6733823);     // #66BFFF
-        $this->RegisterPropertyInteger('TemperaturePoint3', 40);
-        $this->RegisterPropertyInteger('TemperatureColor3', 16769126);    // #FFE066
-        $this->RegisterPropertyInteger('TemperaturePoint4', 50);
-        $this->RegisterPropertyInteger('TemperatureColor4', 16752412);    // #FF9F1C
-        $this->RegisterPropertyInteger('TemperaturePoint5', 60);
-        $this->RegisterPropertyInteger('TemperatureColor5', 15746116);    // #F04444
-        $this->RegisterPropertyInteger('TemperaturePoint6', 70);
-        $this->RegisterPropertyInteger('TemperatureColor6', 16711680);    // #FF0000
+        $this->RegisterPropertyInteger('TemperaturePoint2', 20);
+        $this->RegisterPropertyInteger('TemperatureColor2', 2730472);       // #29A9E8
+        $this->RegisterPropertyInteger('TemperaturePoint3', 25);
+        $this->RegisterPropertyInteger('TemperatureColor3', 3790293);       // #39D5D5
+        $this->RegisterPropertyInteger('TemperaturePoint4', 30);
+        $this->RegisterPropertyInteger('TemperatureColor4', 12114250);       // #B8D94A
+        $this->RegisterPropertyInteger('TemperaturePoint5', 35);
+        $this->RegisterPropertyInteger('TemperatureColor5', 16769126);       // #FFE066
+        $this->RegisterPropertyInteger('TemperaturePoint6', 40);
+        $this->RegisterPropertyInteger('TemperatureColor6', 16761395);       // #FFC233
+        $this->RegisterPropertyInteger('TemperaturePoint7', 45);
+        $this->RegisterPropertyInteger('TemperatureColor7', 16750616);       // #FF9818
+        $this->RegisterPropertyInteger('TemperaturePoint8', 50);
+        $this->RegisterPropertyInteger('TemperatureColor8', 16734744);       // #FF5A18
+        $this->RegisterPropertyInteger('TemperaturePoint9', 55);
+        $this->RegisterPropertyInteger('TemperatureColor9', 15018795);       // #E52B2B
+        $this->RegisterPropertyInteger('TemperaturePoint10', 60);
+        $this->RegisterPropertyInteger('TemperatureColor10', 16711680);       // #FF0000
 
         // Heizkreis 1
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
@@ -620,6 +628,74 @@ class Waermepumpe extends IPSModuleStrict
                             [
                                 'type' => 'SelectColor',
                                 'name' => 'TemperatureColor6',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint7',
+                                'caption' => 'Stufe 7 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor7',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint8',
+                                'caption' => 'Stufe 8 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor8',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint9',
+                                'caption' => 'Stufe 9 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor9',
+                                'caption' => 'Farbe',
+                                'allowTransparent' => false
+                            ]
+                        ]
+                    ],
+                    [
+                        'type' => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'NumberSpinner',
+                                'name' => 'TemperaturePoint10',
+                                'caption' => 'Stufe 10 Temperatur',
+                                'digits' => 0
+                            ],
+                            [
+                                'type' => 'SelectColor',
+                                'name' => 'TemperatureColor10',
                                 'caption' => 'Farbe',
                                 'allowTransparent' => false
                             ]
@@ -1065,7 +1141,11 @@ HTML;
                 ['temperature' => $this->ReadPropertyInteger('TemperaturePoint3'), 'color' => $this->ReadPropertyInteger('TemperatureColor3')],
                 ['temperature' => $this->ReadPropertyInteger('TemperaturePoint4'), 'color' => $this->ReadPropertyInteger('TemperatureColor4')],
                 ['temperature' => $this->ReadPropertyInteger('TemperaturePoint5'), 'color' => $this->ReadPropertyInteger('TemperatureColor5')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint6'), 'color' => $this->ReadPropertyInteger('TemperatureColor6')]
+                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint6'), 'color' => $this->ReadPropertyInteger('TemperatureColor6')],
+                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint7'), 'color' => $this->ReadPropertyInteger('TemperatureColor7')],
+                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint8'), 'color' => $this->ReadPropertyInteger('TemperatureColor8')],
+                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint9'), 'color' => $this->ReadPropertyInteger('TemperatureColor9')],
+                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint10'), 'color' => $this->ReadPropertyInteger('TemperatureColor10')]
             ],
 
             'thermalSolarAvailable'      => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
@@ -1882,12 +1962,16 @@ window.SymconHeatPump = {
                 : [];
 
             const defaults = [
-                {temperature: 20, color: 26316},
-                {temperature: 30, color: 6733823},
-                {temperature: 40, color: 16769126},
-                {temperature: 50, color: 16752412},
-                {temperature: 60, color: 15746116},
-                {temperature: 70, color: 16711680}
+                {temperature: 15, color: 26316},
+                {temperature: 20, color: 2730472},
+                {temperature: 25, color: 3790293},
+                {temperature: 30, color: 12114250},
+                {temperature: 35, color: 16769126},
+                {temperature: 40, color: 16761395},
+                {temperature: 45, color: 16750616},
+                {temperature: 50, color: 16734744},
+                {temperature: 55, color: 15018795},
+                {temperature: 60, color: 16711680}
             ];
 
             const intToRgb = (value, fallback) => {
@@ -1907,10 +1991,14 @@ window.SymconHeatPump = {
 
             const fallbackRgb = [
                 [0, 102, 204],
-                [102, 191, 255],
+                [41, 169, 232],
+                [57, 213, 213],
+                [184, 217, 74],
                 [255, 224, 102],
-                [255, 159, 28],
-                [240, 68, 68],
+                [255, 194, 51],
+                [255, 152, 24],
+                [255, 90, 24],
+                [229, 43, 43],
                 [255, 0, 0]
             ];
 
