@@ -7104,51 +7104,49 @@ window.SymconHeatPump = {
 
             if (mobileLayout) {
                 /*
-                 * Auf dem Handy keine SVG-Messung verwenden.
-                 * Stattdessen die Statuszeile innerhalb des tatsächlich
-                 * vorgesehenen Rahmens #rectSettings verteilen.
+                 * Auf Mobilgeräten verteilen wir die tatsächlich sichtbaren
+                 * Symbole direkt zwischen linker und rechter Innenkante von
+                 * #rectSettings.
+                 *
+                 * Wichtig: Nicht mehr über angenommene Original-Slots
+                 * verschieben. Stattdessen messen wir die aktuell gerenderte
+                 * Position mit getBoundingClientRect(). Das funktioniert in
+                 * der mobilen Symcon-WebView deutlich zuverlässiger als
+                 * getBBox()/getCTM().
                  */
                 const frame =
                     svg.querySelector('#rectSettings');
 
-                const frameX = frame
-                    ? Number(frame.getAttribute('x'))
-                    : 65.353;
+                if (!frame) {
+                    return;
+                }
 
-                const frameWidth = frame
-                    ? Number(frame.getAttribute('width'))
-                    : 474.29;
+                const frameX =
+                    Number(frame.getAttribute('x'));
+                const frameWidth =
+                    Number(frame.getAttribute('width'));
 
-                /*
-                 * Sicherheitsabstand zu den beiden Rahmenkanten.
-                 * So ragen auch die ca. 34 px breiten Zusatzicons nicht aus
-                 * dem vorgesehenen Bereich.
-                 */
-                /*
-                 * Auf dem Handy etwas mehr Innenabstand als bisher.
-                 * Im Screenshot saß der Wasserhahn links bereits am Rahmen
-                 * und das letzte Sollwertsymbol rechts ebenfalls zu knapp.
-                 */
-                const leftX =
-                    Number.isFinite(frameX)
-                        ? frameX + 38
-                        : 103;
+                const frameRect =
+                    frame.getBoundingClientRect();
 
-                const rightX =
-                    Number.isFinite(frameX)
-                    && Number.isFinite(frameWidth)
-                        ? frameX + frameWidth - 38
-                        : 502;
-
-                const originalDefinitions =
-                    definitions.filter(
-                        (definition) => !definition.custom
-                    );
+                if (
+                    !Number.isFinite(frameX)
+                    || !Number.isFinite(frameWidth)
+                    || !frameRect
+                    || frameRect.width <= 0
+                ) {
+                    return;
+                }
 
                 /*
-                 * Originaltransform zuerst zurücksetzen.
+                 * Zuerst sämtliche Originalsymbole auf ihre unveränderte
+                 * Originalposition zurücksetzen.
                  */
-                originalDefinitions.forEach((definition) => {
+                definitions.forEach((definition) => {
+                    if (definition.custom) {
+                        return;
+                    }
+
                     const element =
                         svg.querySelector(definition.selector);
 
@@ -7173,73 +7171,50 @@ window.SymconHeatPump = {
                 });
 
                 /*
-                 * Sichtbare Icons in der bereits festgelegten Reihenfolge.
-                 * Originalicons haben immer Vorrang.
+                 * Sichtbarkeit auf Mobilgeräten anhand der tatsächlich
+                 * gerenderten Größe bestimmen. So zählen keine leeren/
+                 * unsichtbaren SVG-Gruppen als vermeintlicher zusätzlicher
+                 * Slot mit.
                  */
-                const visibleOriginals =
-                    originalDefinitions.filter(
-                        (definition) =>
-                            isVisible(
-                                svg.querySelector(
-                                    definition.selector
-                                )
-                            )
-                    );
-
-                const visibleCustoms =
-                    definitions.filter(
-                        (definition) =>
-                            definition.custom
-                            && isVisible(
-                                svg.querySelector(
-                                    definition.selector
-                                )
-                            )
-                    );
-
-                /*
-                 * Die Original-Card stellt neun Plätze bereit.
-                 * Wenn diese bereits durch Originalstatus belegt sind,
-                 * werden Zusatzicons wie bisher ausgeblendet.
-                 */
-                const availableCustomCount =
-                    Math.max(
-                        0,
-                        TOP_ICON_SLOTS.length
-                        - visibleOriginals.length
-                    );
-
-                visibleCustoms.forEach((definition, index) => {
+                const isRendered = (definition) => {
                     const element =
                         svg.querySelector(definition.selector);
 
-                    if (!element) {
-                        return;
+                    if (!element || !isVisible(element)) {
+                        return false;
                     }
 
-                    if (index >= availableCustomCount) {
-                        element.style.setProperty(
-                            'display',
-                            'none',
-                            'important'
-                        );
+                    if (definition.custom) {
+                        return true;
                     }
-                });
 
-                const shownCustoms =
-                    visibleCustoms.slice(
-                        0,
-                        availableCustomCount
+                    const rect =
+                        element.getBoundingClientRect();
+
+                    return (
+                        rect
+                        && rect.width > 2
+                        && rect.height > 2
                     );
+                };
 
-                const visibleMobile = [
-                    ...visibleOriginals,
-                    ...shownCustoms
-                ];
+                const visibleMobile =
+                    definitions.filter(isRendered);
 
                 if (visibleMobile.length === 0) {
                     return;
                 }
+
+                /*
+                 * Der Rahmen läuft exakt von frameX bis frameX+frameWidth.
+                 * Wir ziehen nur den halben maximalen Icondurchmesser ab,
+                 * damit kein Symbol den Rahmen berührt.
+                 */
+                const innerMargin = 20;
+                const leftX =
+                    frameX + innerMargin;
+                const rightX =
+                    frameX + frameWidth - innerMargin;
 
                 const gap =
                     visibleMobile.length > 1
@@ -7249,6 +7224,13 @@ window.SymconHeatPump = {
                             visibleMobile.length - 1
                         )
                         : 0;
+
+                /*
+                 * Umrechnung Bildschirm-Pixel <-> lokale SVG-Einheiten
+                 * anhand des echten rectSettings.
+                 */
+                const pxPerSvgUnit =
+                    frameRect.width / frameWidth;
 
                 visibleMobile.forEach(
                     (definition, index) => {
@@ -7270,14 +7252,9 @@ window.SymconHeatPump = {
 
                         if (definition.custom) {
                             /*
-                             * Eigene Sollwerticons liegen bereits auf der
-                             * richtigen Statuszeilenhöhe.
-                             */
-                            /*
-                             * Die beiden eigenen Kreise waren auf Mobilgeräten
-                             * zu tief. Ihre lokale Geometrie ist um y=0
-                             * aufgebaut; die Mitte der Original-Statuszeile
-                             * liegt bei etwa y=77.
+                             * Die selbst erzeugten Sollwertkreise sind um
+                             * x=0/y=0 aufgebaut. Ihre Mitte kommt direkt an
+                             * die Zielposition der Statuszeile.
                              */
                             element.setAttribute(
                                 'transform',
@@ -7288,32 +7265,34 @@ window.SymconHeatPump = {
                             return;
                         }
 
-                        /*
-                         * Für Originalicons keine getBBox/getCTM-Messung.
-                         * Ihre bekannten Original-Mittelpunkte aus
-                         * TOP_ICON_SLOTS reichen für die horizontale
-                         * Verschiebung zuverlässig aus.
-                         */
-                        const originalIndex =
-                            definitions.findIndex(
-                                (item) =>
-                                    item.selector
-                                    === definition.selector
-                            );
+                        const rect =
+                            element.getBoundingClientRect();
 
-                        const originalX =
-                            TOP_ICON_SLOTS[
-                                Math.max(
-                                    0,
-                                    Math.min(
-                                        TOP_ICON_SLOTS.length - 1,
-                                        originalIndex
-                                    )
-                                )
-                            ];
+                        if (
+                            !rect
+                            || rect.width <= 0
+                            || !Number.isFinite(pxPerSvgUnit)
+                            || pxPerSvgUnit <= 0
+                        ) {
+                            return;
+                        }
+
+                        /*
+                         * Aktuelles visuelles Zentrum in lokale
+                         * rectSettings-Koordinaten umrechnen.
+                         */
+                        const currentCenterPx =
+                            rect.left + rect.width / 2;
+
+                        const currentLocalX =
+                            frameX
+                            + (
+                                currentCenterPx
+                                - frameRect.left
+                            ) / pxPerSvgUnit;
 
                         const deltaX =
-                            targetX - originalX;
+                            targetX - currentLocalX;
 
                         const original =
                             element.getAttribute(
