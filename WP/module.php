@@ -1430,6 +1430,16 @@ PHP
     .symcon-flow-reverse {
         animation: symcon-flow-reverse 1.4s linear infinite;
     }
+
+    /*
+     * Kältekreis: Flusspunkte bewusst dünner als bei den übrigen Leitungen,
+     * damit die Temperaturfarbe der 5-px-Leitung klar sichtbar bleibt.
+     */
+    .symcon-flow-overlay.symcon-flow-refrigerant {
+        stroke-width: 1.25 !important;
+        stroke: rgba(255,255,255,.62) !important;
+        stroke-dasharray: 3 9 !important;
+    }
 </style>
 
 <div id="wp-root">
@@ -3258,6 +3268,51 @@ window.SymconHeatPump = {
             input.select();
         };
 
+        const ensureDedicatedTopStatusIcons = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const ww = svg.querySelector('#gHPStatusWW');
+
+            /*
+             * Warmwasser ist im Original nur ein <use> auf #gWaterTap.
+             * Dadurch teilt sich das Statussymbol seine Grafik mit dem
+             * Wasserhahn am Boiler. Für eine eigene Aktivfarbe brauchen wir
+             * eine echte, unabhängige Kopie.
+             */
+            if (
+                ww
+                && String(ww.tagName || '').toLowerCase() === 'use'
+            ) {
+                const source = svg.querySelector('#gWaterTap');
+
+                if (source && ww.parentNode) {
+                    const wrapper = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'g'
+                    );
+
+                    wrapper.setAttribute('id', 'gHPStatusWW');
+                    wrapper.setAttribute(
+                        'transform',
+                        ww.getAttribute('transform') || ''
+                    );
+
+                    const clone = source.cloneNode(true);
+                    clone.removeAttribute('id');
+
+                    clone.querySelectorAll('[id]').forEach((element) => {
+                        element.removeAttribute('id');
+                    });
+
+                    wrapper.appendChild(clone);
+                    ww.parentNode.replaceChild(wrapper, ww);
+                }
+            }
+        };
+
         const setIconColor = (group, color) => {
             if (!group) {
                 return;
@@ -4900,31 +4955,55 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
-
-            const affected = [
-                '#pathHPModelOuterCircle',
-                '#pathHPModelInnerCircle',
-                '#pathHPModelEvaporatorSymbol001',
-                '#pathHPModelEvaporatorSymbol002',
-                '#pathHPModelCondenserSymbol',
-                '#pathCompressor'
-            ];
+            const outer =
+                svg.querySelector('#pathHPModelOuterCircle');
+            const pipe =
+                svg.querySelector('#pathHPModelInnerCircle');
 
             if (!currentConfig.useCustomTemperatureColors) {
-                affected.forEach((selector) => {
+                if (outer) {
+                    outer.style.removeProperty('display');
+                    outer.style.removeProperty('visibility');
+                    outer.style.removeProperty('stroke');
+                    outer.style.removeProperty('stroke-width');
+                    outer.removeAttribute(
+                        'data-symcon-refrigerant-pipe'
+                    );
+                }
+
+                if (pipe) {
+                    pipe.style.removeProperty('stroke');
+                    pipe.style.removeProperty('stroke-width');
+                    pipe.style.removeProperty('stroke-opacity');
+                    pipe.removeAttribute(
+                        'data-symcon-refrigerant-pipe'
+                    );
+                }
+
+                [
+                    '#pathHPModelEvaporatorSymbol001',
+                    '#pathHPModelEvaporatorSymbol002',
+                    '#pathHPModelCondenserSymbol',
+                    '#pathCompressor'
+                ].forEach((selector) => {
                     const element = svg.querySelector(selector);
                     if (element) {
                         element.style.removeProperty('stroke');
                         element.style.removeProperty('fill');
                     }
                 });
+
                 return;
             }
 
             const evaporatorTemperature =
-                readStateNumber(currentConfig.evaporatorTemperature);
+                readStateNumber(
+                    currentConfig.evaporatorTemperature
+                );
             const condenserTemperature =
-                readStateNumber(currentConfig.condenserTemperature);
+                readStateNumber(
+                    currentConfig.condenserTemperature
+                );
 
             const evaporatorColor =
                 temperatureColor(evaporatorTemperature);
@@ -4935,14 +5014,45 @@ window.SymconHeatPump = {
                 return;
             }
 
+            /*
+             * Die ursprüngliche Doppelkontur wird im erweiterten Modus zu
+             * EINER Leitung wie die übrigen Hydraulikleitungen:
+             * - Außenkontur unsichtbar
+             * - Innenkontur = 5 px Rohr
+             */
+            if (outer) {
+                outer.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                outer.style.setProperty(
+                    'visibility',
+                    'hidden',
+                    'important'
+                );
+                outer.removeAttribute(
+                    'data-symcon-refrigerant-pipe'
+                );
+            }
+
             const setStroke = (selector, color) => {
                 const element = svg.querySelector(selector);
+
                 if (!element) {
                     return;
                 }
 
-                element.style.setProperty('stroke', color, 'important');
-                element.style.setProperty('stroke-opacity', '1', 'important');
+                element.style.setProperty(
+                    'stroke',
+                    color,
+                    'important'
+                );
+                element.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
             };
 
             setStroke(
@@ -4959,6 +5069,7 @@ window.SymconHeatPump = {
             );
 
             let defs = svg.querySelector('defs');
+
             if (!defs) {
                 defs = document.createElementNS(
                     'http://www.w3.org/2000/svg',
@@ -4967,14 +5078,6 @@ window.SymconHeatPump = {
                 svg.insertBefore(defs, svg.firstChild);
             }
 
-            /*
-             * Nicht direkt Blau -> Rot interpolieren:
-             * genau das erzeugt das unerwünschte Violett.
-             *
-             * Stattdessen werden Zwischenstopps aus der konfigurierten
-             * Temperatur-Farbskala verwendet. Der Verlauf folgt damit
-             * tatsächlich den Farben aus "Temperaturfarben".
-             */
             const createPaletteGradient = (
                 id,
                 lowTemperature,
@@ -4988,10 +5091,17 @@ window.SymconHeatPump = {
                         'linearGradient'
                     );
                     gradient.setAttribute('id', id);
-                    gradient.setAttribute('x1', '0%');
-                    gradient.setAttribute('y1', '0%');
-                    gradient.setAttribute('x2', '100%');
-                    gradient.setAttribute('y2', '0%');
+                    gradient.setAttribute(
+                        'gradientUnits',
+                        'userSpaceOnUse'
+                    );
+                    /*
+                     * Linke Kaltseite -> rechte Heißseite.
+                     */
+                    gradient.setAttribute('x1', '240');
+                    gradient.setAttribute('y1', '0');
+                    gradient.setAttribute('x2', '540');
+                    gradient.setAttribute('y2', '0');
                     defs.appendChild(gradient);
                 }
 
@@ -5005,22 +5115,22 @@ window.SymconHeatPump = {
                 const max = Math.max(low, high);
                 const span = Math.max(0.001, max - min);
 
-                const configured = getTemperatureColorStops()
+                let configured = getTemperatureColorStops()
                     .filter((stop) =>
                         Number(stop.temperature) > min
                         && Number(stop.temperature) < max
                     );
+
+                if (low > high) {
+                    configured = configured.reverse();
+                }
 
                 const stops = [
                     {
                         temperature: low,
                         color: temperatureColor(low)
                     },
-                    ...(
-                        low <= high
-                            ? configured
-                            : configured.reverse()
-                    ),
+                    ...configured,
                     {
                         temperature: high,
                         color: temperatureColor(high)
@@ -5028,23 +5138,27 @@ window.SymconHeatPump = {
                 ];
 
                 stops.forEach((item) => {
-                    const stop = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'stop'
-                    );
+                    const stop =
+                        document.createElementNS(
+                            'http://www.w3.org/2000/svg',
+                            'stop'
+                        );
 
                     const offset =
-                        Math.abs(Number(item.temperature) - low) / span;
+                        Math.abs(
+                            Number(item.temperature) - low
+                        ) / span;
 
                     stop.setAttribute(
                         'offset',
-                        Math.max(0, Math.min(1, offset)) * 100 + '%'
+                        Math.max(
+                            0,
+                            Math.min(1, offset)
+                        ) * 100 + '%'
                     );
-                    stop.setAttribute('stop-color', item.color);
-                    stop.style.setProperty(
+                    stop.setAttribute(
                         'stop-color',
-                        item.color,
-                        'important'
+                        item.color
                     );
 
                     gradient.appendChild(stop);
@@ -5053,56 +5167,67 @@ window.SymconHeatPump = {
                 return 'url(#' + id + ')';
             };
 
-            const circuitGradient = createPaletteGradient(
+            const pipeGradient = createPaletteGradient(
                 'symconRefrigerantTemperatureGradient',
                 evaporatorTemperature,
                 condenserTemperature
             );
 
-            /*
-             * Diese beiden Pfade SIND der sichtbare Kältekreis der
-             * Original-SVG. Sie werden direkt eingefärbt; keine heuristische
-             * Suche nach "weißen" Pfaden mehr.
-             */
-            [
-                '#pathHPModelOuterCircle',
-                '#pathHPModelInnerCircle'
-            ].forEach((selector) => {
-                const element = svg.querySelector(selector);
-                if (!element) {
-                    return;
-                }
-
-                element.style.setProperty(
-                    'stroke',
-                    circuitGradient,
+            if (pipe) {
+                pipe.style.setProperty(
+                    'fill',
+                    'none',
                     'important'
                 );
-                element.style.setProperty(
+                pipe.style.setProperty(
+                    'stroke',
+                    pipeGradient,
+                    'important'
+                );
+                pipe.style.setProperty(
+                    'stroke-width',
+                    '5',
+                    'important'
+                );
+                pipe.style.setProperty(
                     'stroke-opacity',
                     '1',
                     'important'
                 );
-                element.setAttribute(
+                pipe.style.setProperty(
+                    'stroke-linecap',
+                    'round',
+                    'important'
+                );
+                pipe.style.setProperty(
+                    'stroke-linejoin',
+                    'round',
+                    'important'
+                );
+
+                pipe.setAttribute(
                     'data-symcon-refrigerant-pipe',
                     '1'
                 );
-            });
+            }
 
-            const compressorGradient = createPaletteGradient(
-                'symconCompressorTemperatureGradient',
-                evaporatorTemperature,
-                condenserTemperature
-            );
+            const compressorGradient =
+                createPaletteGradient(
+                    'symconCompressorTemperatureGradient',
+                    evaporatorTemperature,
+                    condenserTemperature
+                );
 
-            const compressorSpiral = svg.querySelector('#pathCompressor');
-            if (compressorSpiral) {
-                compressorSpiral.style.setProperty(
+            const compressor =
+                svg.querySelector('#pathCompressor');
+
+            if (compressor) {
+                compressor.style.setProperty(
                     'stroke',
                     compressorGradient,
                     'important'
                 );
-                compressorSpiral.style.setProperty(
+                compressor.style.setProperty(
                     'stroke-opacity',
                     '1',
                     'important'
@@ -5168,27 +5293,40 @@ window.SymconHeatPump = {
              * ------------------------------------------------------------
              * KÄLTEKREIS
              * ------------------------------------------------------------
-             * Keine alternierenden Richtungen mehr nach DOM-Index.
-             * Das war die Ursache für die zwei gegeneinander laufenden
-             * Kreisbewegungen. Die echten Leitungen laufen einheitlich.
+             * Nur EINE farbige Leitung und EIN Fluss-Overlay.
              */
             svg.querySelectorAll(
-                '[data-symcon-refrigerant-pipe="1"]'
-            ).forEach((pipe, index) => {
-                const id = 'symconFlowRefrigerant' + index;
-
-                if (!pipe.id) {
-                    pipe.id = 'symconRefrigerantPipe' + index;
+                '[id^="symconFlowRefrigerant"]'
+            ).forEach((oldOverlay) => {
+                if (
+                    oldOverlay.id !==
+                    'symconFlowRefrigerantMain'
+                    && oldOverlay.parentNode
+                ) {
+                    oldOverlay.parentNode.removeChild(
+                        oldOverlay
+                    );
                 }
-
-                ensureFlowOverlay(
-                    svg,
-                    '#' + pipe.id,
-                    id,
-                    'forward',
-                    compressorRunning
-                );
             });
+
+            ensureFlowOverlay(
+                svg,
+                '#pathHPModelInnerCircle',
+                'symconFlowRefrigerantMain',
+                'forward',
+                compressorRunning
+            );
+
+            const refrigerantOverlay =
+                svg.querySelector(
+                    '#symconFlowRefrigerantMain'
+                );
+
+            if (refrigerantOverlay) {
+                refrigerantOverlay.classList.add(
+                    'symcon-flow-refrigerant'
+                );
+            }
 
             /*
              * Die beiden Wärmetauscher-Wendel in der Wärmepumpe explizit
@@ -6365,48 +6503,61 @@ window.SymconHeatPump = {
                 return;
             }
 
+            ensureDedicatedTopStatusIcons(card);
+
             const enabledColor = resolveLayoutTextColor();
 
             const definitions = [
                 {
                     functionName: 'heating',
                     selector: '#gHPStatusHeating',
+                    dataKey: 'heatingPumpHeatingMode',
                     activeKey: 'heatingActive',
                     runningColor: '#ff9500'
                 },
                 {
                     functionName: 'hotwater',
                     selector: '#gHPStatusWW',
+                    dataKey: 'heatingPumpHotWaterMode',
                     activeKey: 'hotwaterActive',
                     runningColor: '#ff9500'
                 },
                 {
                     functionName: 'cooling',
                     selector: '#gHPStatusCooling',
+                    dataKey: 'heatingPumpCoolingMode',
                     activeKey: 'coolingActive',
                     runningColor: '#0a84ff'
                 }
             ];
 
             definitions.forEach((definition) => {
-                const group = card.content.querySelector(definition.selector);
+                const group =
+                    card.content.querySelector(definition.selector);
+
                 if (!group) {
-                    console.warn('Statussymbol nicht gefunden:', definition.selector);
                     return;
                 }
 
-                const control = currentControls && currentControls[definition.functionName];
+                const control =
+                    currentControls
+                    && currentControls[definition.functionName];
 
                 /*
-                 * Läuft gerade wirklich = kanonischer Datenwert aus
-                 * BuildVisualizationData(). Nicht über die Konfiguration
-                 * zurückauflösen, damit sowohl Betriebsstatus-Fallback als
-                 * auch direkt konfigurierte Bool-Variablen funktionieren.
+                 * Zwei Quellen absichtlich parallel:
+                 * 1. der echte Binärstatus aus currentData
+                 * 2. der von PHP aus dem zentralen Betriebsstatus berechnete
+                 *    Active-Wert.
+                 *
+                 * Sobald EINE Quelle aktiv meldet, wird das Statussymbol
+                 * eingefärbt.
                  */
-                const running = !!(
-                    currentControls
-                    && currentControls[definition.activeKey] === true
-                );
+                const running =
+                    stateIsOn(definition.dataKey)
+                    || !!(
+                        currentControls
+                        && currentControls[definition.activeKey] === true
+                    );
 
                 const hasControl = !!(
                     control
@@ -6417,58 +6568,141 @@ window.SymconHeatPump = {
 
                 const visible =
                     hasControl
-                    || (currentControls && currentControls.hasOperatingStatus)
+                    || (
+                        currentControls
+                        && currentControls.hasOperatingStatus
+                    )
                     || running;
 
-                group.style.setProperty('display', visible ? 'inline' : 'none', 'important');
+                group.style.setProperty(
+                    'display',
+                    visible ? 'inline' : 'none',
+                    'important'
+                );
 
                 if (!visible) {
                     return;
                 }
 
-                group.style.setProperty('visibility', 'visible', 'important');
+                group.style.setProperty(
+                    'visibility',
+                    'visible',
+                    'important'
+                );
+                group.style.setProperty(
+                    'opacity',
+                    '1',
+                    'important'
+                );
                 group.style.removeProperty('filter');
-                group.style.setProperty('opacity', '1', 'important');
 
-                /*
-                 * Der tatsächliche Betriebszustand hat IMMER Vorrang vor
-                 * der optionalen Bedien-/Freigabevariable.
-                 *
-                 * Beispiel:
-                 * Betriebsstatus = Warmwasser aktiv -> Symbol orange,
-                 * auch wenn die separate Bedienvariable gerade nicht als
-                 * "enabled" erkannt wird.
-                 */
+                let color = enabledColor;
+
                 if (running) {
-                    setIconColor(group, definition.runningColor);
-                    group.style.setProperty('opacity', '1', 'important');
+                    color = definition.runningColor;
+                } else if (hasControl && !control.enabled) {
+                    color = '#777777';
                     group.style.setProperty(
-                        'filter',
-                        'brightness(1.15) saturate(1.15)',
+                        'opacity',
+                        '0.60',
                         'important'
                     );
-                } else if (hasControl && !control.enabled) {
-                    // Nicht laufend und Bedien-/Freigabevariable = AUS.
-                    setIconColor(group, '#777777');
-                    group.style.setProperty('opacity', '0.60', 'important');
-                } else {
-                    // Aktiviert/freigegeben, aber momentan nicht laufend.
-                    setIconColor(group, enabledColor);
+                }
+
+                /*
+                 * Statusleiste wirklich DIREKT einfärben.
+                 * Nicht auf Vererbung vertrauen.
+                 */
+                group.style.setProperty(
+                    'fill',
+                    color,
+                    'important'
+                );
+                group.style.setProperty(
+                    'stroke',
+                    color,
+                    'important'
+                );
+                group.style.setProperty(
+                    'color',
+                    color,
+                    'important'
+                );
+
+                group.querySelectorAll(
+                    'path, rect, circle, ellipse, line, polyline, polygon, use'
+                ).forEach((element) => {
+                    const computed = getComputedStyle(element);
+                    const fill =
+                        String(computed.fill || '').toLowerCase();
+                    const stroke =
+                        String(computed.stroke || '').toLowerCase();
+
+                    if (
+                        fill !== 'none'
+                        && fill !== 'transparent'
+                        && fill !== 'rgba(0, 0, 0, 0)'
+                    ) {
+                        element.setAttribute('fill', color);
+                        element.style.setProperty(
+                            'fill',
+                            color,
+                            'important'
+                        );
+                    }
+
+                    if (
+                        stroke !== 'none'
+                        && stroke !== 'transparent'
+                        && stroke !== 'rgba(0, 0, 0, 0)'
+                    ) {
+                        element.setAttribute('stroke', color);
+                        element.style.setProperty(
+                            'stroke',
+                            color,
+                            'important'
+                        );
+                    }
+                });
+
+                if (running) {
+                    group.style.setProperty(
+                        'filter',
+                        'brightness(1.12) saturate(1.12)',
+                        'important'
+                    );
                 }
 
                 if (hasControl) {
-                    group.style.setProperty('cursor', 'pointer', 'important');
-                    group.style.setProperty('pointer-events', 'all', 'important');
+                    group.style.setProperty(
+                        'cursor',
+                        'pointer',
+                        'important'
+                    );
+                    group.style.setProperty(
+                        'pointer-events',
+                        'all',
+                        'important'
+                    );
 
                     if (!group.dataset.symconControlBound) {
                         group.dataset.symconControlBound = '1';
+
                         group.addEventListener(
                             'click',
-                            (event) => openModeMenu(definition.functionName, event)
+                            (event) =>
+                                openModeMenu(
+                                    definition.functionName,
+                                    event
+                                )
                         );
                     }
                 } else {
-                    group.style.setProperty('cursor', 'default', 'important');
+                    group.style.setProperty(
+                        'cursor',
+                        'default',
+                        'important'
+                    );
                 }
             });
         };
@@ -6641,6 +6875,13 @@ window.SymconHeatPump = {
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
                             applyFlowAnimations(this);
+
+                            /*
+                             * Ganz zuletzt: Aktivfarben der oberen Statusleiste.
+                             * So kann keine nachfolgende SVG-/Layout-Funktion
+                             * die Farbe wieder überschreiben.
+                             */
+                            applyControlIcons(this);
                         }
 
                         return result;
