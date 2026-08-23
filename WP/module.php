@@ -109,6 +109,7 @@ class Waermepumpe extends IPSModuleStrict
         'ThermalSolarPumpSpeed',
         'ThermalSolarPanelTemp',
         'ThermalSolarFluxTemp',
+        'ThermalSolarReturnTemp',
 
         'OperatingStatusVariable',
         'HeatingControlVariable',
@@ -244,6 +245,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ThermalSolarPumpSpeed', 0);
         $this->RegisterPropertyInteger('ThermalSolarPanelTemp', 0);
         $this->RegisterPropertyInteger('ThermalSolarFluxTemp', 0);
+        $this->RegisterPropertyInteger('ThermalSolarReturnTemp', 0);
 
         // HTML-SDK Visualisierung
         $this->SetVisualizationType(1);
@@ -639,7 +641,8 @@ class Waermepumpe extends IPSModuleStrict
                 'items'   => [
                     ['type' => 'CheckBox', 'name' => 'ThermalSolarAvailable', 'caption' => 'Solarthermie'],
                     $this->VariableRow('Solarpumpe aktiv', 'ThermalSolarPump', 'Solarpumpendrehzahl', 'ThermalSolarPumpSpeed'),
-                    $this->VariableRow('Kollektortemperatur', 'ThermalSolarPanelTemp', 'Solar Vorlauf', 'ThermalSolarFluxTemp')
+                    $this->VariableRow('Kollektortemperatur', 'ThermalSolarPanelTemp', 'Solar Vorlauf', 'ThermalSolarFluxTemp'),
+                    $this->VariableRow('Solar Rücklauf', 'ThermalSolarReturnTemp', '', '')
                 ]
             ]
         ];
@@ -2698,6 +2701,184 @@ class Waermepumpe extends IPSModuleStrict
 
     let storedHeatingTemperatures = loadStoredHeatingTemperatures();
 
+    const applyThermalSolarVisualization = (card) => {
+        if (!card || !card.content) {
+            return;
+        }
+
+        const svg = card.content;
+        const solarGroup = svg.querySelector('#gThermalSolar');
+
+        if (!solarGroup) {
+            return;
+        }
+
+        /*
+         * Die Solarthermie-Gruppe wurde beim Einbetten der Original-SVG
+         * zunächst auf display:none gesetzt. Wenn Solarthermie in Symcon
+         * aktiviert ist, halten wir die gesamte Gruppe inklusive der
+         * Solar-Wendel ausdrücklich sichtbar.
+         */
+        if (!currentConfig.thermalSolarAvailable) {
+            solarGroup.style.setProperty('display', 'none', 'important');
+            solarGroup.style.setProperty('visibility', 'hidden', 'important');
+            return;
+        }
+
+        solarGroup.style.setProperty('display', 'inline', 'important');
+        solarGroup.style.setProperty('visibility', 'visible', 'important');
+
+        const solarCoil = svg.querySelector('#usePathPipeThermalSolarTank');
+        if (solarCoil) {
+            solarCoil.style.setProperty('display', 'inline', 'important');
+            solarCoil.style.setProperty('visibility', 'visible', 'important');
+        }
+
+        /*
+         * Bei abgeschalteten eigenen Temperaturfarben bleibt die originale
+         * Farbgebung der Heat-Pump-Card bestehen.
+         */
+        if (!currentConfig.useCustomTemperatureColors) {
+            [
+                '#pathPipeThermalSolarHotWater',
+                '#pathPipeThermalSolarColdWater',
+                '#rectThermalSolarPanel',
+                '#usePathPipeThermalSolarTank'
+            ].forEach((selector) => {
+                const element = svg.querySelector(selector);
+                if (!element) {
+                    return;
+                }
+
+                element.style.removeProperty('stroke');
+                element.style.removeProperty('stroke-opacity');
+                element.style.removeProperty('fill');
+                element.style.removeProperty('fill-opacity');
+            });
+
+            if (solarCoil) {
+                solarCoil.style.setProperty(
+                    'stroke',
+                    'url(#linearGradientPipe1)'
+                );
+            }
+
+            return;
+        }
+
+        const panelTemperature =
+            readStateNumber(currentConfig.thermalSolarPanelTemp);
+
+        const supplyTemperature =
+            readStateNumber(currentConfig.thermalSolarFluxTemp);
+
+        /*
+         * Solar-Rücklauf ist neu optional konfigurierbar.
+         * Fehlt er, verwenden wir die untere Boilertemperatur als sinnvolle
+         * Näherung für das Fluid, das die Solar-Wendel wieder verlässt.
+         */
+        const returnTemperature =
+            readStateNumber(currentConfig.thermalSolarReturnTemp)
+            ?? readStateNumber(currentConfig.tankTempWWDown)
+            ?? readStateNumber(currentConfig.tankTempWWMiddle)
+            ?? readStateNumber(currentConfig.tankTempWWUp);
+
+        const panelColor = temperatureColor(panelTemperature);
+        const supplyColor = temperatureColor(supplyTemperature);
+        const returnColor = temperatureColor(returnTemperature);
+
+        const setStroke = (selector, color) => {
+            const element = svg.querySelector(selector);
+            if (!element || !color) {
+                return;
+            }
+
+            element.style.setProperty('stroke', color, 'important');
+            element.style.setProperty('stroke-opacity', '1', 'important');
+        };
+
+        const setFill = (selector, color) => {
+            const element = svg.querySelector(selector);
+            if (!element || !color) {
+                return;
+            }
+
+            element.style.setProperty('fill', color, 'important');
+            element.style.setProperty('fill-opacity', '1', 'important');
+        };
+
+        /*
+         * Kollektor, Vorlauf und Rücklauf.
+         */
+        setFill('#rectThermalSolarPanel', panelColor);
+        setStroke('#pathPipeThermalSolarHotWater', supplyColor);
+        setStroke('#pathPipeThermalSolarColdWater', returnColor);
+
+        /*
+         * Eigener Gradient nur für die Solar-Wendel.
+         * Damit beeinflusst Solar weder die Wärmepumpen- noch die Boiler-
+         * Wendel.
+         */
+        let gradient = svg.querySelector('#symconLinearGradientThermalSolar');
+
+        if (!gradient) {
+            const sourceGradient = svg.querySelector('#linearGradientPipe1');
+
+            if (sourceGradient) {
+                gradient = sourceGradient.cloneNode(true);
+                gradient.setAttribute(
+                    'id',
+                    'symconLinearGradientThermalSolar'
+                );
+
+                gradient.querySelectorAll('stop').forEach((stop, index) => {
+                    stop.setAttribute(
+                        'id',
+                        'symconThermalSolarStop' + (index + 1)
+                    );
+                });
+
+                sourceGradient.parentNode.appendChild(gradient);
+            }
+        }
+
+        if (gradient && supplyColor && returnColor) {
+            const stops = gradient.querySelectorAll('stop');
+
+            if (stops.length >= 2) {
+                stops[0].style.setProperty(
+                    'stop-color',
+                    supplyColor,
+                    'important'
+                );
+                stops[0].setAttribute('stop-color', supplyColor);
+
+                stops[stops.length - 1].style.setProperty(
+                    'stop-color',
+                    returnColor,
+                    'important'
+                );
+                stops[stops.length - 1].setAttribute(
+                    'stop-color',
+                    returnColor
+                );
+            }
+
+            if (solarCoil) {
+                solarCoil.style.setProperty(
+                    'stroke',
+                    'url(#symconLinearGradientThermalSolar)',
+                    'important'
+                );
+                solarCoil.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
+                );
+            }
+        }
+    };
+
     const applySingleCircuitTemperatureDisplay = (card) => {
         if (!card || !card.content) {
             return;
@@ -3361,6 +3542,7 @@ class Waermepumpe extends IPSModuleStrict
                         applyFanAnimation(this);
                         applyHeatingReturnContinuity(this);
                         applySingleCircuitTemperatureDisplay(this);
+                        applyThermalSolarVisualization(this);
                     }
 
                     return result;
@@ -3395,6 +3577,7 @@ class Waermepumpe extends IPSModuleStrict
                 applyFanAnimation(card);
                 applyHeatingReturnContinuity(card);
                 applySingleCircuitTemperatureDisplay(card);
+                applyThermalSolarVisualization(card);
             }
         } catch (error) {
             showError(
@@ -3585,7 +3768,8 @@ HTML;
             'thermalSolarPump'              => $this->EntityName('ThermalSolarPump'),
             'thermalSolarPumpSpeed'         => $this->EntityName('ThermalSolarPumpSpeed'),
             'thermalSolarPanelTemp'         => $this->EntityName('ThermalSolarPanelTemp'),
-            'thermalSolarFluxTemp'          => $this->EntityName('ThermalSolarFluxTemp')
+            'thermalSolarFluxTemp'          => $this->EntityName('ThermalSolarFluxTemp'),
+            'thermalSolarReturnTemp'        => $this->EntityName('ThermalSolarReturnTemp')
         ];
     }
 
