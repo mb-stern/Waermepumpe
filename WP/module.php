@@ -1325,39 +1325,18 @@ PHP
     }
 
     #wp-mode-menu {
-        display: none;
         position: fixed;
-        z-index: 2147483647;
-        box-sizing: border-box;
-        width: min(360px, calc(100vw - 24px));
-        max-height: min(70vh, 520px);
-        overflow-y: auto;
-        left: 50%;
-        bottom: 12px;
-        transform: translateX(-50%);
-        padding: 8px;
-        border-radius: 12px;
-        border: 1px solid rgba(127,127,127,.35);
-        background: Canvas;
+        z-index: 9999;
+        display: none;
+        min-width: 190px;
+        max-width: 300px;
+        padding: 6px;
+        border-radius: 8px;
+        background: color-mix(in srgb, Canvas 94%, transparent);
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
         color: CanvasText;
-        box-shadow: 0 8px 28px rgba(0,0,0,.28);
         font: 14px Arial, sans-serif;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
     }
-
-    /*
-     * Auf genügend breiten Desktop-Ansichten darf das Menü kompakt
-     * mittig erscheinen. Auf dem Handy bleibt es als Bottom-Sheet unten.
-     */
-    @media (min-width: 700px) {
-        #wp-mode-menu {
-            top: 50%;
-            bottom: auto;
-            transform: translate(-50%, -50%);
-        }
-    }
-
 
     #wp-mode-menu .wp-mode-title {
         padding: 6px 8px;
@@ -3209,42 +3188,6 @@ window.SymconHeatPump = {
                 .includes(String(item.value ?? '').trim().toLowerCase());
         };
 
-        const disableOriginalSettingsLink = (card) => {
-            if (!card || !card.content) {
-                return;
-            }
-
-            const link = card.content.querySelector('#linkSettings');
-
-            if (!link) {
-                return;
-            }
-
-            /*
-             * gSettings is wrapped by the original card in:
-             *   <a id="linkSettings" href="#">
-             *
-             * Mobile WebViews/Symcon can interpret that as a separate
-             * navigation surface (the additional arrow area).
-             * We use our own controls, so the original link must be inert.
-             */
-            link.removeAttribute('href');
-            link.removeAttribute('xlink:href');
-            link.style.setProperty('cursor', 'default', 'important');
-
-            if (!link.dataset.symconNeutralized) {
-                link.dataset.symconNeutralized = '1';
-
-                link.addEventListener('click', (event) => {
-                    event.preventDefault();
-                });
-
-                link.addEventListener('touchend', (event) => {
-                    event.preventDefault();
-                }, {passive: false});
-            }
-        };
-
         const closeModeMenu = () => {
             const menu = document.getElementById('wp-mode-menu');
             if (menu) {
@@ -3323,6 +3266,10 @@ window.SymconHeatPump = {
                 menu.appendChild(button);
             });
 
+            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
+            const y = Math.min(event.clientY + 8, window.innerHeight - 260);
+            menu.style.left = Math.max(8, x) + 'px';
+            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
         };
 
@@ -3432,6 +3379,10 @@ window.SymconHeatPump = {
             });
             menu.appendChild(apply);
 
+            const x = Math.min(event.clientX + 8, window.innerWidth - 310);
+            const y = Math.min(event.clientY + 8, window.innerHeight - 220);
+            menu.style.left = Math.max(8, x) + 'px';
+            menu.style.top = Math.max(8, y) + 'px';
             menu.style.display = 'block';
 
             input.focus();
@@ -7318,12 +7269,8 @@ window.SymconHeatPump = {
                     && control.options.length > 0
                 );
 
-                const configuredMode =
-                    !!currentConfig[definition.dataKey];
-
                 const visible =
-                    configuredMode
-                    || hasControl
+                    hasControl
                     || (
                         currentControls
                         && currentControls.hasOperatingStatus
@@ -7640,7 +7587,6 @@ window.SymconHeatPump = {
                             applyHeatingCircuitTemperatureColors(this);
                             applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
-                            disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
                             layoutTopIconBar(this);
