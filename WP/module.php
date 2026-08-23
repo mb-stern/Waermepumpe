@@ -2847,7 +2847,7 @@ class Waermepumpe extends IPSModuleStrict
                     'text'
                 );
                 element.setAttribute('id', id);
-                element.setAttribute('x', '642');
+                element.setAttribute('x', '680');
                 element.setAttribute('y', String(y));
                 element.setAttribute('text-anchor', 'end');
                 element.setAttribute('xml:space', 'preserve');
@@ -2866,11 +2866,11 @@ class Waermepumpe extends IPSModuleStrict
 
         const boilerSupplyText = ensureText(
             'symconBoilerSupplyTemperature',
-            485
+            438
         );
         const boilerRefluxText = ensureText(
             'symconBoilerRefluxTemperature',
-            507
+            548
         );
 
         if (boilerActive) {
@@ -2881,9 +2881,9 @@ class Waermepumpe extends IPSModuleStrict
              * nur die Anzeige am Heizkreis wird eingefroren.
              */
             boilerSupplyText.textContent =
-                'VL ' + formatTemperature(supplyTemperature);
+                formatTemperature(supplyTemperature);
             boilerRefluxText.textContent =
-                'RL ' + formatTemperature(refluxTemperature);
+                formatTemperature(refluxTemperature);
         } else {
             /*
              * Boiler wird nicht geladen:
@@ -2893,9 +2893,9 @@ class Waermepumpe extends IPSModuleStrict
             const boilerText = formatTemperature(boilerTemperature);
 
             boilerSupplyText.textContent =
-                boilerText ? 'VL ' + boilerText : '';
+                boilerText;
             boilerRefluxText.textContent =
-                boilerText ? 'RL ' + boilerText : '';
+                boilerText;
         }
 
         /*
