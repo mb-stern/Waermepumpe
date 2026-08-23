@@ -1281,10 +1281,61 @@ PHP
     }
 
     #wp-root {
+        position: relative;
         width: 100%;
         height: 100%;
         box-sizing: border-box;
         overflow: hidden;
+    }
+
+    #wp-compact-view {
+        display: none;
+        position: absolute;
+        inset: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 8px 48px;
+        background: transparent !important;
+        color: var(--content-color);
+    }
+
+    #wp-compact-view svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        overflow: visible;
+    }
+
+    #wp-view-toggle {
+        position: absolute;
+        left: 50%;
+        right: auto;
+        bottom: 10px;
+        transform: translateX(-50%);
+        z-index: 10000;
+        min-width: 38px;
+        height: 30px;
+        padding: 0 10px;
+        border: 1px solid rgba(127,127,127,.25);
+        border-radius: 6px;
+        background: rgba(255,255,255,.07);
+        color: var(--content-color, #fff);
+        font: 600 18px Arial, sans-serif;
+        line-height: 28px;
+        text-align: center;
+        cursor: pointer;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
+
+    #wp-view-toggle:active {
+        transform: translateX(-50%) scale(.96);
+        opacity: .65;
     }
 
     #wp-error {
@@ -1475,6 +1526,13 @@ PHP
 <div id="wp-root">
     <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
+    <div id="wp-compact-view" aria-hidden="true"></div>
+    <button
+        id="wp-view-toggle"
+        type="button"
+        title="Ansicht umschalten"
+        aria-label="Ansicht umschalten"
+    >⇄</button>
     <div id="wp-mode-menu"></div>
 </div>
 
@@ -2480,6 +2538,29 @@ window.SymconHeatPump = {
         let embeddedLocalization = payload.localization || {};
         let currentData = payload.data || {};
 
+        /*
+         * Umschaltansicht wie beim Energiefluss-Modul:
+         * full    = komplette Wärmepumpengrafik
+         * compact = nur die obere Status-/Temperaturansicht
+         *
+         * Die Auswahl wird lokal im Browser/Handy gespeichert.
+         */
+        const VIEW_STORAGE_KEY = 'symcon-waermepumpe-view';
+        let currentView = 'full';
+
+        try {
+            const storedView =
+                window.localStorage.getItem(VIEW_STORAGE_KEY);
+
+            if (
+                storedView === 'compact'
+                || storedView === 'full'
+            ) {
+                currentView = storedView;
+            }
+        } catch (error) {
+            // LocalStorage ist optional.
+        }
 
         const errorBox = document.getElementById('wp-error');
 
@@ -3163,6 +3244,474 @@ window.SymconHeatPump = {
                     );
                 }
             });
+        };
+
+        const renderCompactView = (card) => {
+            const host =
+                document.getElementById('wp-compact-view');
+
+            if (
+                !host
+                || !card
+                || !card.content
+            ) {
+                return;
+            }
+
+            const sourceSvg = card.content;
+            const sourceSettings =
+                sourceSvg.querySelector('#gSettings');
+
+            if (!sourceSettings) {
+                return;
+            }
+
+            /*
+             * KOMPAKTANSICHT WIRD EIGENSTÄNDIG NEU GERENDERT.
+             * ----------------------------------------------------------
+             * Kein Zoomen der Vollansicht und kein viewBox-Umschalten
+             * am Original-SVG.
+             *
+             * Wir erzeugen ein eigenes SVG und übernehmen nur den bereits
+             * fertig aufbereiteten Kopfbereich. Dadurch bleibt die
+             * Vollansicht komplett unangetastet.
+             */
+            host.innerHTML = '';
+
+            const ns =
+                'http://www.w3.org/2000/svg';
+            const xlinkNs =
+                'http://www.w3.org/1999/xlink';
+
+            const compactSvg =
+                document.createElementNS(ns, 'svg');
+
+            /*
+             * Die Original-SVG definiert einen großen Teil ihrer Optik in
+             * einem eigenen <style>-Element. Beim bisherigen Clone des
+             * gSettings-Blocks fehlte dieses Stylesheet komplett – daher
+             * andere Hintergrund-/Textfarben in der Kompaktansicht.
+             */
+            sourceSvg.querySelectorAll(':scope > style')
+                .forEach((styleElement) => {
+                    compactSvg.appendChild(
+                        styleElement.cloneNode(true)
+                    );
+                });
+
+            const compactTextColor =
+                resolveLayoutTextColor();
+
+            compactSvg.style.setProperty(
+                '--content-color',
+                compactTextColor,
+                'important'
+            );
+            compactSvg.style.setProperty(
+                '--primary-text-color',
+                compactTextColor,
+                'important'
+            );
+            compactSvg.style.setProperty(
+                '--card-background-color',
+                'transparent',
+                'important'
+            );
+            compactSvg.style.setProperty(
+                'background',
+                'transparent',
+                'important'
+            );
+            compactSvg.style.setProperty(
+                'background-color',
+                'transparent',
+                'important'
+            );
+            compactSvg.style.setProperty(
+                'color',
+                compactTextColor,
+                'important'
+            );
+
+            compactSvg.setAttribute(
+                'viewBox',
+                '45 35 515 305'
+            );
+            compactSvg.setAttribute(
+                'preserveAspectRatio',
+                'xMidYMid meet'
+            );
+            compactSvg.setAttribute(
+                'role',
+                'img'
+            );
+
+            /*
+             * Referenzierte SVG-Symbole (<use>) müssen auch im neuen
+             * eigenständigen SVG vorhanden sein. Das betrifft insbesondere
+             * den originalen Warmwasserhahn.
+             */
+            const defs =
+                document.createElementNS(ns, 'defs');
+
+            const originalDefs =
+                sourceSvg.querySelector('defs');
+
+            if (originalDefs) {
+                Array.from(originalDefs.children)
+                    .forEach((child) => {
+                        defs.appendChild(
+                            child.cloneNode(true)
+                        );
+                    });
+            }
+
+            const settingsClone =
+                sourceSettings.cloneNode(true);
+
+            /*
+             * cloneNode() kopiert data-* Attribute, aber keine Eventlistener.
+             * Dadurch war z.B. data-symcon-tap-bound="1" vorhanden und
+             * bindTap() glaubte, das geklonte Icon sei bereits gebunden.
+             * Resultat: Popups reagierten in der Kompaktansicht nicht.
+             */
+            settingsClone
+                .querySelectorAll(
+                    '[data-symcon-tap-bound],'
+                    + '[data-symcon-control-bound]'
+                )
+                .forEach((element) => {
+                    element.removeAttribute(
+                        'data-symcon-tap-bound'
+                    );
+                    element.removeAttribute(
+                        'data-symcon-control-bound'
+                    );
+                });
+
+            settingsClone.removeAttribute(
+                'data-symcon-tap-bound'
+            );
+            settingsClone.removeAttribute(
+                'data-symcon-control-bound'
+            );
+
+            const copiedIds = new Set(
+                Array.from(
+                    defs.querySelectorAll('[id]')
+                ).map((element) => element.id)
+            );
+
+            const copyUseTargets = (root) => {
+                root.querySelectorAll('use')
+                    .forEach((use) => {
+                        const href =
+                            use.getAttribute('href')
+                            || use.getAttributeNS(
+                                xlinkNs,
+                                'href'
+                            )
+                            || use.getAttribute(
+                                'xlink:href'
+                            );
+
+                        if (
+                            !href
+                            || !href.startsWith('#')
+                        ) {
+                            return;
+                        }
+
+                        const id = href.slice(1);
+
+                        if (copiedIds.has(id)) {
+                            return;
+                        }
+
+                        const source =
+                            sourceSvg.querySelector(
+                                '#' + CSS.escape(id)
+                            );
+
+                        if (!source) {
+                            return;
+                        }
+
+                        const clone =
+                            source.cloneNode(true);
+
+                        defs.appendChild(clone);
+                        copiedIds.add(id);
+
+                        /*
+                         * Falls das kopierte Symbol selbst weitere <use>
+                         * enthält, deren Ziele ebenfalls übernehmen.
+                         */
+                        copyUseTargets(clone);
+                    });
+            };
+
+            copyUseTargets(settingsClone);
+
+            if (defs.childNodes.length > 0) {
+                compactSvg.appendChild(defs);
+            }
+
+            compactSvg.appendChild(settingsClone);
+            host.appendChild(compactSvg);
+
+            /*
+             * Nach dem Einhängen die Symcon-Themefarbe auch auf die geklonte
+             * Ansicht anwenden. Damit entspricht hell/dunkel exakt der
+             * Vollansicht.
+             */
+            settingsClone
+                .querySelectorAll('text, tspan')
+                .forEach((element) => {
+                    element.style.setProperty(
+                        'fill',
+                        'var(--content-color)',
+                        'important'
+                    );
+                    element.style.setProperty(
+                        'color',
+                        'var(--content-color)',
+                        'important'
+                    );
+                });
+
+            /*
+             * Die kopierten Symbole bekommen eigene Touch-/Popup-Handler,
+             * weil DOM-Eventlistener beim cloneNode absichtlich nicht
+             * übernommen werden.
+             */
+            [
+                {
+                    selector: '#gHPStatusHeating',
+                    functionName: 'heating'
+                },
+                {
+                    selector: '#gHPStatusWW',
+                    functionName: 'hotwater'
+                },
+                {
+                    selector: '#gHPStatusCooling',
+                    functionName: 'cooling'
+                }
+            ].forEach((definition) => {
+                const element =
+                    compactSvg.querySelector(
+                        definition.selector
+                    );
+
+                const control =
+                    currentControls
+                    && currentControls[
+                        definition.functionName
+                    ];
+
+                if (
+                    !element
+                    || !control
+                    || !control.configured
+                    || !Array.isArray(control.options)
+                    || control.options.length === 0
+                ) {
+                    return;
+                }
+
+                element.style.setProperty(
+                    'cursor',
+                    'pointer',
+                    'important'
+                );
+                element.style.setProperty(
+                    'pointer-events',
+                    'all',
+                    'important'
+                );
+
+                bindTap(
+                    element,
+                    (event) =>
+                        openModeMenu(
+                            definition.functionName,
+                            event
+                        )
+                );
+            });
+
+            [
+                {
+                    selector:
+                        '#gSymconWarmWaterSetpoint',
+                    functionName:
+                        'warmWaterSetpoint'
+                },
+                {
+                    selector:
+                        '#gSymconHeatingCorrection',
+                    functionName:
+                        'heatingTemperatureCorrection'
+                }
+            ].forEach((definition) => {
+                const element =
+                    compactSvg.querySelector(
+                        definition.selector
+                    );
+
+                if (!element) {
+                    return;
+                }
+
+                element.style.setProperty(
+                    'cursor',
+                    'pointer',
+                    'important'
+                );
+                element.style.setProperty(
+                    'pointer-events',
+                    'all',
+                    'important'
+                );
+
+                bindTap(
+                    element,
+                    (event) =>
+                        openNumericMenu(
+                            definition.functionName,
+                            event
+                        )
+                );
+            });
+        };
+
+        const applyViewMode = (card) => {
+            const full =
+                document.getElementById('wp-card');
+            const compact =
+                document.getElementById(
+                    'wp-compact-view'
+                );
+            const toggle =
+                document.getElementById(
+                    'wp-view-toggle'
+                );
+
+            const compactMode =
+                currentView === 'compact';
+
+            if (full) {
+                full.style.setProperty(
+                    'display',
+                    compactMode
+                        ? 'none'
+                        : 'block',
+                    'important'
+                );
+            }
+
+            if (compact) {
+                compact.style.setProperty(
+                    'display',
+                    compactMode
+                        ? 'flex'
+                        : 'none',
+                    'important'
+                );
+                compact.setAttribute(
+                    'aria-hidden',
+                    compactMode
+                        ? 'false'
+                        : 'true'
+                );
+            }
+
+            if (toggle) {
+                toggle.textContent = '⇄';
+                toggle.title =
+                    compactMode
+                        ? 'Komplette Ansicht'
+                        : 'Kompakte Ansicht';
+                toggle.setAttribute(
+                    'aria-label',
+                    toggle.title
+                );
+            }
+        };
+
+        const setupViewToggle = () => {
+            const toggle =
+                document.getElementById('wp-view-toggle');
+
+            if (!toggle || toggle.dataset.symconBound) {
+                return;
+            }
+
+            toggle.dataset.symconBound = '1';
+
+            const switchView = (event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                currentView =
+                    currentView === 'compact'
+                        ? 'full'
+                        : 'compact';
+
+                try {
+                    window.localStorage.setItem(
+                        VIEW_STORAGE_KEY,
+                        currentView
+                    );
+                } catch (error) {
+                    // LocalStorage ist optional.
+                }
+
+                const card =
+                    document.getElementById('wp-card');
+
+                if (currentView === 'compact') {
+                    renderCompactView(card);
+                }
+
+                applyViewMode(card);
+            };
+
+            if (window.PointerEvent) {
+                toggle.addEventListener(
+                    'pointerup',
+                    (event) => {
+                        if (
+                            event.pointerType === 'touch'
+                            || event.pointerType === 'pen'
+                        ) {
+                            switchView(event);
+                        }
+                    }
+                );
+            }
+
+            toggle.addEventListener(
+                'click',
+                (event) => {
+                    /*
+                     * Bei Touch wird der Klick nach pointerup teilweise
+                     * zusätzlich erzeugt. Dann nicht doppelt umschalten.
+                     */
+                    if (
+                        event.detail === 0
+                        && (
+                            'ontouchstart' in window
+                            || navigator.maxTouchPoints > 0
+                        )
+                    ) {
+                        return;
+                    }
+
+                    switchView(event);
+                }
+            );
         };
 
         const rebuildCard = () => {
@@ -7727,6 +8276,14 @@ window.SymconHeatPump = {
                             applyFlowAnimations(this);
 
                             /*
+                             * Die Kompaktansicht ist ein eigener Render.
+                             * Nach jeder Datenaktualisierung neu aus dem
+                             * fertig aufbereiteten Kopfbereich erzeugen.
+                             */
+                            renderCompactView(this);
+                            applyViewMode(this);
+
+                            /*
                              * Ganz zuletzt: Aktivfarben der oberen Statusleiste.
                              * So kann keine nachfolgende SVG-/Layout-Funktion
                              * die Farbe wieder überschreiben.
@@ -7809,6 +8366,7 @@ window.SymconHeatPump = {
             }
         }
 
+        setupViewToggle();
         applyCardData();
   }
 };
