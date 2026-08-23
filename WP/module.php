@@ -5734,7 +5734,6 @@ window.SymconHeatPump = {
 
             const createIcon = (
                 id,
-                x,
                 shortLabel,
                 functionName
             ) => {
@@ -5746,10 +5745,6 @@ window.SymconHeatPump = {
                         'g'
                     );
                     group.setAttribute('id', id);
-                    group.setAttribute(
-                        'transform',
-                        'translate(' + x + ' 78)'
-                    );
 
                     const circle = document.createElementNS(
                         'http://www.w3.org/2000/svg',
@@ -5757,7 +5752,7 @@ window.SymconHeatPump = {
                     );
                     circle.setAttribute('cx', '0');
                     circle.setAttribute('cy', '0');
-                    circle.setAttribute('r', '17');
+                    circle.setAttribute('r', '15');
                     circle.setAttribute('fill', 'none');
                     circle.setAttribute('stroke-width', '2');
 
@@ -5768,7 +5763,7 @@ window.SymconHeatPump = {
                     symbol.setAttribute('x', '0');
                     symbol.setAttribute('y', '4');
                     symbol.setAttribute('text-anchor', 'middle');
-                    symbol.setAttribute('font-size', '10');
+                    symbol.setAttribute('font-size', '9');
                     symbol.setAttribute('font-weight', '600');
                     symbol.textContent = shortLabel;
 
@@ -5778,9 +5773,9 @@ window.SymconHeatPump = {
                     );
                     value.setAttribute('id', id + 'Value');
                     value.setAttribute('x', '0');
-                    value.setAttribute('y', '29');
+                    value.setAttribute('y', '27');
                     value.setAttribute('text-anchor', 'middle');
-                    value.setAttribute('font-size', '11');
+                    value.setAttribute('font-size', '10');
 
                     group.appendChild(circle);
                     group.appendChild(symbol);
@@ -5810,13 +5805,11 @@ window.SymconHeatPump = {
             const definitions = [
                 {
                     id: 'gSymconWarmWaterSetpoint',
-                    x: 420,
                     label: 'WW',
                     functionName: 'warmWaterSetpoint'
                 },
                 {
                     id: 'gSymconHeatingCorrection',
-                    x: 475,
                     label: '±',
                     functionName: 'heatingTemperatureCorrection'
                 }
@@ -5829,7 +5822,6 @@ window.SymconHeatPump = {
 
                 const group = createIcon(
                     definition.id,
-                    definition.x,
                     definition.label,
                     definition.functionName
                 );
@@ -5858,6 +5850,7 @@ window.SymconHeatPump = {
 
                 if (valueElement) {
                     const numeric = Number(control.currentValue);
+
                     const formatted = Number.isFinite(numeric)
                         ? new Intl.NumberFormat('de-CH', {
                             minimumFractionDigits:
@@ -5867,8 +5860,124 @@ window.SymconHeatPump = {
                         : String(control.currentValue ?? '');
 
                     valueElement.textContent =
-                        formatted + (control.unit ? ' ' + control.unit : '');
+                        formatted
+                        + (control.unit ? ' ' + control.unit : '');
                 }
+            });
+        };
+
+        const layoutTopIconBar = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+
+            /*
+             * Logische und reproduzierbare Reihenfolge der kompletten
+             * oberen Icon-Leiste.
+             */
+            const definitions = [
+                ['#gHPStatusOff', 'power'],
+                ['#gHPStatusWW', 'hotwater'],
+                ['#gHPStatusHeating', 'heating'],
+                ['#gHPStatusCooling', 'cooling'],
+                ['#gHPStatusParty', 'party'],
+                ['#gHPStatusSave', 'save'],
+                ['#gTimeSymbolDay', 'day'],
+                ['#gTimeSymbolNight', 'night'],
+                ['#gWarning', 'warning'],
+                ['#gAdditionalHeating', 'additionalHeating'],
+                ['#gDefrost', 'defrost'],
+                ['#gSymconWarmWaterSetpoint', 'warmWaterSetpoint'],
+                ['#gSymconHeatingCorrection', 'heatingTemperatureCorrection']
+            ];
+
+            const isVisible = (element) => {
+                if (!element) {
+                    return false;
+                }
+
+                const style = getComputedStyle(element);
+
+                return (
+                    style.display !== 'none'
+                    && style.visibility !== 'hidden'
+                    && Number(style.opacity || 1) > 0
+                );
+            };
+
+            /*
+             * Tag und Nacht sind alternative Darstellungen derselben
+             * Funktion. Es wird nur das aktuell sichtbare Element verwendet.
+             */
+            const visibleIcons = definitions
+                .map(([selector, key]) => ({
+                    element: svg.querySelector(selector),
+                    key
+                }))
+                .filter((entry) => isVisible(entry.element));
+
+            if (visibleIcons.length === 0) {
+                return;
+            }
+
+            /*
+             * Die Original-Leiste reicht ungefähr von x=55 bis x=395.
+             * Bei wenigen Symbolen bleiben wir linksbündig mit angenehmem
+             * Standardabstand. Bei vielen Symbolen wird der Abstand
+             * automatisch verkleinert, damit alles in die Leiste passt.
+             */
+            const startX = 55;
+            const endX = 395;
+            const preferredGap = 44;
+
+            const gap = visibleIcons.length <= 1
+                ? 0
+                : Math.min(
+                    preferredGap,
+                    (endX - startX) / (visibleIcons.length - 1)
+                );
+
+            visibleIcons.forEach((entry, index) => {
+                const element = entry.element;
+
+                /*
+                 * Originalposition einmal sichern. Danach berechnen wir nur
+                 * eine zusätzliche Translation. So bleiben Skalierung,
+                 * Rotation und interne Geometrie der Original-Icons erhalten.
+                 */
+                if (!element.hasAttribute('data-symcon-original-transform')) {
+                    element.setAttribute(
+                        'data-symcon-original-transform',
+                        element.getAttribute('transform') || ''
+                    );
+                }
+
+                let box;
+                try {
+                    box = element.getBBox();
+                } catch (error) {
+                    return;
+                }
+
+                const targetX = startX + gap * index;
+                const centerX = box.x + box.width / 2;
+                const deltaX = targetX - centerX;
+
+                const originalTransform =
+                    element.getAttribute('data-symcon-original-transform')
+                    || '';
+
+                element.setAttribute(
+                    'transform',
+                    (
+                        originalTransform
+                            ? originalTransform + ' '
+                            : ''
+                    )
+                    + 'translate(' + deltaX + ' 0)'
+                );
             });
         };
 
@@ -6127,6 +6236,7 @@ window.SymconHeatPump = {
                             applyThreeHeaterRods(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
+                            layoutTopIconBar(this);
                             applyFanAnimation(this);
                             applyHeatingReturnContinuity(this);
                             applySingleCircuitTemperatureDisplay(this);
