@@ -1288,6 +1288,26 @@ PHP
         overflow: hidden;
     }
 
+    #wp-compact-view {
+        display: none;
+        position: absolute;
+        inset: 0;
+        box-sizing: border-box;
+        overflow: hidden;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 8px 48px;
+    }
+
+    #wp-compact-view svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        overflow: visible;
+    }
+
     #wp-view-toggle {
         position: absolute;
         left: 50%;
@@ -1504,6 +1524,7 @@ PHP
 <div id="wp-root">
     <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
+    <div id="wp-compact-view" aria-hidden="true"></div>
     <button
         id="wp-view-toggle"
         type="button"
@@ -3223,81 +3244,303 @@ window.SymconHeatPump = {
             });
         };
 
-        const applyViewMode = (card) => {
-            if (!card || !card.content) {
+        const renderCompactView = (card) => {
+            const host =
+                document.getElementById('wp-compact-view');
+
+            if (
+                !host
+                || !card
+                || !card.content
+            ) {
                 return;
             }
 
-            const svg = card.content;
-            const toggle =
-                document.getElementById('wp-view-toggle');
+            const sourceSvg = card.content;
+            const sourceSettings =
+                sourceSvg.querySelector('#gSettings');
 
-            /*
-             * Original-viewBox genau einmal sichern.
-             */
-            if (!svg.dataset.symconOriginalViewBox) {
-                const existing =
-                    svg.getAttribute('viewBox');
-
-                if (existing) {
-                    svg.dataset.symconOriginalViewBox = existing;
-                }
+            if (!sourceSettings) {
+                return;
             }
 
-            if (currentView === 'compact') {
-                /*
-                 * Nur den oberen Originalbereich anzeigen.
-                 *
-                 * rectSettings:
-                 * x=65.353, y=50, width=474.29, height=274.29
-                 *
-                 * Mit etwas Rand oben/seitlich, damit der Rahmen vollständig
-                 * sichtbar bleibt. Alles darunter wird durch den viewBox
-                 * automatisch abgeschnitten – wir verändern keine SVG-Gruppen.
-                 */
-                svg.setAttribute(
-                    'viewBox',
-                    '45 35 515 305'
-                );
-                svg.setAttribute(
-                    'preserveAspectRatio',
-                    'xMidYMid meet'
-                );
+            /*
+             * KOMPAKTANSICHT WIRD EIGENSTÄNDIG NEU GERENDERT.
+             * ----------------------------------------------------------
+             * Kein Zoomen der Vollansicht und kein viewBox-Umschalten
+             * am Original-SVG.
+             *
+             * Wir erzeugen ein eigenes SVG und übernehmen nur den bereits
+             * fertig aufbereiteten Kopfbereich. Dadurch bleibt die
+             * Vollansicht komplett unangetastet.
+             */
+            host.innerHTML = '';
 
-                if (toggle) {
-                    toggle.textContent = '⇄';
-                    toggle.title = 'Komplette Ansicht';
-                    toggle.setAttribute(
-                        'aria-label',
-                        'Komplette Ansicht'
-                    );
+            const ns =
+                'http://www.w3.org/2000/svg';
+            const xlinkNs =
+                'http://www.w3.org/1999/xlink';
+
+            const compactSvg =
+                document.createElementNS(ns, 'svg');
+
+            compactSvg.setAttribute(
+                'viewBox',
+                '45 35 515 305'
+            );
+            compactSvg.setAttribute(
+                'preserveAspectRatio',
+                'xMidYMid meet'
+            );
+            compactSvg.setAttribute(
+                'role',
+                'img'
+            );
+
+            /*
+             * Referenzierte SVG-Symbole (<use>) müssen auch im neuen
+             * eigenständigen SVG vorhanden sein. Das betrifft insbesondere
+             * den originalen Warmwasserhahn.
+             */
+            const defs =
+                document.createElementNS(ns, 'defs');
+
+            const originalDefs =
+                sourceSvg.querySelector('defs');
+
+            if (originalDefs) {
+                Array.from(originalDefs.children)
+                    .forEach((child) => {
+                        defs.appendChild(
+                            child.cloneNode(true)
+                        );
+                    });
+            }
+
+            const settingsClone =
+                sourceSettings.cloneNode(true);
+
+            const copiedIds = new Set(
+                Array.from(
+                    defs.querySelectorAll('[id]')
+                ).map((element) => element.id)
+            );
+
+            const copyUseTargets = (root) => {
+                root.querySelectorAll('use')
+                    .forEach((use) => {
+                        const href =
+                            use.getAttribute('href')
+                            || use.getAttributeNS(
+                                xlinkNs,
+                                'href'
+                            )
+                            || use.getAttribute(
+                                'xlink:href'
+                            );
+
+                        if (
+                            !href
+                            || !href.startsWith('#')
+                        ) {
+                            return;
+                        }
+
+                        const id = href.slice(1);
+
+                        if (copiedIds.has(id)) {
+                            return;
+                        }
+
+                        const source =
+                            sourceSvg.querySelector(
+                                '#' + CSS.escape(id)
+                            );
+
+                        if (!source) {
+                            return;
+                        }
+
+                        const clone =
+                            source.cloneNode(true);
+
+                        defs.appendChild(clone);
+                        copiedIds.add(id);
+
+                        /*
+                         * Falls das kopierte Symbol selbst weitere <use>
+                         * enthält, deren Ziele ebenfalls übernehmen.
+                         */
+                        copyUseTargets(clone);
+                    });
+            };
+
+            copyUseTargets(settingsClone);
+
+            if (defs.childNodes.length > 0) {
+                compactSvg.appendChild(defs);
+            }
+
+            compactSvg.appendChild(settingsClone);
+            host.appendChild(compactSvg);
+
+            /*
+             * Die kopierten Symbole bekommen eigene Touch-/Popup-Handler,
+             * weil DOM-Eventlistener beim cloneNode absichtlich nicht
+             * übernommen werden.
+             */
+            [
+                {
+                    selector: '#gHPStatusHeating',
+                    functionName: 'heating'
+                },
+                {
+                    selector: '#gHPStatusWW',
+                    functionName: 'hotwater'
+                },
+                {
+                    selector: '#gHPStatusCooling',
+                    functionName: 'cooling'
                 }
-            } else {
-                const original =
-                    svg.dataset.symconOriginalViewBox;
-
-                if (original) {
-                    svg.setAttribute(
-                        'viewBox',
-                        original
+            ].forEach((definition) => {
+                const element =
+                    compactSvg.querySelector(
+                        definition.selector
                     );
-                } else {
-                    svg.removeAttribute('viewBox');
+
+                const control =
+                    currentControls
+                    && currentControls[
+                        definition.functionName
+                    ];
+
+                if (
+                    !element
+                    || !control
+                    || !control.configured
+                    || !Array.isArray(control.options)
+                    || control.options.length === 0
+                ) {
+                    return;
                 }
 
-                svg.setAttribute(
-                    'preserveAspectRatio',
-                    'xMidYMid meet'
+                element.style.setProperty(
+                    'cursor',
+                    'pointer',
+                    'important'
+                );
+                element.style.setProperty(
+                    'pointer-events',
+                    'all',
+                    'important'
                 );
 
-                if (toggle) {
-                    toggle.textContent = '⇄';
-                    toggle.title = 'Kompakte Ansicht';
-                    toggle.setAttribute(
-                        'aria-label',
-                        'Kompakte Ansicht'
-                    );
+                bindTap(
+                    element,
+                    (event) =>
+                        openModeMenu(
+                            definition.functionName,
+                            event
+                        )
+                );
+            });
+
+            [
+                {
+                    selector:
+                        '#gSymconWarmWaterSetpoint',
+                    functionName:
+                        'warmWaterSetpoint'
+                },
+                {
+                    selector:
+                        '#gSymconHeatingCorrection',
+                    functionName:
+                        'heatingTemperatureCorrection'
                 }
+            ].forEach((definition) => {
+                const element =
+                    compactSvg.querySelector(
+                        definition.selector
+                    );
+
+                if (!element) {
+                    return;
+                }
+
+                element.style.setProperty(
+                    'cursor',
+                    'pointer',
+                    'important'
+                );
+                element.style.setProperty(
+                    'pointer-events',
+                    'all',
+                    'important'
+                );
+
+                bindTap(
+                    element,
+                    (event) =>
+                        openNumericMenu(
+                            definition.functionName,
+                            event
+                        )
+                );
+            });
+        };
+
+        const applyViewMode = (card) => {
+            const full =
+                document.getElementById('wp-card');
+            const compact =
+                document.getElementById(
+                    'wp-compact-view'
+                );
+            const toggle =
+                document.getElementById(
+                    'wp-view-toggle'
+                );
+
+            const compactMode =
+                currentView === 'compact';
+
+            if (full) {
+                full.style.setProperty(
+                    'display',
+                    compactMode
+                        ? 'none'
+                        : 'block',
+                    'important'
+                );
+            }
+
+            if (compact) {
+                compact.style.setProperty(
+                    'display',
+                    compactMode
+                        ? 'flex'
+                        : 'none',
+                    'important'
+                );
+                compact.setAttribute(
+                    'aria-hidden',
+                    compactMode
+                        ? 'false'
+                        : 'true'
+                );
+            }
+
+            if (toggle) {
+                toggle.textContent = '⇄';
+                toggle.title =
+                    compactMode
+                        ? 'Komplette Ansicht'
+                        : 'Kompakte Ansicht';
+                toggle.setAttribute(
+                    'aria-label',
+                    toggle.title
+                );
             }
         };
 
@@ -3331,6 +3574,10 @@ window.SymconHeatPump = {
 
                 const card =
                     document.getElementById('wp-card');
+
+                if (currentView === 'compact') {
+                    renderCompactView(card);
+                }
 
                 applyViewMode(card);
             };
@@ -7931,6 +8178,13 @@ window.SymconHeatPump = {
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
                             applyFlowAnimations(this);
+
+                            /*
+                             * Die Kompaktansicht ist ein eigener Render.
+                             * Nach jeder Datenaktualisierung neu aus dem
+                             * fertig aufbereiteten Kopfbereich erzeugen.
+                             */
+                            renderCompactView(this);
                             applyViewMode(this);
 
                             /*
