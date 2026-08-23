@@ -6543,6 +6543,50 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
+
+            /*
+             * Aktive elektrische Heizstäbe pulsieren dezent zwischen
+             * Orange und Rot. Nur die Darstellung wird animiert; die
+             * vorhandene Aktivierungs-/Schwellwertlogik bleibt unverändert.
+             */
+            let heaterRodStyle =
+                svg.querySelector('#symconHeaterRodPulseStyle');
+
+            if (!heaterRodStyle) {
+                heaterRodStyle = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'style'
+                );
+                heaterRodStyle.setAttribute(
+                    'id',
+                    'symconHeaterRodPulseStyle'
+                );
+                heaterRodStyle.textContent = `
+                    @keyframes symconHeaterRodPulse {
+                        0%, 100% {
+                            stroke: #ff9800;
+                            filter:
+                                drop-shadow(0 0 1.5px rgba(0,0,0,.95))
+                                drop-shadow(0 0 1px rgba(255,152,0,.35));
+                        }
+                        50% {
+                            stroke: #f04444;
+                            filter:
+                                drop-shadow(0 0 1.5px rgba(0,0,0,.95))
+                                drop-shadow(0 0 3px rgba(240,68,68,.55));
+                        }
+                    }
+
+                    .symcon-heater-rod-active {
+                        animation:
+                            symconHeaterRodPulse 1.8s ease-in-out infinite;
+                    }
+                `;
+                svg.insertBefore(
+                    heaterRodStyle,
+                    svg.firstChild
+                );
+            }
             const tankGroup = svg.querySelector('#gTankWW');
             const original = svg.querySelector('#pathHeaterRodWW');
 
@@ -6664,6 +6708,9 @@ window.SymconHeatPump = {
                 const exists = index < heaterRodCount;
 
                 if (!exists) {
+                    rodInfo.element.classList.remove(
+                        'symcon-heater-rod-active'
+                    );
                     rodInfo.element.style.setProperty('display', 'none', 'important');
                     rodInfo.element.style.setProperty('visibility', 'hidden', 'important');
                     return;
@@ -6673,20 +6720,31 @@ window.SymconHeatPump = {
 
                 rodInfo.element.style.setProperty('display', 'block', 'important');
                 rodInfo.element.style.setProperty('visibility', 'visible', 'important');
-                rodInfo.element.style.setProperty(
-                    'stroke',
-                    active ? rodInfo.activeColor : 'rgba(255,255,255,0.55)',
-                    'important'
-                );
-
-                /*
-                 * Kontur erhöht den Kontrast auch bei rotem/orangem Speicher.
-                 */
-                rodInfo.element.style.setProperty(
-                    'filter',
-                    'drop-shadow(0 0 1.5px rgba(0,0,0,0.95))',
-                    'important'
-                );
+                if (active) {
+                    /*
+                     * Keine Inline-Stroke-Farbe mit !important setzen:
+                     * die Farbe kommt bei aktivem Stab aus der Pulsanimation.
+                     */
+                    rodInfo.element.style.removeProperty('stroke');
+                    rodInfo.element.style.removeProperty('filter');
+                    rodInfo.element.classList.add(
+                        'symcon-heater-rod-active'
+                    );
+                } else {
+                    rodInfo.element.classList.remove(
+                        'symcon-heater-rod-active'
+                    );
+                    rodInfo.element.style.setProperty(
+                        'stroke',
+                        'rgba(255,255,255,0.55)',
+                        'important'
+                    );
+                    rodInfo.element.style.setProperty(
+                        'filter',
+                        'drop-shadow(0 0 1.5px rgba(0,0,0,0.95))',
+                        'important'
+                    );
+                }
             });
         };
 
