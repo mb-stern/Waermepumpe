@@ -532,6 +532,30 @@ class Waermepumpe extends IPSModuleStrict
                         'caption' => 'Eigene Temperaturfarben verwenden'
                     ],
                     [
+                        'type' => 'Button',
+                        'caption' => 'Eigene Farben auf Standardvorlage zurücksetzen',
+                        'onClick' => <<<'JS'
+const defaults = [
+    [15, 26316],
+    [20, 2730472],
+    [25, 3782101],
+    [30, 12114250],
+    [35, 16769126],
+    [40, 16761395],
+    [45, 16750616],
+    [50, 16734744],
+    [55, 15084331],
+    [60, 16711680]
+];
+
+defaults.forEach((item, index) => {
+    const number = index + 1;
+    setValue('TemperaturePoint' + number, item[0]);
+    setValue('TemperatureColor' + number, item[1]);
+});
+JS
+                    ],
+                    [
                         'type' => 'RowLayout',
                         'items' => [
                             [
