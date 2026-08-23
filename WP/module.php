@@ -3273,10 +3273,16 @@ class Waermepumpe extends IPSModuleStrict
              * Position bei jeder Aktualisierung neu setzen. So rutschen die
              * Heizstäbe beim Ändern der Anzahl sofort von unten nach oben.
              */
+            /*
+             * Heizstäbe an der LINKEN Boilerwand:
+             * Eintritt/Austritt liegen bei x=655 und die Schleife ragt
+             * nach rechts in den Speicher. Dadurch bleibt die rechte Seite
+             * für Solar-/Boiler-Wendel und Temperaturtexte frei.
+             */
             rod.setAttribute(
                 'd',
-                'M 745 ' + y + ' H 705 C 699 ' + y + ' 699 ' + (y - 10)
-                + ' 705 ' + (y - 10) + ' H 745'
+                'M 655 ' + y + ' H 695 C 701 ' + y + ' 701 ' + (y - 10)
+                + ' 695 ' + (y - 10) + ' H 655'
             );
 
             rod.style.setProperty('fill', 'none', 'important');
