@@ -565,5 +565,5 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 ## Versionen**
 
 ### Version 1.0 (23.08.2026)**
-
+ 
 - Initiale Version.

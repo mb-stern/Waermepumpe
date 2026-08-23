@@ -4454,6 +4454,45 @@ window.SymconHeatPump = {
             }
         };
 
+        const positionHeatingCircuitTemperatures = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            /*
+             * Durch die einheitliche Anzeige inklusive "°C" benötigt der
+             * Vorlaufwert am Heizkörper / an der Fußbodenheizung etwas mehr
+             * Platz. Deshalb nur die Vorlauftexte leicht nach links schieben.
+             */
+            [
+                '#textSupplyTemperatureHeating',
+                '#textSupplyTemperatureHeating2',
+                '#textSupplyTemperatureHeating3'
+            ].forEach((selector) => {
+                const element = card.content.querySelector(selector);
+                if (!element) {
+                    return;
+                }
+
+                if (!element.hasAttribute('data-symcon-original-x')) {
+                    element.setAttribute(
+                        'data-symcon-original-x',
+                        element.getAttribute('x') || ''
+                    );
+                }
+
+                const originalX = Number(
+                    element.getAttribute('data-symcon-original-x')
+                );
+
+                if (Number.isFinite(originalX)) {
+                    element.setAttribute('x', String(originalX - 10));
+                } else {
+                    element.setAttribute('transform', 'translate(-10 0)');
+                }
+            });
+        };
+
         const applySingleCircuitTemperatureDisplay = (card) => {
             if (!card || !card.content) {
                 return;
@@ -5148,6 +5187,7 @@ window.SymconHeatPump = {
                             applyThermalSolarVisualization(this);
                             applyAdditionalValues(this);
                             normalizeTemperatureUnits(this);
+                            positionHeatingCircuitTemperatures(this);
                         }
 
                         return result;
