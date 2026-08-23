@@ -7085,6 +7085,138 @@ window.SymconHeatPump = {
             });
 
             /*
+             * MOBILE:
+             * In einigen mobilen Symcon-WebViews liefern getBBox()/getCTM()
+             * für SVG-Gruppen unzuverlässige Werte. Das ist die Ursache dafür,
+             * dass mehrere Statussymbole auf dieselbe Position geschoben werden
+             * und am Ende nur noch ein Icon sichtbar ist.
+             *
+             * Auf schmalen Displays verschieben wir deshalb KEIN einziges
+             * Originalsymbol. Es behält exakt seine Position aus der Original-
+             * SVG. Damit stimmt die Position auch 1:1 mit Desktop überein.
+             *
+             * Nur unsere beiden selbst erzeugten Sollwert-Symbole werden in
+             * freie Original-Slots gesetzt.
+             */
+            const mobileLayout =
+                window.matchMedia
+                && window.matchMedia('(max-width: 699px)').matches;
+
+            if (mobileLayout) {
+                const originalDefinitions =
+                    definitions.filter(
+                        (definition) => !definition.custom
+                    );
+
+                /*
+                 * Originale wirklich unangetastet lassen.
+                 */
+                originalDefinitions.forEach((definition) => {
+                    const element =
+                        svg.querySelector(definition.selector);
+
+                    if (!element) {
+                        return;
+                    }
+
+                    const original =
+                        element.getAttribute(
+                            'data-symcon-original-transform'
+                        )
+                        || '';
+
+                    if (original) {
+                        element.setAttribute(
+                            'transform',
+                            original
+                        );
+                    } else {
+                        element.removeAttribute('transform');
+                    }
+                });
+
+                /*
+                 * Belegte Original-Slots anhand der sichtbaren Originalicons.
+                 */
+                const occupied = new Set();
+
+                originalDefinitions.forEach(
+                    (definition, index) => {
+                        const element =
+                            svg.querySelector(
+                                definition.selector
+                            );
+
+                        if (isVisible(element)) {
+                            occupied.add(index);
+                        }
+                    }
+                );
+
+                const freeSlots = TOP_ICON_SLOTS
+                    .map((x, index) => ({x, index}))
+                    .filter(
+                        (slot) => !occupied.has(slot.index)
+                    );
+
+                /*
+                 * Eigene Sollwerticons möglichst rechts in noch freie
+                 * Original-Slots setzen. Keine Originalicons werden dafür
+                 * verschoben.
+                 */
+                const customDefinitions =
+                    definitions.filter(
+                        (definition) =>
+                            definition.custom
+                            && isVisible(
+                                svg.querySelector(
+                                    definition.selector
+                                )
+                            )
+                    );
+
+                const chosenSlots =
+                    freeSlots.slice(
+                        Math.max(
+                            0,
+                            freeSlots.length
+                            - customDefinitions.length
+                        )
+                    );
+
+                customDefinitions.forEach(
+                    (definition, index) => {
+                        const element =
+                            svg.querySelector(
+                                definition.selector
+                            );
+
+                        const slot = chosenSlots[index];
+
+                        if (!element || !slot) {
+                            if (element) {
+                                element.style.setProperty(
+                                    'display',
+                                    'none',
+                                    'important'
+                                );
+                            }
+                            return;
+                        }
+
+                        element.setAttribute(
+                            'transform',
+                            'translate('
+                            + slot.x
+                            + ' 100)'
+                        );
+                    }
+                );
+
+                return;
+            }
+
+            /*
              * Mittelpunkt eines Originalsymbols in den lokalen Koordinaten
              * von #gSettings bestimmen. Das ist wichtig, weil #gSettings in
              * einer Sonderdarstellung selbst verschoben werden kann.
