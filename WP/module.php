@@ -2962,11 +2962,89 @@ window.SymconHeatPump = {
         };
 
         const resolveLayoutTextColor = () => {
-            // Im HTML-SDK erbt document.body die Textfarbe des übergeordneten
-            // Symcon-Layouts nicht zuverlässig. Der Farbschemamodus dagegen wird
-            // vom Browser an die Kachel weitergereicht.
+            /*
+             * Nicht nur prefers-color-scheme verwenden:
+             * Symcon kann ein helles Layout anzeigen, obwohl der Browser
+             * weiterhin "dark" meldet. Genau dann blieben Linien und Texte
+             * weiß auf weiß.
+             *
+             * Deshalb zuerst den tatsächlich sichtbaren Hintergrund der
+             * HTML-Kachel / ihrer Eltern auswerten.
+             */
+            const parseRgb = (value) => {
+                const match = String(value || '').match(
+                    /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/
+                );
+
+                if (!match) {
+                    return null;
+                }
+
+                const alpha =
+                    match[4] === undefined
+                        ? 1
+                        : Number(match[4]);
+
+                if (alpha <= 0.02) {
+                    return null;
+                }
+
+                return {
+                    r: Number(match[1]),
+                    g: Number(match[2]),
+                    b: Number(match[3])
+                };
+            };
+
+            const luminance = (rgb) => {
+                const values = [
+                    rgb.r,
+                    rgb.g,
+                    rgb.b
+                ].map((channel) => {
+                    const value = channel / 255;
+
+                    return value <= 0.03928
+                        ? value / 12.92
+                        : Math.pow(
+                            (value + 0.055) / 1.055,
+                            2.4
+                        );
+                });
+
+                return (
+                    0.2126 * values[0]
+                    + 0.7152 * values[1]
+                    + 0.0722 * values[2]
+                );
+            };
+
+            let element =
+                document.getElementById('wp-root')
+                || document.body;
+
+            while (element) {
+                const background =
+                    getComputedStyle(element).backgroundColor;
+
+                const rgb = parseRgb(background);
+
+                if (rgb) {
+                    return luminance(rgb) > 0.45
+                        ? '#000000'
+                        : '#ffffff';
+                }
+
+                element = element.parentElement;
+            }
+
+            /*
+             * Letzter Fallback, wenn wirklich überall transparent.
+             */
             const dark = window.matchMedia
-                && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                && window.matchMedia(
+                    '(prefers-color-scheme: dark)'
+                ).matches;
 
             return dark ? '#ffffff' : '#000000';
         };
@@ -2984,6 +3062,25 @@ window.SymconHeatPump = {
                 'rgb(0,0,0)',
                 'rgba(0,0,0,1)'
             ].includes(normalized);
+        };
+
+        const isWhite = (value) => {
+            const normalized = String(value || '')
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '');
+
+            return [
+                'white',
+                '#fff',
+                '#ffffff',
+                'rgb(255,255,255)',
+                'rgba(255,255,255,1)'
+            ].includes(normalized);
+        };
+
+        const isNeutralThemeColor = (value) => {
+            return isBlack(value) || isWhite(value);
         };
 
         const applyThemeColors = (card) => {
@@ -3007,9 +3104,30 @@ window.SymconHeatPump = {
                 element.style.setProperty('color', textColor, 'important');
             });
 
-            // Schwarze Linien/Symbole der Original-SVG im Dark Mode weiß machen.
-            // Im Light Mode bleiben sie schwarz.
+            /*
+             * Neutrale Linien/Symbole der Original-SVG an das reale Layout
+             * koppeln:
+             *
+             * dunkles Layout -> weiß
+             * helles Layout  -> schwarz
+             *
+             * Dabei sowohl Schwarz als auch Weiß als neutrale Card-Farbe
+             * erkennen. So werden auch bereits weiß gerenderte Originalteile
+             * im hellen Layout zuverlässig wieder schwarz.
+             *
+             * Temperaturfarben, Flussanimationen und Gradienten bleiben
+             * unangetastet.
+             */
             svg.querySelectorAll('*').forEach((element) => {
+                if (
+                    element.classList
+                    && element.classList.contains(
+                        'symcon-flow-overlay'
+                    )
+                ) {
+                    return;
+                }
+
                 const computed = getComputedStyle(element);
 
                 const fill =
@@ -3022,12 +3140,29 @@ window.SymconHeatPump = {
                     || element.style.stroke
                     || computed.stroke;
 
-                if (isBlack(fill)) {
-                    element.style.setProperty('fill', textColor, 'important');
+                const fillText = String(fill || '');
+                const strokeText = String(stroke || '');
+
+                if (
+                    !fillText.includes('url(')
+                    && isNeutralThemeColor(fillText)
+                ) {
+                    element.style.setProperty(
+                        'fill',
+                        textColor,
+                        'important'
+                    );
                 }
 
-                if (isBlack(stroke)) {
-                    element.style.setProperty('stroke', textColor, 'important');
+                if (
+                    !strokeText.includes('url(')
+                    && isNeutralThemeColor(strokeText)
+                ) {
+                    element.style.setProperty(
+                        'stroke',
+                        textColor,
+                        'important'
+                    );
                 }
             });
         };
