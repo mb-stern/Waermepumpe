@@ -5788,7 +5788,7 @@ window.SymconHeatPump = {
                     circle.setAttribute('cy', '0');
                     circle.setAttribute('r', '17');
                     circle.setAttribute('fill', 'none');
-                    circle.setAttribute('stroke-width', '2');
+                    circle.setAttribute('stroke-width', '2.6');
 
                     /*
                      * Zusatz-Sollwerticon in derselben Größe wie die
@@ -5806,7 +5806,7 @@ window.SymconHeatPump = {
                     value.setAttribute('dominant-baseline', 'central');
                     value.setAttribute('alignment-baseline', 'central');
                     value.setAttribute('font-size', '11');
-                    value.setAttribute('font-weight', '600');
+                    value.setAttribute('font-weight', '700');
 
                     group.appendChild(circle);
                     group.appendChild(value);
