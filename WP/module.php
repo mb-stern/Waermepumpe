@@ -3277,50 +3277,6 @@ window.SymconHeatPump = {
             input.select();
         };
 
-        const ensureDedicatedTopStatusIcons = (card) => {
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-            const ww = svg.querySelector('#gHPStatusWW');
-
-            /*
-             * Warmwasser ist im Original nur ein <use> auf #gWaterTap.
-             * Dadurch teilt sich das Statussymbol seine Grafik mit dem
-             * Wasserhahn am Boiler. Für eine eigene Aktivfarbe brauchen wir
-             * eine echte, unabhängige Kopie.
-             */
-            if (
-                ww
-                && String(ww.tagName || '').toLowerCase() === 'use'
-            ) {
-                const source = svg.querySelector('#gWaterTap');
-
-                if (source && ww.parentNode) {
-                    const wrapper = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'g'
-                    );
-
-                    wrapper.setAttribute('id', 'gHPStatusWW');
-                    wrapper.setAttribute(
-                        'transform',
-                        ww.getAttribute('transform') || ''
-                    );
-
-                    const clone = source.cloneNode(true);
-                    clone.removeAttribute('id');
-
-                    clone.querySelectorAll('[id]').forEach((element) => {
-                        element.removeAttribute('id');
-                    });
-
-                    wrapper.appendChild(clone);
-                    ww.parentNode.replaceChild(wrapper, ww);
-                }
-            }
-        };
 
         const setIconColor = (group, color) => {
             if (!group) {
@@ -7082,8 +7038,6 @@ window.SymconHeatPump = {
                 return;
             }
 
-            ensureDedicatedTopStatusIcons(card);
-
             const enabledColor = resolveLayoutTextColor();
 
             const definitions = [
@@ -7197,8 +7151,11 @@ window.SymconHeatPump = {
                     definition.functionName === 'hotwater';
 
                 /*
-                 * Statusleiste wirklich DIREKT einfärben.
-                 * Nicht auf Vererbung vertrauen.
+                 * Warmwasser bleibt wieder das originale <use>-Symbol der
+                 * Card. Damit sieht der Wasserhahn exakt wieder so aus wie
+                 * vor unserem Färbungsumbau.
+                 *
+                 * Beim <use> wird ausschließlich fill gesetzt.
                  */
                 group.style.setProperty(
                     'fill',
@@ -7206,18 +7163,14 @@ window.SymconHeatPump = {
                     'important'
                 );
 
-                if (isHotWaterStatus) {
-                    group.style.setProperty(
-                        'stroke',
-                        'none',
-                        'important'
-                    );
-                } else {
+                if (!isHotWaterStatus) {
                     group.style.setProperty(
                         'stroke',
                         color,
                         'important'
                     );
+                } else {
+                    group.style.removeProperty('stroke');
                 }
                 group.style.setProperty(
                     'color',
@@ -7225,9 +7178,10 @@ window.SymconHeatPump = {
                     'important'
                 );
 
-                group.querySelectorAll(
-                    'path, rect, circle, ellipse, line, polyline, polygon, use'
-                ).forEach((element) => {
+                if (!isHotWaterStatus) {
+                    group.querySelectorAll(
+                        'path, rect, circle, ellipse, line, polyline, polygon, use'
+                    ).forEach((element) => {
                     const computed = getComputedStyle(element);
                     const fill =
                         String(computed.fill || '').toLowerCase();
@@ -7247,18 +7201,11 @@ window.SymconHeatPump = {
                         );
                     }
 
-                    if (isHotWaterStatus) {
-                        element.removeAttribute('stroke');
-                        element.style.setProperty(
-                            'stroke',
-                            'none',
-                            'important'
-                        );
-                    } else if (
+                    if (!isHotWaterStatus && (
                         stroke !== 'none'
                         && stroke !== 'transparent'
                         && stroke !== 'rgba(0, 0, 0, 0)'
-                    ) {
+                    )) {
                         element.setAttribute('stroke', color);
                         element.style.setProperty(
                             'stroke',
@@ -7266,7 +7213,8 @@ window.SymconHeatPump = {
                             'important'
                         );
                     }
-                });
+                    });
+                }
 
                 if (running) {
                     group.style.setProperty(
