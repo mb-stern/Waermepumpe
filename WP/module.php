@@ -1398,6 +1398,38 @@ PHP
         opacity: .8;
     }
 
+    /*
+     * Dezente Flussanimation für unsere erweiterte Temperaturdarstellung.
+     * Die Original-Card bleibt unangetastet, solange eigene Farben
+     * deaktiviert sind.
+     */
+    @keyframes symcon-flow-forward {
+        from { stroke-dashoffset: 0; }
+        to   { stroke-dashoffset: -24; }
+    }
+
+    @keyframes symcon-flow-reverse {
+        from { stroke-dashoffset: 0; }
+        to   { stroke-dashoffset: 24; }
+    }
+
+    .symcon-flow-overlay {
+        pointer-events: none;
+        fill: none !important;
+        stroke: rgba(255,255,255,.68) !important;
+        stroke-width: 2.2 !important;
+        stroke-dasharray: 4 8 !important;
+        stroke-linecap: round !important;
+        vector-effect: non-scaling-stroke;
+    }
+
+    .symcon-flow-forward {
+        animation: symcon-flow-forward 1.4s linear infinite;
+    }
+
+    .symcon-flow-reverse {
+        animation: symcon-flow-reverse 1.4s linear infinite;
+    }
 </style>
 
 <div id="wp-root">
@@ -4735,6 +4767,64 @@ window.SymconHeatPump = {
             });
         };
 
+        const ensureFlowOverlay = (
+            svg,
+            selector,
+            overlayId,
+            direction = 'forward',
+            active = true
+        ) => {
+            const source = svg.querySelector(selector);
+
+            if (!source) {
+                return;
+            }
+
+            let overlay = svg.querySelector('#' + overlayId);
+
+            if (!overlay) {
+                overlay = source.cloneNode(false);
+                overlay.setAttribute('id', overlayId);
+                overlay.removeAttribute('style');
+
+                if (source.parentNode) {
+                    source.parentNode.insertBefore(
+                        overlay,
+                        source.nextSibling
+                    );
+                }
+            }
+
+            overlay.setAttribute(
+                'class',
+                'symcon-flow-overlay '
+                + (direction === 'reverse'
+                    ? 'symcon-flow-reverse'
+                    : 'symcon-flow-forward')
+            );
+
+            overlay.style.setProperty(
+                'display',
+                active ? 'inline' : 'none',
+                'important'
+            );
+            overlay.style.setProperty(
+                'visibility',
+                active ? 'visible' : 'hidden',
+                'important'
+            );
+        };
+
+        const removeFlowOverlays = (svg) => {
+            svg.querySelectorAll('.symcon-flow-overlay').forEach(
+                (element) => {
+                    if (element && element.parentNode) {
+                        element.parentNode.removeChild(element);
+                    }
+                }
+            );
+        };
+
         const applyRefrigerantTemperatureColors = (card) => {
             if (!card || !card.content) {
                 return;
@@ -4928,6 +5018,23 @@ window.SymconHeatPump = {
             candidates.forEach((element) => {
                 const id = String(element.id || '');
 
+                /*
+                 * Nur echte Kältemittelleitungen markieren.
+                 * Innere Symbole / Kreise / Verdichterteile dürfen NICHT als
+                 * Flusslinie geklont werden, sonst entstehen gegeneinander
+                 * laufende Kreisanimationen.
+                 */
+                const ancestorIds = [];
+                let parent = element.parentElement;
+                while (parent && parent !== refrigerantRoot) {
+                    if (parent.id) {
+                        ancestorIds.push(String(parent.id));
+                    }
+                    parent = parent.parentElement;
+                }
+
+                const structuralContext = ancestorIds.join(' ');
+
                 if (
                     !id
                     || id.includes('Fan')
@@ -4936,6 +5043,7 @@ window.SymconHeatPump = {
                     || id.includes('CondenserSymbol')
                     || id.includes('ExpansionValve')
                     || id.includes('Heater')
+                    || /Fan|Compressor|ExpansionValve/i.test(structuralContext)
                 ) {
                     return;
                 }
@@ -5021,6 +5129,324 @@ window.SymconHeatPump = {
                     '1'
                 );
             });
+        };
+
+        const applyFlowAnimations = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+
+            /*
+             * Flussanimation nur zusammen mit den eigenen Temperaturfarben.
+             */
+            if (!currentConfig.useCustomTemperatureColors) {
+                removeFlowOverlays(svg);
+                return;
+            }
+
+            const compressorRunning =
+                stateIsOn(currentConfig.compressorRunning);
+
+            const circuit1Configured =
+                String(currentConfig.heatingCircuitType1 || 'off') !== 'off';
+            const circuit2Configured =
+                String(currentConfig.heatingCircuitType2 || 'off') !== 'off';
+            const circuit3Configured =
+                String(currentConfig.heatingCircuitType3 || 'off') !== 'off';
+
+            const heatingPump1 =
+                circuit1Configured
+                && stateIsOn(currentConfig.heatingCircuitPumpRunning);
+            const heatingPump2 =
+                circuit2Configured
+                && stateIsOn(currentConfig.heatingCircuitPumpRunning2);
+            const heatingPump3 =
+                circuit3Configured
+                && stateIsOn(currentConfig.heatingCircuitPumpRunning3);
+
+            const anyHeatingActive =
+                heatingPump1 || heatingPump2 || heatingPump3;
+
+            const storagePump =
+                stateIsOn(currentConfig.storageChargingPumpRunning);
+
+            const solarPump =
+                stateIsOn(currentConfig.thermalSolarPump);
+
+            /*
+             * Für die hydraulische Richtung ist – wie bei unserer
+             * Temperatur-/Einfrierlogik – ausschließlich das konfigurierte
+             * Umschaltventil maßgebend.
+             */
+            const valveConfigured = !!currentConfig.wwHeatingValve;
+            const valveToBoiler =
+                valveConfigured
+                && stateIsOn(currentConfig.wwHeatingValve);
+
+            /*
+             * ------------------------------------------------------------
+             * KÄLTEKREIS
+             * ------------------------------------------------------------
+             * Keine alternierenden Richtungen mehr nach DOM-Index.
+             * Das war die Ursache für die zwei gegeneinander laufenden
+             * Kreisbewegungen. Die echten Leitungen laufen einheitlich.
+             */
+            svg.querySelectorAll(
+                '[data-symcon-refrigerant-pipe="1"]'
+            ).forEach((pipe, index) => {
+                const id = 'symconFlowRefrigerant' + index;
+
+                if (!pipe.id) {
+                    pipe.id = 'symconRefrigerantPipe' + index;
+                }
+
+                ensureFlowOverlay(
+                    svg,
+                    '#' + pipe.id,
+                    id,
+                    'forward',
+                    compressorRunning
+                );
+            });
+
+            /*
+             * Die beiden Wärmetauscher-Wendel in der Wärmepumpe explizit
+             * mitnehmen. Sie werden absichtlich NICHT über die generische
+             * Leitungs-Erkennung animiert.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathHPModelEvaporatorSymbol001',
+                'symconFlowEvaporatorCoil1',
+                'forward',
+                compressorRunning
+            );
+            ensureFlowOverlay(
+                svg,
+                '#pathHPModelEvaporatorSymbol002',
+                'symconFlowEvaporatorCoil2',
+                'forward',
+                compressorRunning
+            );
+            ensureFlowOverlay(
+                svg,
+                '#pathHPModelCondenserSymbol',
+                'symconFlowCondenserCoil',
+                'forward',
+                compressorRunning
+            );
+
+            /*
+             * ------------------------------------------------------------
+             * GEMEINSAME HYDRAULIK DIREKT AN DER WÄRMEPUMPE
+             * ------------------------------------------------------------
+             * Diese Stücke gehören sowohl zum Heizbetrieb als auch zur
+             * Boilerladung und dürfen deshalb nicht fehlen.
+             */
+            const hydraulicActive =
+                valveToBoiler || anyHeatingActive || storagePump;
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeHotColdHeatpump',
+                'symconFlowHydraulicSupply',
+                'forward',
+                hydraulicActive
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeRefluxWW',
+                'symconFlowHydraulicReturn',
+                'reverse',
+                hydraulicActive
+            );
+
+            /*
+             * ------------------------------------------------------------
+             * HEIZKREISE
+             * ------------------------------------------------------------
+             * Bei Boilerstellung werden ALLE Heizkreis-Flüsse hart gestoppt,
+             * auch wenn eine Heizkreispumpe noch "aktiv" meldet.
+             */
+            const heatingAllowed = !valveToBoiler;
+
+            const animateCircuit = (
+                number,
+                active,
+                supplySelectors,
+                returnSelectors
+            ) => {
+                const enabled = !!active && heatingAllowed;
+
+                supplySelectors.forEach((selector, index) => {
+                    ensureFlowOverlay(
+                        svg,
+                        selector,
+                        'symconFlowHeatingSupply'
+                            + number + '_' + index,
+                        'forward',
+                        enabled
+                    );
+                });
+
+                returnSelectors.forEach((selector, index) => {
+                    ensureFlowOverlay(
+                        svg,
+                        selector,
+                        'symconFlowHeatingReturn'
+                            + number + '_' + index,
+                        'reverse',
+                        enabled
+                    );
+                });
+            };
+
+            animateCircuit(
+                1,
+                heatingPump1,
+                [
+                    '#pathPipeToHeatingCircuitPump',
+                    '#pathPipeHeatingSupply',
+                    '#pathRadiatorPipeIn1',
+                    '#pathUnderfloorHeating1'
+                ],
+                [
+                    '#pathPipeToHP',
+                    '#pathPipeHeatingReturn',
+                    '#pathRadiatorPipeOut1'
+                ]
+            );
+
+            animateCircuit(
+                2,
+                heatingPump2,
+                [
+                    '#pathPipeToHeatingCircuitPump2',
+                    '#pathPipeHeatingSupply2',
+                    '#pathRadiatorPipeIn2',
+                    '#pathUnderfloorHeating2'
+                ],
+                [
+                    '#pathPipeToHP2',
+                    '#pathPipeHeatingReturn2',
+                    '#pathRadiatorPipeOut2'
+                ]
+            );
+
+            animateCircuit(
+                3,
+                heatingPump3,
+                [
+                    '#pathPipeToHeatingCircuitPump3',
+                    '#pathPipeHeatingSupply3',
+                    '#pathRadiatorPipeIn3',
+                    '#pathUnderfloorHeating3'
+                ],
+                [
+                    '#pathPipeHeatingReturn3',
+                    '#pathRadiatorPipeOut3'
+                ]
+            );
+
+            /*
+             * ------------------------------------------------------------
+             * BOILER / WARMWASSER
+             * ------------------------------------------------------------
+             * Bei Boilerstellung läuft der Fluss ausschließlich über diesen
+             * Zweig. Der Boiler-Wendel selbst wird ebenfalls animiert.
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeHotWaterToTank',
+                'symconFlowBoilerCoil',
+                'forward',
+                valveToBoiler
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeToCirculatingPump',
+                'symconFlowBoilerReturn',
+                'reverse',
+                valveToBoiler
+            );
+
+            /*
+             * ------------------------------------------------------------
+             * PUFFERSPEICHER
+             * ------------------------------------------------------------
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeToBuffer',
+                'symconFlowBufferSupply',
+                'forward',
+                storagePump && !valveToBoiler
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeFromBuffer',
+                'symconFlowBufferReturn',
+                'reverse',
+                storagePump && !valveToBoiler
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeBufferToHeating',
+                'symconFlowBufferToHeating',
+                'forward',
+                storagePump && anyHeatingActive && !valveToBoiler
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeHeatingToBuffer',
+                'symconFlowHeatingToBuffer',
+                'reverse',
+                storagePump && anyHeatingActive && !valveToBoiler
+            );
+
+            /*
+             * ------------------------------------------------------------
+             * SOLARTHERMIE
+             * ------------------------------------------------------------
+             */
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeThermalSolarHotWater',
+                'symconFlowSolarSupply',
+                'forward',
+                solarPump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#pathPipeThermalSolarColdWater',
+                'symconFlowSolarReturn',
+                'reverse',
+                solarPump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#symconThermalSolarTankCoil',
+                'symconFlowSolarCoil',
+                'forward',
+                solarPump
+            );
+
+            ensureFlowOverlay(
+                svg,
+                '#symconThermalSolarHotConnector',
+                'symconFlowSolarConnector',
+                'forward',
+                solarPump
+            );
         };
 
         const applySingleCircuitTemperatureDisplay = (card) => {
@@ -6201,6 +6627,7 @@ window.SymconHeatPump = {
                             applyAdditionalValues(this);
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
+                            applyFlowAnimations(this);
                         }
 
                         return result;
