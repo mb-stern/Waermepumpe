@@ -2722,16 +2722,76 @@ class Waermepumpe extends IPSModuleStrict
         if (!currentConfig.thermalSolarAvailable) {
             solarGroup.style.setProperty('display', 'none', 'important');
             solarGroup.style.setProperty('visibility', 'hidden', 'important');
+
+            const existingCoil =
+                svg.querySelector('#symconThermalSolarTankCoil');
+
+            if (existingCoil) {
+                existingCoil.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                existingCoil.style.setProperty(
+                    'visibility',
+                    'hidden',
+                    'important'
+                );
+            }
+
             return;
         }
 
         solarGroup.style.setProperty('display', 'inline', 'important');
         solarGroup.style.setProperty('visibility', 'visible', 'important');
 
-        const solarCoil = svg.querySelector('#usePathPipeThermalSolarTank');
+        /*
+         * Die Original-SVG verwendet für die Solar-Wendel lediglich ein <use>
+         * in gThermalSolar. Dieses liegt in der SVG-Reihenfolge HINTER der
+         * später gezeichneten, gefüllten Boilerfläche und kann deshalb
+         * vollständig verdeckt werden.
+         *
+         * Wir erzeugen daher einen eigenständigen Pfad direkt in gTankWW,
+         * unmittelbar NACH dem Boiler-Chassis. So liegt die Solar-Wendel
+         * sichtbar über der Speicherfüllung, aber weiterhin sauber innerhalb
+         * des Boilers.
+         */
+        const tankGroup = svg.querySelector('#gTankWW');
+        const tankChassis = svg.querySelector('#pathTankWWChassis');
+        const sourceCoil = svg.querySelector('#pathPipeHotColdHeatpump');
+        const originalSolarUse = svg.querySelector('#usePathPipeThermalSolarTank');
+
+        let solarCoil = svg.querySelector('#symconThermalSolarTankCoil');
+
+        if (!solarCoil && tankGroup && tankChassis && sourceCoil) {
+            solarCoil = sourceCoil.cloneNode(false);
+            solarCoil.setAttribute('id', 'symconThermalSolarTankCoil');
+            solarCoil.setAttribute('transform', 'translate(193,90)');
+            solarCoil.removeAttribute('style');
+
+            if (tankChassis.nextSibling) {
+                tankGroup.insertBefore(solarCoil, tankChassis.nextSibling);
+            } else {
+                tankGroup.appendChild(solarCoil);
+            }
+        }
+
+        /*
+         * Die ursprüngliche <use>-Kopie aus gThermalSolar unterdrücken,
+         * damit bei halbtransparentem Original-Speicher keine doppelte
+         * Wendel sichtbar wird.
+         */
+        if (originalSolarUse) {
+            originalSolarUse.style.setProperty('display', 'none', 'important');
+            originalSolarUse.style.setProperty('visibility', 'hidden', 'important');
+        }
+
         if (solarCoil) {
             solarCoil.style.setProperty('display', 'inline', 'important');
             solarCoil.style.setProperty('visibility', 'visible', 'important');
+            solarCoil.style.setProperty('fill', 'none', 'important');
+            solarCoil.style.setProperty('stroke-width', '5', 'important');
+            solarCoil.style.setProperty('stroke-opacity', '1', 'important');
         }
 
         /*
@@ -2743,7 +2803,7 @@ class Waermepumpe extends IPSModuleStrict
                 '#pathPipeThermalSolarHotWater',
                 '#pathPipeThermalSolarColdWater',
                 '#rectThermalSolarPanel',
-                '#usePathPipeThermalSolarTank'
+                '#symconThermalSolarTankCoil'
             ].forEach((selector) => {
                 const element = svg.querySelector(selector);
                 if (!element) {
@@ -2759,7 +2819,13 @@ class Waermepumpe extends IPSModuleStrict
             if (solarCoil) {
                 solarCoil.style.setProperty(
                     'stroke',
-                    'url(#linearGradientPipe1)'
+                    'url(#linearGradientPipe1)',
+                    'important'
+                );
+                solarCoil.style.setProperty(
+                    'stroke-opacity',
+                    '1',
+                    'important'
                 );
             }
 
@@ -2815,9 +2881,9 @@ class Waermepumpe extends IPSModuleStrict
         setStroke('#pathPipeThermalSolarColdWater', returnColor);
 
         /*
-         * Eigener Gradient nur für die Solar-Wendel.
-         * Damit beeinflusst Solar weder die Wärmepumpen- noch die Boiler-
-         * Wendel.
+         * Eigener Gradient nur für den eigenständigen Solar-Wendel-Pfad.
+         * Damit beeinflusst Solar weder die Wärmepumpen- noch die normale
+         * Boiler-Wendel.
          */
         let gradient = svg.querySelector('#symconLinearGradientThermalSolar');
 
