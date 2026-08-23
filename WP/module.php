@@ -2853,8 +2853,13 @@ class Waermepumpe extends IPSModuleStrict
                  * Gleiche X-Position wie textThermalSolarFluxTemp (x=850),
                  * direkt darunter.
                  */
+                /*
+                 * Rücklauftemperatur auf derselben horizontalen Linie/
+                 * X-Ausrichtung wie die vorhandene Solar-Temperatur,
+                 * aber direkt unterhalb der kühlen Rücklaufleitung.
+                 */
                 solarReturnText.setAttribute('x', '850');
-                solarReturnText.setAttribute('y', '580');
+                solarReturnText.setAttribute('y', '625');
                 solarReturnText.setAttribute('text-anchor', 'end');
                 solarReturnText.setAttribute('xml:space', 'preserve');
                 solarReturnText.style.setProperty(
