@@ -3227,41 +3227,16 @@ window.SymconHeatPump = {
                 return;
             }
 
-            /*
-             * Statussymbole bestehen je nach SVG-Version aus unterschiedlich
-             * verschachtelten Pfaden. Darum sowohl die Gruppe selbst als auch
-             * sämtliche grafischen Kindelemente mit currentColor versorgen
-             * und vorhandene Fill-/Stroke-Flächen direkt überschreiben.
-             */
-            group.style.setProperty('color', color, 'important');
-
-            group.querySelectorAll(
-                'path, rect, circle, ellipse, line, polyline, polygon, use'
-            ).forEach((element) => {
+            group.querySelectorAll('path, rect, circle, line, polyline, polygon, use').forEach((element) => {
                 const computed = getComputedStyle(element);
 
-                const fill = String(computed.fill || '').toLowerCase();
-                const stroke = String(computed.stroke || '').toLowerCase();
-
-                if (
-                    fill
-                    && fill !== 'none'
-                    && fill !== 'rgba(0, 0, 0, 0)'
-                    && fill !== 'transparent'
-                ) {
+                if (computed.fill && computed.fill !== 'none' && computed.fill !== 'rgba(0, 0, 0, 0)') {
                     element.style.setProperty('fill', color, 'important');
                 }
 
-                if (
-                    stroke
-                    && stroke !== 'none'
-                    && stroke !== 'rgba(0, 0, 0, 0)'
-                    && stroke !== 'transparent'
-                ) {
+                if (computed.stroke && computed.stroke !== 'none' && computed.stroke !== 'rgba(0, 0, 0, 0)') {
                     element.style.setProperty('stroke', color, 'important');
                 }
-
-                element.style.setProperty('color', color, 'important');
             });
         };
 
@@ -6468,27 +6443,18 @@ window.SymconHeatPump = {
                 group.style.removeProperty('filter');
                 group.style.setProperty('opacity', '1', 'important');
 
-                /*
-                 * Der tatsächliche Betriebszustand hat IMMER Vorrang vor
-                 * der optionalen Bedien-/Freigabevariable.
-                 *
-                 * Beispiel:
-                 * Betriebsstatus = Warmwasser aktiv -> Symbol orange,
-                 * auch wenn die separate Bedienvariable gerade nicht als
-                 * "enabled" erkannt wird.
-                 */
-                if (running) {
+                if (hasControl && !control.enabled) {
+                    // Nicht aktiviert / Steuerung = AUS.
+                    setIconColor(group, '#777777');
+                    group.style.setProperty('opacity', '0.60', 'important');
+                } else if (running) {
+                    // Funktion läuft gerade tatsächlich.
                     setIconColor(group, definition.runningColor);
-                    group.style.setProperty('opacity', '1', 'important');
                     group.style.setProperty(
                         'filter',
                         'brightness(1.15) saturate(1.15)',
                         'important'
                     );
-                } else if (hasControl && !control.enabled) {
-                    // Nicht laufend und Bedien-/Freigabevariable = AUS.
-                    setIconColor(group, '#777777');
-                    group.style.setProperty('opacity', '0.60', 'important');
                 } else {
                     // Aktiviert/freigegeben, aber momentan nicht laufend.
                     setIconColor(group, enabledColor);
