@@ -49,7 +49,6 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingPumpCoolingMode',
         'HeatingPumpPartyMode',
         'HeatingPumpEnergySaveMode',
-        'HeatingPumpNightMode',
         'HeatingProgramStatusVariable',
 
         'Warning',
