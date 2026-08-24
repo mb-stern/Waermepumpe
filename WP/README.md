@@ -557,6 +557,7 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 
 - Es kann auf jedem Gerät eine individuelle Ansicht gewählt werden. Werden pro View mehrere unterschiedliche Ansichten gewünscht, muss die Instanz geklont werden. Die Kacheln in der Visu identifizieren sich nun über die Instanz.
 - Zuätzlich zu den Heizstäben im Warmwasserspeicher wird im Bedienfeld entsprechend ein Icon eingeblendet falls Heizstäbe konfiguriert sind.
+- Tag und Nachtmodus lässt sich nun über einen Integer konfigurieren.
 
 ### Version 1.0 (23.08.2026)
 
