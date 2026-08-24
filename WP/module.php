@@ -20,7 +20,6 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingPumpCoolingMode',
         'HeatingPumpPartyMode',
         'HeatingPumpEnergySaveMode',
-        'HeatingPumpNightMode',
         'Warning',
         'Error',
         'DefrostMode',
@@ -51,6 +50,7 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingPumpPartyMode',
         'HeatingPumpEnergySaveMode',
         'HeatingPumpNightMode',
+        'HeatingProgramStatusVariable',
 
         'Warning',
         'Error',
@@ -170,7 +170,11 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('HeatingPumpCoolingMode', 0);
         $this->RegisterPropertyInteger('HeatingPumpPartyMode', 0);
         $this->RegisterPropertyInteger('HeatingPumpEnergySaveMode', 0);
-        $this->RegisterPropertyInteger('HeatingPumpNightMode', 0);
+        // Heizprogramm-Status, z. B. Luxtronik opStateHeating / Calculation 125.
+        // Die Werte können wie beim zentralen Betriebsstatus frei definiert werden.
+        $this->RegisterPropertyInteger('HeatingProgramStatusVariable', 0);
+        $this->RegisterPropertyString('HeatingProgramDayValues', '1');
+        $this->RegisterPropertyString('HeatingProgramNightValues', '2');
 
         $this->RegisterPropertyInteger('Warning', 0);
         $this->RegisterPropertyInteger('Error', 0);
@@ -465,8 +469,24 @@ class Waermepumpe extends IPSModuleStrict
                     ['type' => 'Label', 'caption' => 'Betriebszustände'],
                     $this->VariableGrid([
                         ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff'],
-                        ['caption' => 'Nachtbetrieb aktiv', 'name' => 'HeatingPumpNightMode'],
-
+                        ['caption' => 'Heizprogramm-Status (Integer)', 'name' => 'HeatingProgramStatusVariable'],
+                    ]),
+                    [
+                        'type'  => 'RowLayout',
+                        'items' => [
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'HeatingProgramDayValues',
+                                'caption' => 'Tagbetrieb – Statuswerte'
+                            ],
+                            [
+                                'type' => 'ValidationTextBox',
+                                'name' => 'HeatingProgramNightValues',
+                                'caption' => 'Nachtbetrieb – Statuswerte'
+                            ]
+                        ]
+                    ],
+                    $this->VariableGrid([
                         ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
                         ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
 
@@ -1561,7 +1581,12 @@ HTML;
             'heatingPumpCoolingMode'     => $this->HasOperatingStatus() ? 'heatingPumpCoolingMode' : $this->DataKey('HeatingPumpCoolingMode', 'heatingPumpCoolingMode'),
             'heatingPumpPartyMode'       => $this->DataKey('HeatingPumpPartyMode', 'heatingPumpPartyMode'),
             'heatingPumpEnergySaveMode'  => $this->DataKey('HeatingPumpEnergySaveMode', 'heatingPumpEnergySaveMode'),
-            'heatingPumpNightMode'       => $this->DataKey('HeatingPumpNightMode', 'heatingPumpNightMode'),
+            'heatingPumpNightMode'       => $this->HasHeatingProgramStatus()
+                ? 'heatingPumpNightMode'
+                : '',
+            'heatingPumpDayMode'         => $this->HasHeatingProgramStatus()
+                ? 'heatingPumpDayMode'
+                : '',
 
             'warning'                    => $this->DataKey('Warning', 'warning'),
             'error'                      => $this->DataKey('Error', 'error'),
@@ -1691,7 +1716,6 @@ HTML;
             'heatingPumpCoolingMode'     => 'HeatingPumpCoolingMode',
             'heatingPumpPartyMode'       => 'HeatingPumpPartyMode',
             'heatingPumpEnergySaveMode'  => 'HeatingPumpEnergySaveMode',
-            'heatingPumpNightMode'       => 'HeatingPumpNightMode',
             'warning'                    => 'Warning',
             'error'                      => 'Error',
             'defrostMode'                => 'DefrostMode',
@@ -1771,6 +1795,26 @@ HTML;
                 'ambientTemperatureNormal',
                 'AmbientTemperatureActual',
                 false
+            );
+        }
+
+        if ($this->HasHeatingProgramStatus()) {
+            $heatingProgramStatus = GetValue(
+                $this->ReadPropertyInteger('HeatingProgramStatusVariable')
+            );
+
+            $data['heatingPumpDayMode'] = $this->BinaryData(
+                $this->ValueMatchesCsv(
+                    $heatingProgramStatus,
+                    $this->ReadPropertyString('HeatingProgramDayValues')
+                )
+            );
+
+            $data['heatingPumpNightMode'] = $this->BinaryData(
+                $this->ValueMatchesCsv(
+                    $heatingProgramStatus,
+                    $this->ReadPropertyString('HeatingProgramNightValues')
+                )
             );
         }
 
@@ -1855,6 +1899,12 @@ HTML;
     private function HasOperatingStatus(): bool
     {
         $variableId = $this->ReadPropertyInteger('OperatingStatusVariable');
+        return $variableId > 0 && IPS_VariableExists($variableId);
+    }
+
+    private function HasHeatingProgramStatus(): bool
+    {
+        $variableId = $this->ReadPropertyInteger('HeatingProgramStatusVariable');
         return $variableId > 0 && IPS_VariableExists($variableId);
     }
 
@@ -2253,6 +2303,10 @@ class HeatPumpCard extends HTMLElement {
 
     const party = this.binary(c.heatingPumpPartyMode);
     const night = this.binary(c.heatingPumpNightMode);
+    const hasExplicitDayState = !!c.heatingPumpDayMode;
+    const day = hasExplicitDayState
+      ? this.binary(c.heatingPumpDayMode)
+      : !night;
     const warning = this.binary(c.warning);
 
     const show = (selector, visible) => {
@@ -2267,7 +2321,7 @@ class HeatPumpCard extends HTMLElement {
     show('#gHPStatusParty', party);
     show('#gHPStatusSave', this.binary(c.heatingPumpEnergySaveMode));
     show('#gTimeSymbolNight', night);
-    show('#gTimeSymbolDay', !night);
+    show('#gTimeSymbolDay', day);
     show('#gWarning', warning);
     show('#gError', this.binary(c.error) || warning);
     show('#gDefrost', this.binary(c.defrostMode));
@@ -7185,7 +7239,10 @@ window.SymconHeatPump = {
             // Die Original-Card zeigt ohne Variable automatisch die Sonne.
             // In Symcon werden Sonne UND Mond nur angezeigt, wenn eine
             // Nachtbetriebsvariable tatsächlich konfiguriert ist.
-            const nightModeConfigured = !!currentConfig.heatingPumpNightMode;
+            const nightModeConfigured =
+                !!currentConfig.heatingPumpNightMode
+                || !!currentConfig.heatingPumpDayMode;
+
             if (!nightModeConfigured) {
                 setConfiguredVisibility('#gTimeSymbolDay', false);
                 setConfiguredVisibility('#gTimeSymbolNight', false);
