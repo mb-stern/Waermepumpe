@@ -7411,6 +7411,264 @@ window.SymconHeatPump = {
             });
         };
 
+        const applyHeaterRodStatusIcon = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const settings =
+                svg.querySelector('#gSettings');
+
+            if (!settings) {
+                return;
+            }
+
+            /*
+             * Zusatzanzeige im Bereich Tag/Nacht.
+             *
+             * Die Sonne bzw. der Mond liegen ungefähr bei x=100 / y=142.
+             * Die Heizwendel sitzt direkt daneben und gehört bewusst NICHT
+             * zur oberen dynamischen Status-Icon-Leiste.
+             */
+            let group =
+                svg.querySelector(
+                    '#gSymconHeaterRodStatus'
+                );
+
+            if (!group) {
+                group = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'g'
+                );
+                group.setAttribute(
+                    'id',
+                    'gSymconHeaterRodStatus'
+                );
+                group.setAttribute(
+                    'transform',
+                    'translate(155 142)'
+                );
+
+                /*
+                 * Einfache Heizwendel:
+                 * Anschluss links/rechts mit vier weichen Bögen.
+                 */
+                const coil =
+                    document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'path'
+                    );
+
+                coil.setAttribute(
+                    'd',
+                    'M -18 0 '
+                    + 'H -14 '
+                    + 'C -12 -8 -8 -8 -6 0 '
+                    + 'C -4 8 0 8 2 0 '
+                    + 'C 4 -8 8 -8 10 0 '
+                    + 'C 12 8 16 8 18 0 '
+                    + 'H 21'
+                );
+                coil.setAttribute(
+                    'fill',
+                    'none'
+                );
+                coil.setAttribute(
+                    'stroke-width',
+                    '3.2'
+                );
+                coil.setAttribute(
+                    'stroke-linecap',
+                    'round'
+                );
+                coil.setAttribute(
+                    'stroke-linejoin',
+                    'round'
+                );
+
+                group.appendChild(coil);
+                settings.appendChild(group);
+            }
+
+            const heaterRodCount = Math.max(
+                0,
+                Math.min(
+                    3,
+                    Number(
+                        currentConfig.heaterRodCount || 0
+                    )
+                )
+            );
+
+            /*
+             * Wenn überhaupt kein Heizstab konfiguriert ist,
+             * wird auch das Statussymbol nicht angezeigt.
+             */
+            if (heaterRodCount <= 0) {
+                group.style.setProperty(
+                    'display',
+                    'none',
+                    'important'
+                );
+                return;
+            }
+
+            group.style.setProperty(
+                'display',
+                'inline',
+                'important'
+            );
+            group.style.setProperty(
+                'visibility',
+                'visible',
+                'important'
+            );
+
+            const rodEntities = [
+                currentConfig.heaterRod1,
+                currentConfig.heaterRod2,
+                currentConfig.heaterRod3
+            ];
+
+            const rodThresholds = [
+                currentConfig.heaterRod1Threshold,
+                currentConfig.heaterRod2Threshold,
+                currentConfig.heaterRod3Threshold
+            ];
+
+            const isActive = (
+                entity,
+                threshold
+            ) => {
+                if (
+                    !entity
+                    || !currentData
+                    || !currentData[entity]
+                ) {
+                    return false;
+                }
+
+                const raw =
+                    currentData[entity].value;
+
+                const value =
+                    String(raw ?? '')
+                        .trim()
+                        .toLowerCase();
+
+                const numericThreshold =
+                    Number(threshold);
+
+                const limit =
+                    Number.isFinite(
+                        numericThreshold
+                    )
+                        ? numericThreshold
+                        : 1;
+
+                if ([
+                    'true',
+                    'on',
+                    'yes',
+                    'ja',
+                    'ein',
+                    'active',
+                    'aktiv'
+                ].includes(value)) {
+                    return 1 >= limit;
+                }
+
+                if ([
+                    'false',
+                    'off',
+                    'no',
+                    'nein',
+                    'aus',
+                    'inactive',
+                    'inaktiv',
+                    ''
+                ].includes(value)) {
+                    return 0 >= limit;
+                }
+
+                const numeric =
+                    Number(raw);
+
+                return (
+                    Number.isFinite(numeric)
+                    && numeric >= limit
+                );
+            };
+
+            let anyActive = false;
+
+            for (
+                let index = 0;
+                index < heaterRodCount;
+                index++
+            ) {
+                if (
+                    isActive(
+                        rodEntities[index],
+                        rodThresholds[index]
+                    )
+                ) {
+                    anyActive = true;
+                    break;
+                }
+            }
+
+            const coil =
+                group.querySelector('path');
+
+            if (!coil) {
+                return;
+            }
+
+            if (anyActive) {
+                /*
+                 * Mindestens ein Heizstab läuft:
+                 * deutlich orange mit leichtem Leuchteffekt.
+                 */
+                coil.style.setProperty(
+                    'stroke',
+                    '#ff9800',
+                    'important'
+                );
+                coil.style.setProperty(
+                    'opacity',
+                    '1',
+                    'important'
+                );
+                coil.style.setProperty(
+                    'filter',
+                    'drop-shadow(0 0 2px rgba(255,152,0,.75)) '
+                    + 'drop-shadow(0 0 5px rgba(255,152,0,.45))',
+                    'important'
+                );
+            } else {
+                /*
+                 * Heizstäbe vorhanden, aber keiner aktiv:
+                 * Symbol bleibt dezent sichtbar.
+                 */
+                coil.style.setProperty(
+                    'stroke',
+                    resolveLayoutTextColor(),
+                    'important'
+                );
+                coil.style.setProperty(
+                    'opacity',
+                    '.38',
+                    'important'
+                );
+                coil.style.removeProperty(
+                    'filter'
+                );
+            }
+        };
+
+
         /*
          * Die obere Statusleiste der Original-SVG besitzt neun fest
          * vorgesehene Icon-Slots.
@@ -8315,6 +8573,7 @@ window.SymconHeatPump = {
                             applyHeatingCircuitTemperatureColors(this);
                             applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
+                            applyHeaterRodStatusIcon(this);
                             disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
