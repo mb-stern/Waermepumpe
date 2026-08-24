@@ -2539,18 +2539,65 @@ window.SymconHeatPump = {
         let currentData = payload.data || {};
 
         /*
-         * Umschaltansicht wie beim Energiefluss-Modul:
-         * full    = komplette Wärmepumpengrafik
-         * compact = nur die obere Status-/Temperaturansicht
+         * Ansichts-Speicherung nach demselben Instanz-Prinzip wie im
+         * Energiefluss-Modul:
          *
-         * Die Auswahl wird lokal im Browser/Handy gespeichert.
+         *   /visu/36446/ -> instance-36446
+         *
+         * Damit besitzt jede Wärmepumpen-Instanz im selben Browser bzw.
+         * in der Symcon-App ihren eigenen gespeicherten Ansichtsstatus.
          */
         const VIEW_STORAGE_KEY = 'symcon-waermepumpe-view';
+
+        const getHeatPumpInstanceID = () => {
+            try {
+                const match =
+                    window.location.pathname.match(
+                        /\/visu\/(\d+)\/?/
+                    );
+
+                return match ? match[1] : null;
+            } catch (_) {
+                return null;
+            }
+        };
+
+        const getInstanceStorageScope = () => {
+            const instanceID =
+                getHeatPumpInstanceID();
+
+            if (!instanceID) {
+                return null;
+            }
+
+            return `instance-${instanceID}`;
+        };
+
+        const instanceStorageScope =
+            getInstanceStorageScope();
+
+        const instanceViewStorageKey =
+            instanceStorageScope
+                ? `symcon-waermepumpe-${instanceStorageScope}-view`
+                : null;
+
         let currentView = 'full';
 
         try {
+            /*
+             * Instanzspezifischer Zustand hat Vorrang.
+             * Nur wenn keine Instanz-ID aus /visu/<ID>/ ermittelt werden
+             * kann, verwenden wir den bisherigen browserweiten Key als
+             * Sicherheitsfallback.
+             */
             const storedView =
-                window.localStorage.getItem(VIEW_STORAGE_KEY);
+                instanceViewStorageKey
+                    ? window.localStorage.getItem(
+                        instanceViewStorageKey
+                    )
+                    : window.localStorage.getItem(
+                        VIEW_STORAGE_KEY
+                    );
 
             if (
                 storedView === 'compact'
@@ -3660,8 +3707,14 @@ window.SymconHeatPump = {
                         : 'compact';
 
                 try {
+                    /*
+                     * Wenn die Instanz-ID bekannt ist, nur für diese
+                     * Wärmepumpen-Instanz speichern. Der bisherige globale
+                     * Key dient ausschließlich als Fallback.
+                     */
                     window.localStorage.setItem(
-                        VIEW_STORAGE_KEY,
+                        instanceViewStorageKey
+                            || VIEW_STORAGE_KEY,
                         currentView
                     );
                 } catch (error) {
