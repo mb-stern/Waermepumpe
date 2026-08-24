@@ -556,6 +556,7 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 ### Version 1.1 (24.08.2026)
 
 - Es kann auf jedem Gerät eine individuelle Ansicht gewählt werden. Werden pro View mehrere unterschiedliche Ansichten gewünscht, muss die Instanz geklont werden. Die Kacheln in der Visu identifizieren sich nun über die Instanz.
+- Zuätzlich zu den Heizstäben im Warmwasserspeicher wird im Bedienfeld entsprechend ein Icon eingeblendet falls Heizstäbe konfiguriert sind.
 
 ### Version 1.0 (23.08.2026)
 
