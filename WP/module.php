@@ -1931,8 +1931,21 @@ HTML;
 
     private function BuildControlData(): array
     {
+        $hasOperatingStatus = $this->HasOperatingStatus();
+        $operatingStatusValue = null;
+
+        if ($hasOperatingStatus) {
+            $operatingStatusValue = GetValue(
+                $this->ReadPropertyInteger('OperatingStatusVariable')
+            );
+        }
+
         return [
-            'hasOperatingStatus'           => $this->HasOperatingStatus(),
+            'hasOperatingStatus'           => $hasOperatingStatus,
+            'operatingStatusValue'         => $operatingStatusValue,
+            'operatingStatusCoolingValues' => $this->ReadPropertyString(
+                'OperatingStatusCoolingValues'
+            ),
             'heatingActive'                => $this->GetOperatingModeActive(
                 'HeatingPumpHeatingMode',
                 'OperatingStatusHeatingValues'
@@ -7436,9 +7449,44 @@ window.SymconHeatPump = {
              * Beide Beschriftungen müssen gemeinsam die Rolle wechseln,
              * sonst entstehen zwei "Verdampfer"-Texte.
              */
+            /*
+             * Beschriftung ausschließlich über den konfigurierten
+             * Integer-Betriebszustand bestimmen.
+             *
+             * Beispiel:
+             * OperatingStatusCoolingValues = "7"
+             * -> nur Status 7 gilt als Kühlbetrieb.
+             */
+            const operatingStatusValue =
+                currentControls
+                    ? currentControls.operatingStatusValue
+                    : null;
+
+            const coolingStatusValues =
+                currentControls
+                && typeof currentControls.operatingStatusCoolingValues === 'string'
+                    ? currentControls.operatingStatusCoolingValues
+                        .split(',')
+                        .map((value) => value.trim())
+                        .filter((value) => value !== '')
+                    : [];
+
             const coolingActive =
                 currentControls
-                && currentControls.coolingActive === true;
+                && currentControls.hasOperatingStatus === true
+                && coolingStatusValues.some((value) => {
+                    const statusNumber = Number(operatingStatusValue);
+                    const valueNumber = Number(value);
+
+                    if (
+                        Number.isFinite(statusNumber)
+                        && Number.isFinite(valueNumber)
+                    ) {
+                        return statusNumber === valueNumber;
+                    }
+
+                    return String(operatingStatusValue) === value;
+                });
 
             const evaporatorText =
                 card.content.querySelector('#textEvaporator');
