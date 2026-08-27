@@ -555,8 +555,8 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 
 ### Version 1.2 (27.08.2026)
 
-- Die animierten Flusslinien werden nun auch im Heizkörper und bodeheizung daragestellt.
-- Die Flussrichtung und Beschriftung im Kältekreislauf wurde angepast.
+- Die animierten Flusslinien werden nun auch im Heizkörper und Bodenheizung dargestellt.
+- Die Flussrichtung und Beschriftung im Kältekreislauf wurde angepasst.
 
 ### Version 1.1 (24.08.2026)
 
