@@ -5684,6 +5684,49 @@ window.SymconHeatPump = {
             });
         };
 
+        const ensureSvgFlowStyle = (svg) => {
+            if (!svg || svg.querySelector('#symconFlowStyle')) {
+                return;
+            }
+
+            const style = document.createElementNS(
+                'http://www.w3.org/2000/svg',
+                'style'
+            );
+            style.setAttribute('id', 'symconFlowStyle');
+            style.textContent = `
+                @keyframes symcon-svg-flow-forward {
+                    from { stroke-dashoffset: 0; }
+                    to   { stroke-dashoffset: -24; }
+                }
+                @keyframes symcon-svg-flow-reverse {
+                    from { stroke-dashoffset: 0; }
+                    to   { stroke-dashoffset: 24; }
+                }
+                .symcon-flow-overlay {
+                    pointer-events: none;
+                    fill: none !important;
+                    stroke: rgba(255,255,255,.78) !important;
+                    stroke-width: 2.2 !important;
+                    stroke-dasharray: 4 8 !important;
+                    stroke-linecap: round !important;
+                    vector-effect: non-scaling-stroke;
+                }
+                .symcon-flow-forward {
+                    animation: symcon-svg-flow-forward 1.4s linear infinite !important;
+                }
+                .symcon-flow-reverse {
+                    animation: symcon-svg-flow-reverse 1.4s linear infinite !important;
+                }
+                .symcon-flow-emitter {
+                    stroke-width: 1.7 !important;
+                    stroke-dasharray: 3 7 !important;
+                }
+            `;
+
+            svg.insertBefore(style, svg.firstChild);
+        };
+
         const ensureFlowOverlay = (
             svg,
             selector,
@@ -5718,6 +5761,39 @@ window.SymconHeatPump = {
                 + (direction === 'reverse'
                     ? 'symcon-flow-reverse'
                     : 'symcon-flow-forward')
+            );
+
+            overlay.style.setProperty(
+                'animation',
+                direction === 'reverse'
+                    ? 'symcon-svg-flow-reverse 1.4s linear infinite'
+                    : 'symcon-svg-flow-forward 1.4s linear infinite',
+                'important'
+            );
+            overlay.style.setProperty(
+                'fill',
+                'none',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke',
+                'rgba(255,255,255,.78)',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke-width',
+                '2.2',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke-dasharray',
+                '4 8',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke-linecap',
+                'round',
+                'important'
             );
 
             overlay.style.setProperty(
@@ -6261,6 +6337,7 @@ window.SymconHeatPump = {
             }
 
             const svg = card.content;
+            ensureSvgFlowStyle(svg);
 
             /*
              * Flussanimation nur zusammen mit den eigenen Temperaturfarben.
@@ -6610,11 +6687,13 @@ window.SymconHeatPump = {
                          */
                         radiatorWaterPath.setAttribute(
                             'd',
-                            'M 838 82 '
-                            + 'H 930 '
-                            + 'C 934 82 936 84 936 88 '
+                            'M 785 82 '
+                            + 'H 837 '
+                            + 'V 80 '
+                            + 'H 932 '
+                            + 'C 935 80 937 82 937 85 '
                             + 'V 115 '
-                            + 'H 937'
+                            + 'H 998'
                         );
                         radiatorWaterPath.setAttribute('fill', 'none');
                         radiatorWaterPath.style.setProperty(
@@ -6710,28 +6789,19 @@ window.SymconHeatPump = {
                  */
                 const radiatorEnabled = enabled && type === 'radiator';
 
-                ensureFlowOverlay(
-                    svg,
-                    '#pathRadiatorPipeIn' + number,
-                    'symconFlowRadiatorPipeIn' + number,
-                    'forward',
-                    radiatorEnabled
-                );
-                ensureFlowOverlay(
-                    svg,
-                    '#pathRadiatorPipeOut' + number,
-                    'symconFlowRadiatorPipeOut' + number,
-                    'forward',
-                    radiatorEnabled
-                );
-
+                /*
+                 * Beim Heizkörper sind Zu- und Rückleitung bereits Bestandteil
+                 * des zusammenhängenden symconRadiatorWaterPathN. Alte einzelne
+                 * Overlays werden deshalb konsequent ausgeblendet.
+                 */
                 [
                     '#symconFlowRadiatorPipeIn' + number,
                     '#symconFlowRadiatorPipeOut' + number
                 ].forEach((selector) => {
-                    const overlay = svg.querySelector(selector);
-                    if (overlay) {
-                        overlay.classList.add('symcon-flow-emitter');
+                    const oldOverlay = svg.querySelector(selector);
+                    if (oldOverlay) {
+                        oldOverlay.style.setProperty('display', 'none', 'important');
+                        oldOverlay.style.setProperty('visibility', 'hidden', 'important');
                     }
                 });
 
