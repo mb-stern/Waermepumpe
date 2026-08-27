@@ -6569,13 +6569,11 @@ window.SymconHeatPump = {
                 svg.dataset.refrigerantCircuitDirection === 'reversed';
 
             const refrigerantDirection = (normalDirection) => {
-                if (!refrigerantReversed) {
-                    return normalDirection;
-                }
-
-                return normalDirection === 'reverse'
-                    ? 'forward'
-                    : 'reverse';
+                /*
+                 * Flussrichtung auch im Kühlbetrieb NICHT umdrehen.
+                 * Nur die Beschriftungen wechseln ihre Rollen.
+                 */
+                return normalDirection;
             };
 
             svg.querySelectorAll(
