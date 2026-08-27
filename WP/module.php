@@ -7446,14 +7446,14 @@ window.SymconHeatPump = {
                 card.content.querySelector('#textEvaporator');
             if (evaporatorText) {
                 evaporatorText.textContent =
-                    coolingActive ? 'Kondensator' : 'Verdampfer';
+                    coolingActive ? 'Verdampfer' : 'Kondensator';
             }
 
             const condenserText =
                 card.content.querySelector('#textCondenser');
             if (condenserText) {
                 condenserText.textContent =
-                    coolingActive ? 'Verdampfer' : 'Kondensator';
+                    coolingActive ? 'Kondensator' : 'Verdampfer';
             }
 
             if (!card || !card.content) {
