@@ -5763,13 +5763,52 @@ window.SymconHeatPump = {
                     : 'symcon-flow-forward')
             );
 
-            overlay.style.setProperty(
-                'animation',
-                direction === 'reverse'
-                    ? 'symcon-svg-flow-reverse 1.4s linear infinite'
-                    : 'symcon-svg-flow-forward 1.4s linear infinite',
-                'important'
+            /*
+             * SVG-native Dash-Animation.
+             *
+             * Nicht auf CSS-Keyframes / Shadow-DOM-Vererbung angewiesen.
+             * Dadurch funktionieren auch die Pfade innerhalb der Gruppen
+             * radiatorN und gHeaterCircuitFloorN zuverlässig.
+             */
+            overlay.style.removeProperty('animation');
+            overlay.setAttribute('stroke-dashoffset', '0');
+
+            let dashAnimation =
+                overlay.querySelector('animate[data-symcon-flow-animation]');
+
+            if (!dashAnimation) {
+                dashAnimation = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'animate'
+                );
+                dashAnimation.setAttribute(
+                    'data-symcon-flow-animation',
+                    '1'
+                );
+                dashAnimation.setAttribute(
+                    'attributeName',
+                    'stroke-dashoffset'
+                );
+                dashAnimation.setAttribute(
+                    'from',
+                    '0'
+                );
+                dashAnimation.setAttribute(
+                    'dur',
+                    '1.4s'
+                );
+                dashAnimation.setAttribute(
+                    'repeatCount',
+                    'indefinite'
+                );
+                overlay.appendChild(dashAnimation);
+            }
+
+            dashAnimation.setAttribute(
+                'to',
+                direction === 'reverse' ? '24' : '-24'
             );
+
             overlay.style.setProperty(
                 'fill',
                 'none',
@@ -6797,12 +6836,6 @@ window.SymconHeatPump = {
                         'round',
                         'important'
                     );
-                    overlay.style.setProperty(
-                        'animation',
-                        'symcon-svg-flow-forward 1.4s linear infinite',
-                        'important'
-                    );
-
                     if (overlay.parentNode) {
                         overlay.parentNode.appendChild(overlay);
                     }
