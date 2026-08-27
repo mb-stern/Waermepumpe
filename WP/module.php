@@ -1931,8 +1931,21 @@ HTML;
 
     private function BuildControlData(): array
     {
+        $hasOperatingStatus = $this->HasOperatingStatus();
+        $operatingStatusValue = null;
+
+        if ($hasOperatingStatus) {
+            $operatingStatusValue = GetValue(
+                $this->ReadPropertyInteger('OperatingStatusVariable')
+            );
+        }
+
         return [
-            'hasOperatingStatus'           => $this->HasOperatingStatus(),
+            'hasOperatingStatus'           => $hasOperatingStatus,
+            'operatingStatusValue'         => $operatingStatusValue,
+            'operatingStatusCoolingValues' => $this->ReadPropertyString(
+                'OperatingStatusCoolingValues'
+            ),
             'heatingActive'                => $this->GetOperatingModeActive(
                 'HeatingPumpHeatingMode',
                 'OperatingStatusHeatingValues'
@@ -6255,6 +6268,223 @@ window.SymconHeatPump = {
             }
         };
 
+
+        /*
+         * DIAGNOSE / ROBUSTER HEIZKREIS-FLUSS
+         *
+         * Bewusst unabhängig von den normalen CSS-Keyframes und Pumpenstatus.
+         * Die Original-SVG entscheidet selbst, ob Heizkörper oder
+         * Fußbodenheizung sichtbar ist.
+         */
+        let symconHeatingFlowRaf = 0;
+        let symconHeatingFlowOffset = 0;
+
+        const ensureHeatingTestOverlay = (
+            svg,
+            selector,
+            id,
+            configured
+        ) => {
+            const source = svg.querySelector(selector);
+            if (!source) {
+                return;
+            }
+
+            let overlay = svg.querySelector('#' + id);
+
+            if (!overlay) {
+                overlay = source.cloneNode(false);
+                overlay.setAttribute('id', id);
+                overlay.removeAttribute('style');
+                overlay.removeAttribute('class');
+
+                if (source.parentNode) {
+                    source.parentNode.insertBefore(
+                        overlay,
+                        source.nextSibling
+                    );
+                }
+            }
+
+            overlay.classList.add('symcon-heating-test-flow');
+
+            overlay.style.setProperty(
+                'display',
+                configured ? 'inline' : 'none',
+                'important'
+            );
+            overlay.style.setProperty(
+                'visibility',
+                configured ? 'visible' : 'hidden',
+                'important'
+            );
+            overlay.style.setProperty(
+                'fill',
+                'none',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke',
+                'rgba(255,255,255,.85)',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke-width',
+                '2.2',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke-dasharray',
+                '4 8',
+                'important'
+            );
+            overlay.style.setProperty(
+                'stroke-linecap',
+                'round',
+                'important'
+            );
+            overlay.style.setProperty(
+                'pointer-events',
+                'none',
+                'important'
+            );
+            overlay.style.setProperty(
+                'opacity',
+                '1',
+                'important'
+            );
+
+            // Ganz nach vorne innerhalb derselben SVG-Gruppe.
+            if (overlay.parentNode) {
+                overlay.parentNode.appendChild(overlay);
+            }
+        };
+
+        const applyHeatingFlowDiagnostic = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+
+            /*
+             * Die zusätzlichen gestrichelten Heizkreis-Flüsse gehören zur
+             * eigenen Temperaturfarb-Darstellung und werden deshalb nur
+             * angezeigt, wenn "Eigene Temperaturfarben verwenden" aktiv ist.
+             */
+            const customColorsEnabled =
+                currentConfig.useCustomTemperatureColors === true;
+
+            const configured = [
+                false,
+                customColorsEnabled
+                    && String(currentConfig.heatingCircuitType1 || 'off') !== 'off',
+                customColorsEnabled
+                    && String(currentConfig.heatingCircuitType2 || 'off') !== 'off',
+                customColorsEnabled
+                    && String(currentConfig.heatingCircuitType3 || 'off') !== 'off'
+            ];
+
+            for (let number = 1; number <= 3; number++) {
+                const suffix = number === 1 ? '' : String(number);
+
+                /*
+                 * Leitung vom Verteiler/Pumpe zur Heizfläche.
+                 */
+                ensureHeatingTestOverlay(
+                    svg,
+                    '#pathPipeToHeatingCircuitPump' + suffix,
+                    'symconHeatingTestPump' + number,
+                    configured[number]
+                );
+
+                /*
+                 * Fußbodenheizung. Ist sie in der SVG ausgeblendet, bleibt
+                 * auch unser Klon durch den ausgeblendeten Eltern-<g> unsichtbar.
+                 */
+                ensureHeatingTestOverlay(
+                    svg,
+                    '#pathUnderfloorHeating' + number,
+                    'symconHeatingTestFloor' + number,
+                    configured[number]
+                );
+
+                /*
+                 * Heizkörper: Original-Zuleitung, Original-Heizkörper und
+                 * Original-Rückleitung. Keine erfundenen Koordinaten.
+                 */
+                ensureHeatingTestOverlay(
+                    svg,
+                    '#pathRadiatorPipeIn' + number,
+                    'symconHeatingTestRadiatorIn' + number,
+                    configured[number]
+                );
+                ensureHeatingTestOverlay(
+                    svg,
+                    '#rectRadiator' + number,
+                    'symconHeatingTestRadiatorBody' + number,
+                    configured[number]
+                );
+                ensureHeatingTestOverlay(
+                    svg,
+                    '#pathRadiatorPipeOut' + number,
+                    'symconHeatingTestRadiatorOut' + number,
+                    configured[number]
+                );
+            }
+
+            /*
+             * Rücklaufstücke ebenfalls mitnehmen.
+             */
+            ensureHeatingTestOverlay(
+                svg,
+                '#pathPipeToHP',
+                'symconHeatingTestReturn1',
+                configured[1]
+            );
+            ensureHeatingTestOverlay(
+                svg,
+                '#pathPipeToHP2',
+                'symconHeatingTestReturnShared',
+                configured[1] || configured[2]
+            );
+
+            /*
+             * EIN globaler requestAnimationFrame-Loop.
+             * Keine CSS-Keyframes, keine SVG-animate-Abhängigkeit.
+             */
+            if (!symconHeatingFlowRaf) {
+                let lastTime = performance.now();
+
+                const animate = (time) => {
+                    const delta = Math.min(50, time - lastTime);
+                    lastTime = time;
+
+                    // ungefähr gleiche Geschwindigkeit wie 1.4 s / 24 px
+                    symconHeatingFlowOffset -= (24 / 1400) * delta;
+
+                    if (symconHeatingFlowOffset <= -24) {
+                        symconHeatingFlowOffset += 24;
+                    }
+
+                    document
+                        .querySelectorAll('heat-pump-card svg .symcon-heating-test-flow')
+                        .forEach((element) => {
+                            element.setAttribute(
+                                'stroke-dashoffset',
+                                String(symconHeatingFlowOffset)
+                            );
+                        });
+
+                    symconHeatingFlowRaf =
+                        requestAnimationFrame(animate);
+                };
+
+                symconHeatingFlowRaf =
+                    requestAnimationFrame(animate);
+            }
+        };
+
         const applyFlowAnimations = (card) => {
             if (!card || !card.content) {
                 return;
@@ -6343,7 +6573,39 @@ window.SymconHeatPump = {
              * KÄLTEKREIS
              * ------------------------------------------------------------
              * Nur EINE farbige Leitung und EIN Fluss-Overlay.
+             *
+             * Im Kühlbetrieb wurde der reversible Kältekreis bereits durch
+             * applyRefrigerantCircuitMode() auf "reversed" gesetzt.
+             * Dann muss auch die komplette gestrichelte Flussrichtung drehen.
              */
+            /*
+             * Animierter Kältemittel-Fluss:
+             *
+             * Kühlbetrieb ist aktuell korrekt und bleibt deshalb unverändert.
+             * Im Heizbetrieb wird ausschließlich die gestrichelte
+             * Animationsrichtung gegenüber dem Kühlbetrieb umgekehrt.
+             *
+             * Nicht auf das persistierende SVG-dataset verlassen, sondern den
+             * aktuellen Kühlzustand direkt aus den vorhandenen Statusquellen
+             * bestimmen.
+             */
+            const refrigerantCooling =
+                stateIsOn(currentConfig.heatingPumpCoolingMode)
+                || !!(
+                    currentControls
+                    && currentControls.coolingActive === true
+                );
+
+            const refrigerantDirection = (coolingDirection) => {
+                if (refrigerantCooling) {
+                    return coolingDirection;
+                }
+
+                return coolingDirection === 'reverse'
+                    ? 'forward'
+                    : 'reverse';
+            };
+
             svg.querySelectorAll(
                 '[id^="symconFlowRefrigerant"]'
             ).forEach((oldOverlay) => {
@@ -6362,7 +6624,7 @@ window.SymconHeatPump = {
                 svg,
                 '#symconRefrigerantCircuitPipe',
                 'symconFlowRefrigerantMain',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
 
@@ -6382,7 +6644,7 @@ window.SymconHeatPump = {
                     svg,
                     '#symconRefrigerantBridge' + name,
                     'symconFlowRefrigerantBridge' + name,
-                    definition.direction,
+                    refrigerantDirection(definition.direction),
                     compressorRunning
                 );
 
@@ -6418,21 +6680,21 @@ window.SymconHeatPump = {
                 svg,
                 '#pathHPModelEvaporatorSymbol001',
                 'symconFlowEvaporatorCoil1',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelEvaporatorSymbol002',
                 'symconFlowEvaporatorCoil2',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelCondenserSymbol',
                 'symconFlowCondenserCoil',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
 
@@ -7201,7 +7463,24 @@ window.SymconHeatPump = {
                 return;
             }
 
-            const condenserText = card.content.querySelector('#textCondenser');
+            /*
+             * Vor JEDEM Datenupdate zuerst den normalen Grundzustand
+             * herstellen. applyRefrigerantCircuitMode() vertauscht diese
+             * beiden Texte anschließend im Kühlbetrieb.
+             *
+             * Wichtig: Beide Texte zurücksetzen. Würde nur der Kondensator
+             * zurückgesetzt, bleibt der beim vorherigen Kühl-Update bereits
+             * vertauschte Verdampfer-Text stehen und nach dem nächsten Tausch
+             * hätten beide Wärmetauscher dieselbe Bezeichnung.
+             */
+            const evaporatorText =
+                card.content.querySelector('#textEvaporator');
+            if (evaporatorText) {
+                evaporatorText.textContent = 'Verdampfer';
+            }
+
+            const condenserText =
+                card.content.querySelector('#textCondenser');
             if (condenserText) {
                 condenserText.textContent = 'Kondensator';
             }
@@ -8649,6 +8928,7 @@ window.SymconHeatPump = {
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
                             applyFlowAnimations(this);
+                            applyHeatingFlowDiagnostic(this);
 
                             /*
                              * Die Kompaktansicht ist ein eigener Render.
