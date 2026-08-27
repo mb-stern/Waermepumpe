@@ -6542,14 +6542,11 @@ window.SymconHeatPump = {
                         || getComputedStyle(floorParent).display !== 'none';
 
                     /*
-                     * Für die Fußbodenheizung NICHT mehr den kompletten
-                     * Originalpfad klonen. Der Originalpfad kann SVG-
-                     * Präsentationsattribute (z. B. stroke-opacity,
-                     * mask/filter/class) mitbringen, die unser Overlay trotz
-                     * sichtbarer Leitung unsichtbar machen.
-                     *
-                     * Deshalb erzeugen wir einen frischen Path und übernehmen
-                     * ausschließlich die Geometrie.
+                     * Robusteste Variante:
+                     * Nicht die Geometrie des Originalelements nachbauen,
+                     * sondern das ORIGINAL per <use> ein zweites Mal darüber
+                     * zeichnen. Damit ist es egal, ob pathUnderfloorHeatingN
+                     * ein path, polyline oder sogar eine Gruppe ist.
                      */
                     const floorOverlayId =
                         'symconFlowEmitterFloor' + number;
@@ -6560,52 +6557,31 @@ window.SymconHeatPump = {
                     if (!floorOverlay) {
                         floorOverlay = document.createElementNS(
                             'http://www.w3.org/2000/svg',
-                            'path'
+                            'use'
                         );
+
                         floorOverlay.setAttribute(
                             'id',
                             floorOverlayId
                         );
 
-                        if (floor.hasAttribute('d')) {
-                            floorOverlay.setAttribute(
-                                'd',
-                                floor.getAttribute('d')
-                            );
-                        }
+                        floorOverlay.setAttribute(
+                            'href',
+                            '#pathUnderfloorHeating' + number
+                        );
 
-                        if (floor.hasAttribute('transform')) {
-                            floorOverlay.setAttribute(
-                                'transform',
-                                floor.getAttribute('transform')
-                            );
-                        }
+                        /*
+                         * Für ältere SVG-Engines zusätzlich xlink:href.
+                         */
+                        floorOverlay.setAttributeNS(
+                            'http://www.w3.org/1999/xlink',
+                            'xlink:href',
+                            '#pathUnderfloorHeating' + number
+                        );
 
                         if (floorParent) {
                             floorParent.appendChild(
                                 floorOverlay
-                            );
-                        }
-                    } else {
-                        /*
-                         * Geometrie bei jedem Update synchron halten, falls
-                         * die Card den Originalpfad neu setzt.
-                         */
-                        if (floor.hasAttribute('d')) {
-                            floorOverlay.setAttribute(
-                                'd',
-                                floor.getAttribute('d')
-                            );
-                        }
-
-                        if (floor.hasAttribute('transform')) {
-                            floorOverlay.setAttribute(
-                                'transform',
-                                floor.getAttribute('transform')
-                            );
-                        } else {
-                            floorOverlay.removeAttribute(
-                                'transform'
                             );
                         }
                     }
@@ -6618,6 +6594,11 @@ window.SymconHeatPump = {
                     const floorFlowActive =
                         !!enabled && floorVisible;
 
+                    /*
+                     * Alle für den sichtbaren Fluss relevanten Eigenschaften
+                     * direkt auf <use> setzen. So kann uns keine Eigenschaft
+                     * des Originalelements den weißen Fluss wieder verstecken.
+                     */
                     floorOverlay.style.setProperty(
                         'display',
                         floorFlowActive ? 'inline' : 'none',
@@ -6635,7 +6616,7 @@ window.SymconHeatPump = {
                     );
                     floorOverlay.style.setProperty(
                         'stroke',
-                        'rgba(255,255,255,.88)',
+                        'rgba(255,255,255,.92)',
                         'important'
                     );
                     floorOverlay.style.setProperty(
@@ -6650,7 +6631,7 @@ window.SymconHeatPump = {
                     );
                     floorOverlay.style.setProperty(
                         'stroke-width',
-                        '1.8',
+                        '2',
                         'important'
                     );
                     floorOverlay.style.setProperty(
@@ -6663,15 +6644,14 @@ window.SymconHeatPump = {
                         'round',
                         'important'
                     );
-
-                    /*
-                     * Animation zusätzlich inline setzen. Dadurch hängt die
-                     * Fußbodenheizung nicht davon ab, ob die Shadow-/SVG-CSS
-                     * für diese dynamisch erzeugte Ebene gegriffen hat.
-                     */
                     floorOverlay.style.setProperty(
                         'animation',
                         'symcon-flow-forward 1.4s linear infinite',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'pointer-events',
+                        'none',
                         'important'
                     );
 
