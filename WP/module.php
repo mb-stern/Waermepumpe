@@ -6666,6 +6666,106 @@ window.SymconHeatPump = {
                     !!enabled && radiatorVisible
                 );
 
+                /*
+                 * Heizkörper – oberer Sammelkanal:
+                 * Zusätzlich zur Serpentine läuft die gestrichelte
+                 * Flussanimation auch durch den oberen Bereich des Heizkörpers.
+                 * Der Pfad liegt im selben <g> und übernimmt damit automatisch
+                 * die Position/Transformation von Heizkreis 2 und 3.
+                 */
+                let radiatorTopPath =
+                    svg.querySelector(
+                        '#symconRadiatorTopWaterPath' + number
+                    );
+
+                if (!radiatorTopPath) {
+                    radiatorTopPath = document.createElementNS(
+                        'http://www.w3.org/2000/svg',
+                        'path'
+                    );
+
+                    radiatorTopPath.setAttribute(
+                        'id',
+                        'symconRadiatorTopWaterPath' + number
+                    );
+                    radiatorTopPath.setAttribute(
+                        'd',
+                        'M 837 82 L 937 82'
+                    );
+                    radiatorTopPath.setAttribute('fill', 'none');
+                    radiatorTopPath.style.setProperty(
+                        'stroke',
+                        'transparent',
+                        'important'
+                    );
+                    radiatorTopPath.style.setProperty(
+                        'fill',
+                        'none',
+                        'important'
+                    );
+
+                    radiatorParent.appendChild(radiatorTopPath);
+                }
+
+                if (radiatorTopPath.parentNode) {
+                    radiatorTopPath.parentNode.appendChild(radiatorTopPath);
+                }
+
+                ensureFlowOverlay(
+                    svg,
+                    '#symconRadiatorTopWaterPath' + number,
+                    'symconFlowEmitterRadiatorTop' + number,
+                    'forward',
+                    !!enabled && radiatorVisible
+                );
+
+                const radiatorTopOverlay =
+                    svg.querySelector(
+                        '#symconFlowEmitterRadiatorTop' + number
+                    );
+
+                if (radiatorTopOverlay) {
+                    radiatorTopOverlay.classList.add(
+                        'symcon-flow-emitter'
+                    );
+                    radiatorTopOverlay.style.setProperty(
+                        'fill',
+                        'none',
+                        'important'
+                    );
+                    radiatorTopOverlay.style.setProperty(
+                        'stroke',
+                        'rgba(255,255,255,.82)',
+                        'important'
+                    );
+                    radiatorTopOverlay.style.setProperty(
+                        'stroke-width',
+                        '2',
+                        'important'
+                    );
+                    radiatorTopOverlay.style.setProperty(
+                        'stroke-dasharray',
+                        '4 7',
+                        'important'
+                    );
+                    radiatorTopOverlay.style.setProperty(
+                        'stroke-linecap',
+                        'round',
+                        'important'
+                    );
+                    radiatorTopOverlay.style.setProperty(
+                        'opacity',
+                        '1',
+                        'important'
+                    );
+
+                    if (radiatorTopOverlay.parentNode) {
+                        radiatorTopOverlay.parentNode.appendChild(
+                            radiatorTopOverlay
+                        );
+                    }
+                }
+
                 const radiatorOverlay =
                     svg.querySelector(
                         '#symconFlowEmitterRadiator' + number
