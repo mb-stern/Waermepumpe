@@ -7442,84 +7442,14 @@ window.SymconHeatPump = {
         };
 
         const applyTerminology = (card) => {
-            /*
-             * Reversibler Kältekreis:
-             * Heizbetrieb: links Verdampfer, rechts Kondensator.
-             * Kühlbetrieb: links Kondensator, rechts Verdampfer.
-             * Beide Beschriftungen müssen gemeinsam die Rolle wechseln,
-             * sonst entstehen zwei "Verdampfer"-Texte.
-             */
-            /*
-             * Beschriftung ausschließlich über den konfigurierten
-             * Integer-Betriebszustand bestimmen.
-             *
-             * Beispiel:
-             * OperatingStatusCoolingValues = "7"
-             * -> nur Status 7 gilt als Kühlbetrieb.
-             */
-            const operatingStatusValue =
-                currentControls
-                    ? currentControls.operatingStatusValue
-                    : null;
-
-            const coolingStatusValues =
-                currentControls
-                && typeof currentControls.operatingStatusCoolingValues === 'string'
-                    ? currentControls.operatingStatusCoolingValues
-                        .split(',')
-                        .map((value) => value.trim())
-                        .filter((value) => value !== '')
-                    : [];
-
-            const coolingActive =
-                currentControls
-                && currentControls.hasOperatingStatus === true
-                && coolingStatusValues.some((value) => {
-                    const statusNumber = Number(operatingStatusValue);
-                    const valueNumber = Number(value);
-
-                    if (
-                        Number.isFinite(statusNumber)
-                        && Number.isFinite(valueNumber)
-                    ) {
-                        return statusNumber === valueNumber;
-                    }
-
-                    return String(operatingStatusValue) === value;
-                });
-
-            const evaporatorText =
-                card.content.querySelector('#textEvaporator');
-            if (evaporatorText) {
-                /*
-                 * Normalbetrieb:
-                 * links = Verdampfer
-                 *
-                 * Kühlbetrieb:
-                 * Rollen werden vertauscht.
-                 */
-                evaporatorText.textContent =
-                    coolingActive ? 'Kondensator' : 'Verdampfer';
-            }
-
-            const condenserText =
-                card.content.querySelector('#textCondenser');
-            if (condenserText) {
-                /*
-                 * Normalbetrieb:
-                 * rechts = Kondensator
-                 *
-                 * Kühlbetrieb:
-                 * Rollen werden vertauscht.
-                 */
-                condenserText.textContent =
-                    coolingActive ? 'Verdampfer' : 'Kondensator';
-            }
-
             if (!card || !card.content) {
                 return;
             }
 
+            const condenserText = card.content.querySelector('#textCondenser');
+            if (condenserText) {
+                condenserText.textContent = 'Kondensator';
+            }
         };
 
         const applyOptionalStatusVisibility = (card) => {
