@@ -7446,7 +7446,24 @@ window.SymconHeatPump = {
                 return;
             }
 
-            const condenserText = card.content.querySelector('#textCondenser');
+            /*
+             * Vor JEDEM Datenupdate zuerst den normalen Grundzustand
+             * herstellen. applyRefrigerantCircuitMode() vertauscht diese
+             * beiden Texte anschließend im Kühlbetrieb.
+             *
+             * Wichtig: Beide Texte zurücksetzen. Würde nur der Kondensator
+             * zurückgesetzt, bleibt der beim vorherigen Kühl-Update bereits
+             * vertauschte Verdampfer-Text stehen und nach dem nächsten Tausch
+             * hätten beide Wärmetauscher dieselbe Bezeichnung.
+             */
+            const evaporatorText =
+                card.content.querySelector('#textEvaporator');
+            if (evaporatorText) {
+                evaporatorText.textContent = 'Verdampfer';
+            }
+
+            const condenserText =
+                card.content.querySelector('#textCondenser');
             if (condenserText) {
                 condenserText.textContent = 'Kondensator';
             }
