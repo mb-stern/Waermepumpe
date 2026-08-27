@@ -4682,6 +4682,186 @@ window.SymconHeatPump = {
 
                 setGradient(circuit.gradient, colors.supply, colors.reflux);
 
+                /*
+                 * Fluss DIREKT dort ergänzen, wo auch die Heizkreisfarbe
+                 * gesetzt wird. Damit verwenden Farbe und Animation garantiert
+                 * exakt dasselbe sichtbare SVG-Element und denselben Zeitpunkt.
+                 */
+                const emitterFlowActive = !!(
+                    !hotWaterActive
+                    && String(circuit.type || 'off') !== 'off'
+                    && (
+                        stateIsOn('heatingPumpHeatingMode')
+                        || (
+                            currentControls
+                            && currentControls.heatingActive === true
+                        )
+                        || stateIsOn(
+                            circuit.key === '1'
+                                ? currentConfig.heatingCircuitPumpRunning
+                                : circuit.key === '2'
+                                    ? currentConfig.heatingCircuitPumpRunning2
+                                    : currentConfig.heatingCircuitPumpRunning3
+                        )
+                    )
+                );
+
+                const ensureColoredElementFlow = (
+                    selector,
+                    id,
+                    direction = 'forward'
+                ) => {
+                    const original = svg.querySelector(selector);
+
+                    if (!original || !original.parentNode) {
+                        return;
+                    }
+
+                    let overlay = svg.querySelector('#' + id);
+
+                    if (!overlay) {
+                        overlay = original.cloneNode(false);
+                        overlay.setAttribute('id', id);
+
+                        /*
+                         * Keine Darstellungseigenschaften des Originals
+                         * übernehmen. Nur die Geometrie des Elements bleibt.
+                         */
+                        overlay.removeAttribute('style');
+                        overlay.removeAttribute('class');
+                        overlay.removeAttribute('stroke');
+                        overlay.removeAttribute('fill');
+                        overlay.removeAttribute('stroke-opacity');
+                        overlay.removeAttribute('opacity');
+                        overlay.removeAttribute('filter');
+                        overlay.removeAttribute('mask');
+                        overlay.removeAttribute('clip-path');
+
+                        original.parentNode.insertBefore(
+                            overlay,
+                            original.nextSibling
+                        );
+                    }
+
+                    /*
+                     * Falls die Card die Geometrie dynamisch ändert, die
+                     * geometrischen Attribute wieder vom sichtbaren Original
+                     * übernehmen.
+                     */
+                    [
+                        'd',
+                        'x',
+                        'y',
+                        'x1',
+                        'y1',
+                        'x2',
+                        'y2',
+                        'points',
+                        'rx',
+                        'ry',
+                        'width',
+                        'height',
+                        'transform'
+                    ].forEach((attribute) => {
+                        if (original.hasAttribute(attribute)) {
+                            overlay.setAttribute(
+                                attribute,
+                                original.getAttribute(attribute)
+                            );
+                        } else {
+                            overlay.removeAttribute(attribute);
+                        }
+                    });
+
+                    overlay.setAttribute(
+                        'class',
+                        'symcon-flow-overlay symcon-flow-emitter '
+                        + (
+                            direction === 'reverse'
+                                ? 'symcon-flow-reverse'
+                                : 'symcon-flow-forward'
+                        )
+                    );
+
+                    overlay.style.setProperty(
+                        'display',
+                        emitterFlowActive ? 'inline' : 'none',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'visibility',
+                        emitterFlowActive ? 'visible' : 'hidden',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'fill',
+                        'none',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'stroke',
+                        'rgba(255,255,255,.92)',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'stroke-opacity',
+                        '1',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'opacity',
+                        '1',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'stroke-width',
+                        '1.8',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'stroke-dasharray',
+                        '4 7',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'stroke-linecap',
+                        'round',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'animation',
+                        (
+                            direction === 'reverse'
+                                ? 'symcon-flow-reverse'
+                                : 'symcon-flow-forward'
+                        )
+                        + ' 1.4s linear infinite',
+                        'important'
+                    );
+                    overlay.style.setProperty(
+                        'pointer-events',
+                        'none',
+                        'important'
+                    );
+
+                    /*
+                     * Immer ganz nach vorne im selben SVG-Container holen.
+                     */
+                    if (overlay.parentNode) {
+                        overlay.parentNode.appendChild(overlay);
+                    }
+                };
+
+                /*
+                 * Fußbodenheizung: exakt derselbe Pfad, der hier auch den
+                 * Temperaturverlauf erhält.
+                 */
+                ensureColoredElementFlow(
+                    '#pathUnderfloorHeating' + circuit.key,
+                    'symconColorFlowUnderfloor' + circuit.key,
+                    'forward'
+                );
+
                 [
                     '#pathUnderfloorHeating' + circuit.key,
                     '#pathRadiatorPipeIn' + circuit.key,
@@ -6535,37 +6715,11 @@ window.SymconHeatPump = {
                         '#pathUnderfloorHeating' + number
                     );
 
-                if (floor) {
-                    const floorParent = floor.parentElement;
-                    const floorVisible =
-                        !floorParent
-                        || getComputedStyle(floorParent).display !== 'none';
-
-                    ensureFlowOverlay(
-                        svg,
-                        '#pathUnderfloorHeating' + number,
-                        'symconFlowEmitterFloor' + number,
-                        'forward',
-                        !!enabled && floorVisible
-                    );
-
-                    const floorOverlay =
-                        svg.querySelector(
-                            '#symconFlowEmitterFloor' + number
-                        );
-
-                    if (floorOverlay) {
-                        floorOverlay.classList.add(
-                            'symcon-flow-emitter'
-                        );
-
-                        if (floorOverlay.parentNode) {
-                            floorOverlay.parentNode.appendChild(
-                                floorOverlay
-                            );
-                        }
-                    }
-                }
+                /*
+                 * Fußbodenheizungs-Fluss wird jetzt direkt zusammen mit der
+                 * Temperaturfärbung erzeugt (symconColorFlowUnderfloorN).
+                 * Hier deshalb keine zweite Overlay-Erzeugung mehr.
+                 */
 
                 /*
                  * Heizkörper:
@@ -6709,6 +6863,16 @@ window.SymconHeatPump = {
                     radiatorOverlay.style.setProperty(
                         'opacity',
                         '1',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'stroke-opacity',
+                        '1',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'animation',
+                        'symcon-flow-forward 1.4s linear infinite',
                         'important'
                     );
 
