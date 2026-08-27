@@ -6578,15 +6578,32 @@ window.SymconHeatPump = {
              * applyRefrigerantCircuitMode() auf "reversed" gesetzt.
              * Dann muss auch die komplette gestrichelte Flussrichtung drehen.
              */
-            const refrigerantReversed =
-                svg.dataset.refrigerantCircuitDirection === 'reversed';
+            /*
+             * Animierter Kältemittel-Fluss:
+             *
+             * Kühlbetrieb ist aktuell korrekt und bleibt deshalb unverändert.
+             * Im Heizbetrieb wird ausschließlich die gestrichelte
+             * Animationsrichtung gegenüber dem Kühlbetrieb umgekehrt.
+             *
+             * Nicht auf das persistierende SVG-dataset verlassen, sondern den
+             * aktuellen Kühlzustand direkt aus den vorhandenen Statusquellen
+             * bestimmen.
+             */
+            const refrigerantCooling =
+                stateIsOn(currentConfig.heatingPumpCoolingMode)
+                || !!(
+                    currentControls
+                    && currentControls.coolingActive === true
+                );
 
-            const refrigerantDirection = (normalDirection) => {
-                /*
-                 * Flussrichtung auch im Kühlbetrieb NICHT umdrehen.
-                 * Nur die Beschriftungen wechseln ihre Rollen.
-                 */
-                return normalDirection;
+            const refrigerantDirection = (coolingDirection) => {
+                if (refrigerantCooling) {
+                    return coolingDirection;
+                }
+
+                return coolingDirection === 'reverse'
+                    ? 'forward'
+                    : 'reverse';
             };
 
             svg.querySelectorAll(
