@@ -7443,15 +7443,29 @@ window.SymconHeatPump = {
             const evaporatorText =
                 card.content.querySelector('#textEvaporator');
             if (evaporatorText) {
+                /*
+                 * Normalbetrieb:
+                 * links = Verdampfer
+                 *
+                 * Kühlbetrieb:
+                 * Rollen werden vertauscht.
+                 */
                 evaporatorText.textContent =
-                    coolingActive ? 'Verdampfer' : 'Kondensator';
+                    coolingActive ? 'Kondensator' : 'Verdampfer';
             }
 
             const condenserText =
                 card.content.querySelector('#textCondenser');
             if (condenserText) {
+                /*
+                 * Normalbetrieb:
+                 * rechts = Kondensator
+                 *
+                 * Kühlbetrieb:
+                 * Rollen werden vertauscht.
+                 */
                 condenserText.textContent =
-                    coolingActive ? 'Kondensator' : 'Verdampfer';
+                    coolingActive ? 'Verdampfer' : 'Kondensator';
             }
 
             if (!card || !card.content) {
