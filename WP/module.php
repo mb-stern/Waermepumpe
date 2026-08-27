@@ -6560,7 +6560,24 @@ window.SymconHeatPump = {
              * KÄLTEKREIS
              * ------------------------------------------------------------
              * Nur EINE farbige Leitung und EIN Fluss-Overlay.
+             *
+             * Im Kühlbetrieb wurde der reversible Kältekreis bereits durch
+             * applyRefrigerantCircuitMode() auf "reversed" gesetzt.
+             * Dann muss auch die komplette gestrichelte Flussrichtung drehen.
              */
+            const refrigerantReversed =
+                svg.dataset.refrigerantCircuitDirection === 'reversed';
+
+            const refrigerantDirection = (normalDirection) => {
+                if (!refrigerantReversed) {
+                    return normalDirection;
+                }
+
+                return normalDirection === 'reverse'
+                    ? 'forward'
+                    : 'reverse';
+            };
+
             svg.querySelectorAll(
                 '[id^="symconFlowRefrigerant"]'
             ).forEach((oldOverlay) => {
@@ -6579,7 +6596,7 @@ window.SymconHeatPump = {
                 svg,
                 '#symconRefrigerantCircuitPipe',
                 'symconFlowRefrigerantMain',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
 
@@ -6599,7 +6616,7 @@ window.SymconHeatPump = {
                     svg,
                     '#symconRefrigerantBridge' + name,
                     'symconFlowRefrigerantBridge' + name,
-                    definition.direction,
+                    refrigerantDirection(definition.direction),
                     compressorRunning
                 );
 
@@ -6635,21 +6652,21 @@ window.SymconHeatPump = {
                 svg,
                 '#pathHPModelEvaporatorSymbol001',
                 'symconFlowEvaporatorCoil1',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelEvaporatorSymbol002',
                 'symconFlowEvaporatorCoil2',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelCondenserSymbol',
                 'symconFlowCondenserCoil',
-                'forward',
+                refrigerantDirection('forward'),
                 compressorRunning
             );
 
@@ -7420,7 +7437,11 @@ window.SymconHeatPump = {
 
             const condenserText = card.content.querySelector('#textCondenser');
             if (condenserText) {
-                condenserText.textContent = 'Kondensator';
+                const coolingActive =
+                    currentControls
+                    && currentControls.coolingActive === true;
+                condenserText.textContent =
+                    coolingActive ? 'Verdampfer' : 'Kondensator';
             }
         };
 
