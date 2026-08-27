@@ -6541,124 +6541,29 @@ window.SymconHeatPump = {
                         !floorParent
                         || getComputedStyle(floorParent).display !== 'none';
 
-                    /*
-                     * Robusteste Variante:
-                     * Nicht die Geometrie des Originalelements nachbauen,
-                     * sondern das ORIGINAL per <use> ein zweites Mal darüber
-                     * zeichnen. Damit ist es egal, ob pathUnderfloorHeatingN
-                     * ein path, polyline oder sogar eine Gruppe ist.
-                     */
-                    const floorOverlayId =
-                        'symconFlowEmitterFloor' + number;
+                    ensureFlowOverlay(
+                        svg,
+                        '#pathUnderfloorHeating' + number,
+                        'symconFlowEmitterFloor' + number,
+                        'forward',
+                        !!enabled && floorVisible
+                    );
 
-                    let floorOverlay =
-                        svg.querySelector('#' + floorOverlayId);
-
-                    if (!floorOverlay) {
-                        floorOverlay = document.createElementNS(
-                            'http://www.w3.org/2000/svg',
-                            'use'
+                    const floorOverlay =
+                        svg.querySelector(
+                            '#symconFlowEmitterFloor' + number
                         );
 
-                        floorOverlay.setAttribute(
-                            'id',
-                            floorOverlayId
+                    if (floorOverlay) {
+                        floorOverlay.classList.add(
+                            'symcon-flow-emitter'
                         );
 
-                        floorOverlay.setAttribute(
-                            'href',
-                            '#pathUnderfloorHeating' + number
-                        );
-
-                        /*
-                         * Für ältere SVG-Engines zusätzlich xlink:href.
-                         */
-                        floorOverlay.setAttributeNS(
-                            'http://www.w3.org/1999/xlink',
-                            'xlink:href',
-                            '#pathUnderfloorHeating' + number
-                        );
-
-                        if (floorParent) {
-                            floorParent.appendChild(
+                        if (floorOverlay.parentNode) {
+                            floorOverlay.parentNode.appendChild(
                                 floorOverlay
                             );
                         }
-                    }
-
-                    floorOverlay.setAttribute(
-                        'class',
-                        'symcon-flow-overlay symcon-flow-emitter symcon-flow-forward'
-                    );
-
-                    const floorFlowActive =
-                        !!enabled && floorVisible;
-
-                    /*
-                     * Alle für den sichtbaren Fluss relevanten Eigenschaften
-                     * direkt auf <use> setzen. So kann uns keine Eigenschaft
-                     * des Originalelements den weißen Fluss wieder verstecken.
-                     */
-                    floorOverlay.style.setProperty(
-                        'display',
-                        floorFlowActive ? 'inline' : 'none',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'visibility',
-                        floorFlowActive ? 'visible' : 'hidden',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'fill',
-                        'none',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'stroke',
-                        'rgba(255,255,255,.92)',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'stroke-opacity',
-                        '1',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'opacity',
-                        '1',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'stroke-width',
-                        '2',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'stroke-dasharray',
-                        '4 7',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'stroke-linecap',
-                        'round',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'animation',
-                        'symcon-flow-forward 1.4s linear infinite',
-                        'important'
-                    );
-                    floorOverlay.style.setProperty(
-                        'pointer-events',
-                        'none',
-                        'important'
-                    );
-
-                    if (floorOverlay.parentNode) {
-                        floorOverlay.parentNode.appendChild(
-                            floorOverlay
-                        );
                     }
                 }
 
@@ -6804,16 +6709,6 @@ window.SymconHeatPump = {
                     radiatorOverlay.style.setProperty(
                         'opacity',
                         '1',
-                        'important'
-                    );
-                    radiatorOverlay.style.setProperty(
-                        'stroke-opacity',
-                        '1',
-                        'important'
-                    );
-                    radiatorOverlay.style.setProperty(
-                        'animation',
-                        'symcon-flow-forward 1.4s linear infinite',
                         'important'
                     );
 
