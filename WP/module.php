@@ -7431,18 +7431,35 @@ window.SymconHeatPump = {
         };
 
         const applyTerminology = (card) => {
+            /*
+             * Reversibler Kältekreis:
+             * Heizbetrieb: links Verdampfer, rechts Kondensator.
+             * Kühlbetrieb: links Kondensator, rechts Verdampfer.
+             * Beide Beschriftungen müssen gemeinsam die Rolle wechseln,
+             * sonst entstehen zwei "Verdampfer"-Texte.
+             */
+            const coolingActive =
+                currentControls
+                && currentControls.coolingActive === true;
+
+            const evaporatorText =
+                card.content.querySelector('#textEvaporator');
+            if (evaporatorText) {
+                evaporatorText.textContent =
+                    coolingActive ? 'Kondensator' : 'Verdampfer';
+            }
+
+            const condenserText =
+                card.content.querySelector('#textCondenser');
+            if (condenserText) {
+                condenserText.textContent =
+                    coolingActive ? 'Verdampfer' : 'Kondensator';
+            }
+
             if (!card || !card.content) {
                 return;
             }
 
-            const condenserText = card.content.querySelector('#textCondenser');
-            if (condenserText) {
-                const coolingActive =
-                    currentControls
-                    && currentControls.coolingActive === true;
-                condenserText.textContent =
-                    coolingActive ? 'Verdampfer' : 'Kondensator';
-            }
         };
 
         const applyOptionalStatusVisibility = (card) => {
