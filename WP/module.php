@@ -6263,72 +6263,6 @@ window.SymconHeatPump = {
             const svg = card.content;
 
             /*
-             * Die Fluss-CSS muss direkt IM SVG liegen.
-             * Besonders Heizkörper und Fußbodenheizung liegen innerhalb
-             * der Card-/SVG-Struktur und dürfen sich nicht darauf verlassen,
-             * dass die äußere HTML-CSS bis dorthin durchgereicht wird.
-             */
-            if (!svg.querySelector('#symconFlowAnimationStyle')) {
-                const flowStyle = document.createElementNS(
-                    'http://www.w3.org/2000/svg',
-                    'style'
-                );
-
-                flowStyle.setAttribute(
-                    'id',
-                    'symconFlowAnimationStyle'
-                );
-
-                flowStyle.textContent = `
-                    @keyframes symcon-flow-forward {
-                        from { stroke-dashoffset: 0; }
-                        to   { stroke-dashoffset: -24; }
-                    }
-
-                    @keyframes symcon-flow-reverse {
-                        from { stroke-dashoffset: 0; }
-                        to   { stroke-dashoffset: 24; }
-                    }
-
-                    .symcon-flow-overlay {
-                        pointer-events: none;
-                        fill: none !important;
-                        stroke: rgba(255,255,255,.68) !important;
-                        stroke-width: 2.2 !important;
-                        stroke-dasharray: 4 8 !important;
-                        stroke-linecap: round !important;
-                        vector-effect: non-scaling-stroke;
-                    }
-
-                    .symcon-flow-forward {
-                        animation: symcon-flow-forward 1.4s linear infinite;
-                    }
-
-                    .symcon-flow-reverse {
-                        animation: symcon-flow-reverse 1.4s linear infinite;
-                    }
-
-                    .symcon-flow-overlay.symcon-flow-refrigerant {
-                        stroke-width: 1.25 !important;
-                        stroke: rgba(255,255,255,.62) !important;
-                        stroke-dasharray: 3 9 !important;
-                    }
-
-                    .symcon-flow-overlay.symcon-flow-emitter {
-                        stroke: rgba(255,255,255,.82) !important;
-                        stroke-width: 1.55 !important;
-                        stroke-dasharray: 3 8 !important;
-                        stroke-linecap: round !important;
-                    }
-                `;
-
-                svg.insertBefore(
-                    flowStyle,
-                    svg.firstChild
-                );
-            }
-
-            /*
              * Flussanimation nur zusammen mit den eigenen Temperaturfarben.
              */
             if (!currentConfig.useCustomTemperatureColors) {
@@ -6607,66 +6541,144 @@ window.SymconHeatPump = {
                         !floorParent
                         || getComputedStyle(floorParent).display !== 'none';
 
-                    ensureFlowOverlay(
-                        svg,
-                        '#pathUnderfloorHeating' + number,
-                        'symconFlowEmitterFloor' + number,
-                        'forward',
-                        !!enabled && floorVisible
-                    );
+                    /*
+                     * Für die Fußbodenheizung NICHT mehr den kompletten
+                     * Originalpfad klonen. Der Originalpfad kann SVG-
+                     * Präsentationsattribute (z. B. stroke-opacity,
+                     * mask/filter/class) mitbringen, die unser Overlay trotz
+                     * sichtbarer Leitung unsichtbar machen.
+                     *
+                     * Deshalb erzeugen wir einen frischen Path und übernehmen
+                     * ausschließlich die Geometrie.
+                     */
+                    const floorOverlayId =
+                        'symconFlowEmitterFloor' + number;
 
-                    const floorOverlay =
-                        svg.querySelector(
-                            '#symconFlowEmitterFloor' + number
-                        );
+                    let floorOverlay =
+                        svg.querySelector('#' + floorOverlayId);
 
-                    if (floorOverlay) {
-                        floorOverlay.classList.add(
-                            'symcon-flow-emitter'
+                    if (!floorOverlay) {
+                        floorOverlay = document.createElementNS(
+                            'http://www.w3.org/2000/svg',
+                            'path'
                         );
-
-                        /*
-                         * Sichtbarkeit direkt setzen, damit auch die
-                         * Fußbodenheizung sicher einen animierten Fluss
-                         * erhält und keine Original-SVG-Eigenschaft den
-                         * Overlay-Pfad unsichtbar macht.
-                         */
-                        floorOverlay.style.setProperty(
-                            'fill',
-                            'none',
-                            'important'
-                        );
-                        floorOverlay.style.setProperty(
-                            'stroke',
-                            'rgba(255,255,255,.82)',
-                            'important'
-                        );
-                        floorOverlay.style.setProperty(
-                            'stroke-width',
-                            '1.55',
-                            'important'
-                        );
-                        floorOverlay.style.setProperty(
-                            'stroke-dasharray',
-                            '3 8',
-                            'important'
-                        );
-                        floorOverlay.style.setProperty(
-                            'stroke-linecap',
-                            'round',
-                            'important'
-                        );
-                        floorOverlay.style.setProperty(
-                            'opacity',
-                            '1',
-                            'important'
+                        floorOverlay.setAttribute(
+                            'id',
+                            floorOverlayId
                         );
 
-                        if (floorOverlay.parentNode) {
-                            floorOverlay.parentNode.appendChild(
+                        if (floor.hasAttribute('d')) {
+                            floorOverlay.setAttribute(
+                                'd',
+                                floor.getAttribute('d')
+                            );
+                        }
+
+                        if (floor.hasAttribute('transform')) {
+                            floorOverlay.setAttribute(
+                                'transform',
+                                floor.getAttribute('transform')
+                            );
+                        }
+
+                        if (floorParent) {
+                            floorParent.appendChild(
                                 floorOverlay
                             );
                         }
+                    } else {
+                        /*
+                         * Geometrie bei jedem Update synchron halten, falls
+                         * die Card den Originalpfad neu setzt.
+                         */
+                        if (floor.hasAttribute('d')) {
+                            floorOverlay.setAttribute(
+                                'd',
+                                floor.getAttribute('d')
+                            );
+                        }
+
+                        if (floor.hasAttribute('transform')) {
+                            floorOverlay.setAttribute(
+                                'transform',
+                                floor.getAttribute('transform')
+                            );
+                        } else {
+                            floorOverlay.removeAttribute(
+                                'transform'
+                            );
+                        }
+                    }
+
+                    floorOverlay.setAttribute(
+                        'class',
+                        'symcon-flow-overlay symcon-flow-emitter symcon-flow-forward'
+                    );
+
+                    const floorFlowActive =
+                        !!enabled && floorVisible;
+
+                    floorOverlay.style.setProperty(
+                        'display',
+                        floorFlowActive ? 'inline' : 'none',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'visibility',
+                        floorFlowActive ? 'visible' : 'hidden',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'fill',
+                        'none',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'stroke',
+                        'rgba(255,255,255,.88)',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'stroke-opacity',
+                        '1',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'opacity',
+                        '1',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'stroke-width',
+                        '1.8',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'stroke-dasharray',
+                        '4 7',
+                        'important'
+                    );
+                    floorOverlay.style.setProperty(
+                        'stroke-linecap',
+                        'round',
+                        'important'
+                    );
+
+                    /*
+                     * Animation zusätzlich inline setzen. Dadurch hängt die
+                     * Fußbodenheizung nicht davon ab, ob die Shadow-/SVG-CSS
+                     * für diese dynamisch erzeugte Ebene gegriffen hat.
+                     */
+                    floorOverlay.style.setProperty(
+                        'animation',
+                        'symcon-flow-forward 1.4s linear infinite',
+                        'important'
+                    );
+
+                    if (floorOverlay.parentNode) {
+                        floorOverlay.parentNode.appendChild(
+                            floorOverlay
+                        );
                     }
                 }
 
@@ -6812,6 +6824,16 @@ window.SymconHeatPump = {
                     radiatorOverlay.style.setProperty(
                         'opacity',
                         '1',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'stroke-opacity',
+                        '1',
+                        'important'
+                    );
+                    radiatorOverlay.style.setProperty(
+                        'animation',
+                        'symcon-flow-forward 1.4s linear infinite',
                         'important'
                     );
 
