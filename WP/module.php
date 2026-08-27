@@ -6523,105 +6523,133 @@ window.SymconHeatPump = {
 
             const animateEmitter = (
                 number,
+                type,
                 enabled
             ) => {
+                const emitterEnabled = !!enabled && heatingAllowed;
+
                 /*
-                 * Fußbodenheizung:
-                 * Die Original-Schlange ist bereits ein echter,
-                 * durchgehender Wasserweg.
+                 * --------------------------------------------------------
+                 * FUSSBODENHEIZUNG
+                 * --------------------------------------------------------
+                 * Der SVG-Pfad ist bereits ein echter durchgehender
+                 * Wasserweg vom Vorlauf bis zum Rücklauf.
                  */
-                const floor =
-                    svg.querySelector(
-                        '#pathUnderfloorHeating' + number
-                    );
+                const floorEnabled =
+                    emitterEnabled && type === 'underfloor';
 
-                if (floor) {
-                    const floorParent = floor.parentElement;
-                    const floorVisible =
-                        !floorParent
-                        || getComputedStyle(floorParent).display !== 'none';
+                ensureFlowOverlay(
+                    svg,
+                    '#pathUnderfloorHeating' + number,
+                    'symconFlowEmitterFloor' + number,
+                    'forward',
+                    floorEnabled
+                );
 
-                    ensureFlowOverlay(
-                        svg,
-                        '#pathUnderfloorHeating' + number,
-                        'symconFlowEmitterFloor' + number,
-                        'forward',
-                        !!enabled && floorVisible
-                    );
+                const floorOverlay =
+                    svg.querySelector('#symconFlowEmitterFloor' + number);
 
-                    const floorOverlay =
-                        svg.querySelector(
-                            '#symconFlowEmitterFloor' + number
-                        );
-
-                    if (floorOverlay) {
-                        floorOverlay.classList.add(
-                            'symcon-flow-emitter'
-                        );
-
-                        if (floorOverlay.parentNode) {
-                            floorOverlay.parentNode.appendChild(
-                                floorOverlay
-                            );
-                        }
+                if (floorOverlay) {
+                    floorOverlay.classList.add('symcon-flow-emitter');
+                    if (floorOverlay.parentNode) {
+                        floorOverlay.parentNode.appendChild(floorOverlay);
                     }
                 }
 
                 /*
-                 * Heizkörper:
+                 * --------------------------------------------------------
+                 * HEIZKÖRPER
+                 * --------------------------------------------------------
+                 * Der Original-Heizkörper ist ein zusammengesetzter Pfad aus
+                 * Außenrahmen und einzelnen geschlossenen Rippen. Darauf kann
+                 * keine saubere gerichtete Dash-Animation entstehen.
                  *
-                 * Keine künstliche Wasserlinie mehr. Wir verwenden direkt
-                 * die bereits vorhandene Heizkörper-Geometrie aus der SVG
-                 * und legen darauf – genau wie auf Vor- und Rücklauf –
-                 * ein animiertes gestricheltes Overlay.
+                 * Deshalb erzeugen wir einen unsichtbaren hydraulischen Pfad
+                 * im ORIGINALEN Heizkörper-<g>:
                  *
-                 * Damit läuft die Animation:
-                 *   Vorlauf -> Leitung vor Heizkörper -> Heizkörper
-                 *   -> Leitung nach Heizkörper -> Rücklauf
+                 *   Eingang links oben -> oberer Sammelkanal ->
+                 *   rechter Abstieg -> Ausgang rechts unten.
+                 *
+                 * Heizkreis 2/3 übernehmen automatisch den translate() ihres
+                 * jeweiligen radiator-<g>.
                  */
                 const radiator =
-                    svg.querySelector(
-                        '#rectRadiator' + number
-                    );
-
-                if (!radiator) {
-                    return;
-                }
-
-                const radiatorParent = radiator.parentElement;
+                    svg.querySelector('#rectRadiator' + number);
+                const radiatorParent = radiator ? radiator.parentElement : null;
                 const radiatorVisible =
-                    !radiatorParent
-                    || getComputedStyle(radiatorParent).display !== 'none';
+                    !!radiatorParent
+                    && getComputedStyle(radiatorParent).display !== 'none';
+                const radiatorEnabled =
+                    emitterEnabled
+                    && type === 'radiator'
+                    && radiatorVisible;
+
+                if (radiatorParent) {
+                    let radiatorWaterPath =
+                        svg.querySelector('#symconRadiatorWaterPath' + number);
+
+                    if (!radiatorWaterPath) {
+                        radiatorWaterPath = document.createElementNS(
+                            'http://www.w3.org/2000/svg',
+                            'path'
+                        );
+                        radiatorWaterPath.setAttribute(
+                            'id',
+                            'symconRadiatorWaterPath' + number
+                        );
+
+                        /*
+                         * Die echte SVG-Geometrie liegt bei:
+                         * Eingang  x=838 / y=82
+                         * Oberkante y=80
+                         * Ausgang  x=937 / y=115
+                         *
+                         * Der Fluss wird leicht innerhalb des Heizkörpers
+                         * geführt, damit die gestrichelten Punkte klar auf dem
+                         * oberen Sammelbereich sichtbar sind.
+                         */
+                        radiatorWaterPath.setAttribute(
+                            'd',
+                            'M 838 82 '
+                            + 'H 930 '
+                            + 'C 934 82 936 84 936 88 '
+                            + 'V 115 '
+                            + 'H 937'
+                        );
+                        radiatorWaterPath.setAttribute('fill', 'none');
+                        radiatorWaterPath.style.setProperty(
+                            'stroke',
+                            'transparent',
+                            'important'
+                        );
+                        radiatorWaterPath.style.setProperty(
+                            'fill',
+                            'none',
+                            'important'
+                        );
+                        radiatorParent.appendChild(radiatorWaterPath);
+                    }
+
+                    if (radiatorWaterPath.parentNode) {
+                        radiatorWaterPath.parentNode.appendChild(
+                            radiatorWaterPath
+                        );
+                    }
+                }
 
                 ensureFlowOverlay(
                     svg,
-                    '#rectRadiator' + number,
+                    '#symconRadiatorWaterPath' + number,
                     'symconFlowEmitterRadiator' + number,
                     'forward',
-                    !!enabled && radiatorVisible
+                    radiatorEnabled
                 );
 
                 const radiatorOverlay =
-                    svg.querySelector(
-                        '#symconFlowEmitterRadiator' + number
-                    );
+                    svg.querySelector('#symconFlowEmitterRadiator' + number);
 
                 if (radiatorOverlay) {
-                    radiatorOverlay.classList.add(
-                        'symcon-flow-emitter'
-                    );
-
-                    /*
-                     * Gleiche Darstellung wie auf den Heizkreisleitungen.
-                     * Das Overlay liegt bewusst vor dem Heizkörper, damit die
-                     * gestrichelte Bewegung auch im oberen Bereich und über
-                     * den Rippen sichtbar bleibt.
-                     */
-                    radiatorOverlay.style.setProperty(
-                        'fill',
-                        'none',
-                        'important'
-                    );
+                    radiatorOverlay.classList.add('symcon-flow-emitter');
                     radiatorOverlay.style.setProperty(
                         'stroke',
                         'rgba(255,255,255,.82)',
@@ -6643,8 +6671,8 @@ window.SymconHeatPump = {
                         'important'
                     );
                     radiatorOverlay.style.setProperty(
-                        'opacity',
-                        '1',
+                        'fill',
+                        'none',
                         'important'
                     );
 
@@ -6656,119 +6684,101 @@ window.SymconHeatPump = {
                 }
             };
 
-            const animateCircuit = (
+            const animateHeatingCircuit = (
                 number,
+                type,
                 active,
-                supplySelectors,
-                returnSelectors
+                pumpPipeSelector,
+                directReturnSelector = null
             ) => {
                 const enabled = !!active && heatingAllowed;
 
-                supplySelectors.forEach((selector, index) => {
-                    const overlayId =
-                        'symconFlowHeatingSupply'
-                        + number + '_' + index;
+                /* Leitung vom gemeinsamen Vorlauf bis zur Heizkreispumpe. */
+                ensureFlowOverlay(
+                    svg,
+                    pumpPipeSelector,
+                    'symconFlowHeatingPumpPipe' + number,
+                    'forward',
+                    enabled
+                );
 
-                    ensureFlowOverlay(
-                        svg,
-                        selector,
-                        overlayId,
-                        'forward',
-                        enabled
-                    );
+                /*
+                 * Heizkörper besitzt separate kurze Zu-/Rückleitungen.
+                 * Bei Fußbodenheizung sind diese NICHT Teil des sichtbaren
+                 * Kreises; dort übernimmt pathUnderfloorHeatingN den gesamten
+                 * Abschnitt zwischen Pumpe und Rücklauf.
+                 */
+                const radiatorEnabled = enabled && type === 'radiator';
 
-                    if (
-                        selector.includes('Radiator')
-                        || selector.includes('Underfloor')
-                        || selector.includes('HeatingCircuitPump')
-                    ) {
-                        const overlay =
-                            svg.querySelector('#' + overlayId);
+                ensureFlowOverlay(
+                    svg,
+                    '#pathRadiatorPipeIn' + number,
+                    'symconFlowRadiatorPipeIn' + number,
+                    'forward',
+                    radiatorEnabled
+                );
+                ensureFlowOverlay(
+                    svg,
+                    '#pathRadiatorPipeOut' + number,
+                    'symconFlowRadiatorPipeOut' + number,
+                    'forward',
+                    radiatorEnabled
+                );
 
-                        if (overlay) {
-                            overlay.classList.add(
-                                'symcon-flow-emitter'
-                            );
-                        }
+                [
+                    '#symconFlowRadiatorPipeIn' + number,
+                    '#symconFlowRadiatorPipeOut' + number
+                ].forEach((selector) => {
+                    const overlay = svg.querySelector(selector);
+                    if (overlay) {
+                        overlay.classList.add('symcon-flow-emitter');
                     }
                 });
 
-                returnSelectors.forEach((selector, index) => {
-                    const overlayId =
-                        'symconFlowHeatingReturn'
-                        + number + '_' + index;
-
+                /*
+                 * Heizkreis 1 besitzt zusätzlich pathPipeToHP zwischen seinem
+                 * Rücklauf und dem gemeinsamen vertikalen Rücklauf.
+                 */
+                if (directReturnSelector) {
                     ensureFlowOverlay(
                         svg,
-                        selector,
-                        overlayId,
+                        directReturnSelector,
+                        'symconFlowHeatingDirectReturn' + number,
                         'forward',
                         enabled
                     );
+                }
 
-                    if (
-                        selector.includes('Radiator')
-                        || selector.includes('PipeToHP')
-                    ) {
-                        const overlay =
-                            svg.querySelector('#' + overlayId);
-
-                        if (overlay) {
-                            overlay.classList.add(
-                                'symcon-flow-emitter'
-                            );
-                        }
-                    }
-                });
+                animateEmitter(number, type, enabled);
             };
 
-            animateCircuit(
+            const circuitType1 =
+                String(currentConfig.heatingCircuitType1 || 'off');
+            const circuitType2 =
+                String(currentConfig.heatingCircuitType2 || 'off');
+            const circuitType3 =
+                String(currentConfig.heatingCircuitType3 || 'off');
+
+            animateHeatingCircuit(
                 1,
+                circuitType1,
                 circuit1Active,
-                [
-                    '#pathPipeToHeatingCircuitPump',
-                    '#pathRadiatorPipeIn1'
-                ],
-                [
-                    '#pathPipeToHP',
-                    '#pathRadiatorPipeOut1'
-                ]
-            );
-            animateEmitter(
-                1,
-                circuit1Active && heatingAllowed
+                '#pathPipeToHeatingCircuitPump',
+                '#pathPipeToHP'
             );
 
-            animateCircuit(
+            animateHeatingCircuit(
                 2,
+                circuitType2,
                 circuit2Active,
-                [
-                    '#pathPipeToHeatingCircuitPump2',
-                    '#pathRadiatorPipeIn2'
-                ],
-                [
-                    '#pathRadiatorPipeOut2'
-                ]
-            );
-            animateEmitter(
-                2,
-                circuit2Active && heatingAllowed
+                '#pathPipeToHeatingCircuitPump2'
             );
 
-            animateCircuit(
+            animateHeatingCircuit(
                 3,
+                circuitType3,
                 circuit3Active,
-                [
-                    '#pathPipeToHeatingCircuitPump3',
-                    '#pathRadiatorPipeIn3'
-                ],
-                [
-                    '#pathRadiatorPipeOut3'
-                ]
-            );
-            animateEmitter(
-                3,
-                circuit3Active && heatingAllowed
+                '#pathPipeToHeatingCircuitPump3'
             );
 
             /*
