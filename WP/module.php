@@ -6354,11 +6354,22 @@ window.SymconHeatPump = {
 
             const svg = card.content;
 
+            /*
+             * Die zusätzlichen gestrichelten Heizkreis-Flüsse gehören zur
+             * eigenen Temperaturfarb-Darstellung und werden deshalb nur
+             * angezeigt, wenn "Eigene Temperaturfarben verwenden" aktiv ist.
+             */
+            const customColorsEnabled =
+                currentConfig.useCustomTemperatureColors === true;
+
             const configured = [
                 false,
-                String(currentConfig.heatingCircuitType1 || 'off') !== 'off',
-                String(currentConfig.heatingCircuitType2 || 'off') !== 'off',
-                String(currentConfig.heatingCircuitType3 || 'off') !== 'off'
+                customColorsEnabled
+                    && String(currentConfig.heatingCircuitType1 || 'off') !== 'off',
+                customColorsEnabled
+                    && String(currentConfig.heatingCircuitType2 || 'off') !== 'off',
+                customColorsEnabled
+                    && String(currentConfig.heatingCircuitType3 || 'off') !== 'off'
             ];
 
             for (let number = 1; number <= 3; number++) {
