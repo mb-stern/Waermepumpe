@@ -6263,6 +6263,72 @@ window.SymconHeatPump = {
             const svg = card.content;
 
             /*
+             * Die Fluss-CSS muss direkt IM SVG liegen.
+             * Besonders Heizkörper und Fußbodenheizung liegen innerhalb
+             * der Card-/SVG-Struktur und dürfen sich nicht darauf verlassen,
+             * dass die äußere HTML-CSS bis dorthin durchgereicht wird.
+             */
+            if (!svg.querySelector('#symconFlowAnimationStyle')) {
+                const flowStyle = document.createElementNS(
+                    'http://www.w3.org/2000/svg',
+                    'style'
+                );
+
+                flowStyle.setAttribute(
+                    'id',
+                    'symconFlowAnimationStyle'
+                );
+
+                flowStyle.textContent = `
+                    @keyframes symcon-flow-forward {
+                        from { stroke-dashoffset: 0; }
+                        to   { stroke-dashoffset: -24; }
+                    }
+
+                    @keyframes symcon-flow-reverse {
+                        from { stroke-dashoffset: 0; }
+                        to   { stroke-dashoffset: 24; }
+                    }
+
+                    .symcon-flow-overlay {
+                        pointer-events: none;
+                        fill: none !important;
+                        stroke: rgba(255,255,255,.68) !important;
+                        stroke-width: 2.2 !important;
+                        stroke-dasharray: 4 8 !important;
+                        stroke-linecap: round !important;
+                        vector-effect: non-scaling-stroke;
+                    }
+
+                    .symcon-flow-forward {
+                        animation: symcon-flow-forward 1.4s linear infinite;
+                    }
+
+                    .symcon-flow-reverse {
+                        animation: symcon-flow-reverse 1.4s linear infinite;
+                    }
+
+                    .symcon-flow-overlay.symcon-flow-refrigerant {
+                        stroke-width: 1.25 !important;
+                        stroke: rgba(255,255,255,.62) !important;
+                        stroke-dasharray: 3 9 !important;
+                    }
+
+                    .symcon-flow-overlay.symcon-flow-emitter {
+                        stroke: rgba(255,255,255,.82) !important;
+                        stroke-width: 1.55 !important;
+                        stroke-dasharray: 3 8 !important;
+                        stroke-linecap: round !important;
+                    }
+                `;
+
+                svg.insertBefore(
+                    flowStyle,
+                    svg.firstChild
+                );
+            }
+
+            /*
              * Flussanimation nur zusammen mit den eigenen Temperaturfarben.
              */
             if (!currentConfig.useCustomTemperatureColors) {
@@ -6557,6 +6623,43 @@ window.SymconHeatPump = {
                     if (floorOverlay) {
                         floorOverlay.classList.add(
                             'symcon-flow-emitter'
+                        );
+
+                        /*
+                         * Sichtbarkeit direkt setzen, damit auch die
+                         * Fußbodenheizung sicher einen animierten Fluss
+                         * erhält und keine Original-SVG-Eigenschaft den
+                         * Overlay-Pfad unsichtbar macht.
+                         */
+                        floorOverlay.style.setProperty(
+                            'fill',
+                            'none',
+                            'important'
+                        );
+                        floorOverlay.style.setProperty(
+                            'stroke',
+                            'rgba(255,255,255,.82)',
+                            'important'
+                        );
+                        floorOverlay.style.setProperty(
+                            'stroke-width',
+                            '1.55',
+                            'important'
+                        );
+                        floorOverlay.style.setProperty(
+                            'stroke-dasharray',
+                            '3 8',
+                            'important'
+                        );
+                        floorOverlay.style.setProperty(
+                            'stroke-linecap',
+                            'round',
+                            'important'
+                        );
+                        floorOverlay.style.setProperty(
+                            'opacity',
+                            '1',
+                            'important'
                         );
 
                         if (floorOverlay.parentNode) {
