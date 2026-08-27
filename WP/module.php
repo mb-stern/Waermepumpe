@@ -6650,22 +6650,32 @@ window.SymconHeatPump = {
                  * symcon-flow-overlay animieren.
                  */
 
-                // Fußbodenheizung: Originalpfad direkt animieren.
+                /*
+                 * Keine zusätzliche Typprüfung mehr.
+                 *
+                 * Die Original-SVG schaltet selbst zwischen
+                 * Fußbodenheizung und Heizkörper um:
+                 *   gHeaterCircuitFloorN -> display none/inline
+                 *   radiatorN           -> display none/inline
+                 *
+                 * Deshalb animieren wir bei aktivem Heizkreis einfach ALLE
+                 * vorhandenen Originalpfade. Sichtbar bleibt automatisch nur
+                 * die aktuell eingeblendete Heizfläche.
+                 */
                 ensureFlowOverlay(
                     svg,
                     '#pathUnderfloorHeating' + number,
                     'symconFlowEmitterFloor' + number,
                     'forward',
-                    active && type === 'underfloor'
+                    active
                 );
 
-                // Heizkörper: vorhandene Originalelemente direkt animieren.
                 ensureFlowOverlay(
                     svg,
                     '#pathRadiatorPipeIn' + number,
                     'symconFlowRadiatorIn' + number,
                     'forward',
-                    active && type === 'radiator'
+                    active
                 );
 
                 ensureFlowOverlay(
@@ -6673,7 +6683,7 @@ window.SymconHeatPump = {
                     '#rectRadiator' + number,
                     'symconFlowRadiatorBody' + number,
                     'forward',
-                    active && type === 'radiator'
+                    active
                 );
 
                 ensureFlowOverlay(
@@ -6681,7 +6691,7 @@ window.SymconHeatPump = {
                     '#pathRadiatorPipeOut' + number,
                     'symconFlowRadiatorOut' + number,
                     'forward',
-                    active && type === 'radiator'
+                    active
                 );
 
                 [
