@@ -553,6 +553,11 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 
 ## Versionen
 
+### Version 1.2 (27.08.2026)
+
+- Die animierten Flusslinien werden nun auch im Heizkörper und bodeheizung daragestellt.
+- Die Flussrichtung und Beschriftung im Kältekreislauf wurde angepast.
+
 ### Version 1.1 (24.08.2026)
 
 - Es kann auf jedem Gerät eine individuelle Ansicht gewählt werden. Werden pro View mehrere unterschiedliche Ansichten gewünscht, muss die Instanz geklont werden. Die Kacheln in der Visu identifizieren sich nun über die Instanz.
