@@ -6503,6 +6503,26 @@ window.SymconHeatPump = {
             const compressorRunning =
                 stateIsOn(currentConfig.compressorRunning);
 
+            /*
+             * Kältekreis-Fluss an die Zirkulationspumpe koppeln.
+             * Nicht der Verdichterstatus, sondern CirculatingPumpRunning
+             * beendet/startet die gestrichelte Kältekreis-Animation.
+             */
+            const refrigerantPumpRunning =
+                stateIsOn(currentConfig.circulatingPumpRunning);
+
+            if (!refrigerantPumpRunning) {
+                svg.querySelectorAll(
+                    '[id^="symconFlowRefrigerant"],'
+                    + '[id^="symconFlowEvaporatorCoil"],'
+                    + '[id^="symconFlowCondenserCoil"]'
+                ).forEach((overlay) => {
+                    if (overlay && overlay.parentNode) {
+                        overlay.parentNode.removeChild(overlay);
+                    }
+                });
+            }
+
             const circuit1Configured =
                 String(currentConfig.heatingCircuitType1 || 'off') !== 'off';
             const circuit2Configured =
@@ -6625,7 +6645,7 @@ window.SymconHeatPump = {
                 '#symconRefrigerantCircuitPipe',
                 'symconFlowRefrigerantMain',
                 refrigerantDirection('forward'),
-                compressorRunning
+                refrigerantPumpRunning
             );
 
             [
@@ -6645,7 +6665,7 @@ window.SymconHeatPump = {
                     '#symconRefrigerantBridge' + name,
                     'symconFlowRefrigerantBridge' + name,
                     refrigerantDirection(definition.direction),
-                    compressorRunning
+                    refrigerantPumpRunning
                 );
 
                 const bridgeOverlay =
@@ -6681,21 +6701,21 @@ window.SymconHeatPump = {
                 '#pathHPModelEvaporatorSymbol001',
                 'symconFlowEvaporatorCoil1',
                 refrigerantDirection('forward'),
-                compressorRunning
+                refrigerantPumpRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelEvaporatorSymbol002',
                 'symconFlowEvaporatorCoil2',
                 refrigerantDirection('forward'),
-                compressorRunning
+                refrigerantPumpRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelCondenserSymbol',
                 'symconFlowCondenserCoil',
                 refrigerantDirection('forward'),
-                compressorRunning
+                refrigerantPumpRunning
             );
 
             /*
