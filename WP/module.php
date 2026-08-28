@@ -6270,11 +6270,15 @@ window.SymconHeatPump = {
 
 
         /*
-         * DIAGNOSE / ROBUSTER HEIZKREIS-FLUSS
+         * ROBUSTER HEIZKREIS-FLUSS FÜR HEIZKÖRPER / FUSSBODENHEIZUNG
          *
-         * Bewusst unabhängig von den normalen CSS-Keyframes und Pumpenstatus.
          * Die Original-SVG entscheidet selbst, ob Heizkörper oder
          * Fußbodenheizung sichtbar ist.
+         *
+         * WICHTIG:
+         * Auch diese zusätzliche Animation folgt jetzt dem Status der
+         * jeweiligen Heizkreispumpe. Steht die Pumpe, steht damit auch
+         * die Animation im Heizkörper bzw. in der Fußbodenheizung.
          */
         let symconHeatingFlowRaf = 0;
         let symconHeatingFlowOffset = 0;
@@ -6375,14 +6379,75 @@ window.SymconHeatPump = {
             const customColorsEnabled =
                 currentConfig.useCustomTemperatureColors === true;
 
+            const storagePumpRunning =
+                stateIsOn(currentConfig.storageChargingPumpRunning);
+
+            const valveToBoiler =
+                !!currentConfig.wwHeatingValve
+                && stateIsOn(currentConfig.wwHeatingValve);
+
+            const pump1Configured =
+                !!currentConfig.heatingCircuitPumpRunning;
+            const pump2Configured =
+                !!currentConfig.heatingCircuitPumpRunning2;
+            const pump3Configured =
+                !!currentConfig.heatingCircuitPumpRunning3;
+
+            const anyHeatingCircuitPumpConfigured =
+                pump1Configured
+                || pump2Configured
+                || pump3Configured;
+
+            /*
+             * Dieselbe hydraulische Freigabe wie im normalen Heizkreisfluss:
+             * - keine Heizkreispumpe konfiguriert:
+             *   Speicherladepumpe treibt alle vorhandenen Heizkreise;
+             * - Heizkreispumpen vorhanden:
+             *   nur die jeweilige laufende Heizkreispumpe treibt ihren Kreis;
+             * - Boiler-Ventil aktiv:
+             *   Heizkörper/Fußbodenheizung bleiben immer stehen.
+             */
             const configured = [
                 false,
                 customColorsEnabled
-                    && String(currentConfig.heatingCircuitType1 || 'off') !== 'off',
+                    && !valveToBoiler
+                    && String(currentConfig.heatingCircuitType1 || 'off') !== 'off'
+                    && (
+                        anyHeatingCircuitPumpConfigured
+                            ? (
+                                pump1Configured
+                                && stateIsOn(
+                                    currentConfig.heatingCircuitPumpRunning
+                                )
+                            )
+                            : storagePumpRunning
+                    ),
                 customColorsEnabled
-                    && String(currentConfig.heatingCircuitType2 || 'off') !== 'off',
+                    && !valveToBoiler
+                    && String(currentConfig.heatingCircuitType2 || 'off') !== 'off'
+                    && (
+                        anyHeatingCircuitPumpConfigured
+                            ? (
+                                pump2Configured
+                                && stateIsOn(
+                                    currentConfig.heatingCircuitPumpRunning2
+                                )
+                            )
+                            : storagePumpRunning
+                    ),
                 customColorsEnabled
+                    && !valveToBoiler
                     && String(currentConfig.heatingCircuitType3 || 'off') !== 'off'
+                    && (
+                        anyHeatingCircuitPumpConfigured
+                            ? (
+                                pump3Configured
+                                && stateIsOn(
+                                    currentConfig.heatingCircuitPumpRunning3
+                                )
+                            )
+                            : storagePumpRunning
+                    )
             ];
 
             for (let number = 1; number <= 3; number++) {
@@ -6503,26 +6568,6 @@ window.SymconHeatPump = {
             const compressorRunning =
                 stateIsOn(currentConfig.compressorRunning);
 
-            /*
-             * Kältekreis-Fluss an die Zirkulationspumpe koppeln.
-             * Nicht der Verdichterstatus, sondern CirculatingPumpRunning
-             * beendet/startet die gestrichelte Kältekreis-Animation.
-             */
-            const refrigerantPumpRunning =
-                stateIsOn(currentConfig.circulatingPumpRunning);
-
-            if (!refrigerantPumpRunning) {
-                svg.querySelectorAll(
-                    '[id^="symconFlowRefrigerant"],'
-                    + '[id^="symconFlowEvaporatorCoil"],'
-                    + '[id^="symconFlowCondenserCoil"]'
-                ).forEach((overlay) => {
-                    if (overlay && overlay.parentNode) {
-                        overlay.parentNode.removeChild(overlay);
-                    }
-                });
-            }
-
             const circuit1Configured =
                 String(currentConfig.heatingCircuitType1 || 'off') !== 'off';
             const circuit2Configured =
@@ -6547,33 +6592,72 @@ window.SymconHeatPump = {
                     && currentControls.heatingActive === true
                 );
 
+            const storagePump =
+                stateIsOn(currentConfig.storageChargingPumpRunning);
+
             /*
-             * Ein konfigurierter Heizkreis gilt als aktiv, sobald
-             * - der Heizbetrieb aktiv ist ODER
-             * - seine Heizkreispumpe aktiv meldet.
+             * Hydraulische Freigabe der Heizkreise:
              *
-             * Eine vorhandene, aber gerade false meldende Pumpenvariable
-             * darf den sichtbaren Heizfluss nicht mehr blockieren.
+             * 1) Ist KEINE Heizkreispumpe als Variable konfiguriert,
+             *    übernimmt die Speicherladepumpe die Zirkulation durch die
+             *    vorhandenen Heizkreise.
+             *
+             * 2) Sobald mindestens EINE Heizkreispumpe konfiguriert ist,
+             *    wird jeder Heizkreis ausschließlich durch SEINE zugehörige
+             *    Heizkreispumpe freigegeben.
+             *
+             * Der Betriebsmodus allein darf keinen sichtbaren Wasserfluss
+             * erzeugen.
              */
+            const heatingCircuitPump1Configured =
+                !!currentConfig.heatingCircuitPumpRunning;
+            const heatingCircuitPump2Configured =
+                !!currentConfig.heatingCircuitPumpRunning2;
+            const heatingCircuitPump3Configured =
+                !!currentConfig.heatingCircuitPumpRunning3;
+
+            const anyHeatingCircuitPumpConfigured =
+                heatingCircuitPump1Configured
+                || heatingCircuitPump2Configured
+                || heatingCircuitPump3Configured;
+
             const circuit1Active =
                 circuit1Configured
-                && (heatingModeActive || heatingPump1);
+                && (
+                    anyHeatingCircuitPumpConfigured
+                        ? (
+                            heatingCircuitPump1Configured
+                            && heatingPump1
+                        )
+                        : storagePump
+                );
 
             const circuit2Active =
                 circuit2Configured
-                && (heatingModeActive || heatingPump2);
+                && (
+                    anyHeatingCircuitPumpConfigured
+                        ? (
+                            heatingCircuitPump2Configured
+                            && heatingPump2
+                        )
+                        : storagePump
+                );
 
             const circuit3Active =
                 circuit3Configured
-                && (heatingModeActive || heatingPump3);
+                && (
+                    anyHeatingCircuitPumpConfigured
+                        ? (
+                            heatingCircuitPump3Configured
+                            && heatingPump3
+                        )
+                        : storagePump
+                );
 
             const anyHeatingActive =
                 circuit1Active
                 || circuit2Active
                 || circuit3Active;
-
-            const storagePump =
-                stateIsOn(currentConfig.storageChargingPumpRunning);
 
             const solarPump =
                 stateIsOn(currentConfig.thermalSolarPump);
@@ -6645,7 +6729,7 @@ window.SymconHeatPump = {
                 '#symconRefrigerantCircuitPipe',
                 'symconFlowRefrigerantMain',
                 refrigerantDirection('forward'),
-                refrigerantPumpRunning
+                compressorRunning
             );
 
             [
@@ -6665,7 +6749,7 @@ window.SymconHeatPump = {
                     '#symconRefrigerantBridge' + name,
                     'symconFlowRefrigerantBridge' + name,
                     refrigerantDirection(definition.direction),
-                    refrigerantPumpRunning
+                    compressorRunning
                 );
 
                 const bridgeOverlay =
@@ -6701,21 +6785,21 @@ window.SymconHeatPump = {
                 '#pathHPModelEvaporatorSymbol001',
                 'symconFlowEvaporatorCoil1',
                 refrigerantDirection('forward'),
-                refrigerantPumpRunning
+                compressorRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelEvaporatorSymbol002',
                 'symconFlowEvaporatorCoil2',
                 refrigerantDirection('forward'),
-                refrigerantPumpRunning
+                compressorRunning
             );
             ensureFlowOverlay(
                 svg,
                 '#pathHPModelCondenserSymbol',
                 'symconFlowCondenserCoil',
                 refrigerantDirection('forward'),
-                refrigerantPumpRunning
+                compressorRunning
             );
 
             /*
