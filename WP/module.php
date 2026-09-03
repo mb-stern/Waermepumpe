@@ -640,12 +640,11 @@ $defaults = [
 
 foreach ($defaults as $index => $item) {
     $number = $index + 1;
-    IPS_SetProperty($id, 'TemperaturePoint' . $number, $item[0]);
-    IPS_SetProperty($id, 'TemperatureColor' . $number, $item[1]);
+    $this->UpdateFormField('TemperaturePoint' . $number, 'value', $item[0]);
+    $this->UpdateFormField('TemperatureColor' . $number, 'value', $item[1]);
 }
 
-IPS_ApplyChanges($id);
-echo 'Temperaturfarben wurden auf die Standardvorlage zurückgesetzt.';
+echo 'Temperaturfarben wurden in der Konfiguration auf die Standardvorlage zurückgesetzt. Bitte prüfen und mit "Änderungen übernehmen" speichern.';
 PHP
                     ],
                     [
