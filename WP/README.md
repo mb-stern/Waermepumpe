@@ -555,7 +555,7 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 
 ### Version 1.3 (03.09.2026)
 
-- Geänderte Farben in der Konfiguration werdn nun nicht mehr ohne Rückfrage gespeichert.
+- Geänderte Farben in der Konfiguration werden nun nicht mehr ohne Rückfrage gespeichert.
 
 ### Version 1.2 (27.08.2026)
 
