@@ -3277,6 +3277,58 @@ window.SymconHeatPump = {
             const svg = card.content;
             const textColor = resolveLayoutTextColor();
 
+            // Neutralflächen passend zum Symcon Hell-/Dunkel-Theme setzen.
+            // Rot/Blau/Orange der Hydraulik bleiben unverändert.
+            const colorMatch = String(textColor || '').match(/rgba?\((\d+)[, ]+(\d+)[, ]+(\d+)/i);
+            let lightTheme = false;
+            if (colorMatch) {
+                const r = Number(colorMatch[1]), g = Number(colorMatch[2]), b = Number(colorMatch[3]);
+                lightTheme = ((r * 299 + g * 587 + b * 114) / 1000) < 128;
+            } else {
+                lightTheme = ['#000', '#000000', 'black'].includes(String(textColor || '').toLowerCase());
+            }
+
+            const themeVars = lightTheme ? {
+                '--wp-bg':'#f3f5f6',
+                '--wp-panel1':'#ffffff',
+                '--wp-panel2':'#e9eef1',
+                '--wp-button':'#ffffff',
+                '--wp-border':'#9aaab3',
+                '--wp-border2':'#8ca0ab',
+                '--wp-text':'#172027',
+                '--wp-icon':'#25323a',
+                '--wp-fan':'#65747d',
+                '--wp-fan-hub':'#35434b'
+            } : {
+                '--wp-bg':'#020506',
+                '--wp-panel1':'#111d24',
+                '--wp-panel2':'#071015',
+                '--wp-button':'#0b151b',
+                '--wp-border':'#557386',
+                '--wp-border2':'#57798b',
+                '--wp-text':'#f4f6f7',
+                '--wp-icon':'#eef3f5',
+                '--wp-fan':'#aeb8bf',
+                '--wp-fan-hub':'#66737c'
+            };
+            Object.entries(themeVars).forEach(([name, value]) => {
+                svg.style.setProperty(name, value);
+            });
+
+            const bg = svg.querySelector('#symconThemeBackground');
+            if (bg) bg.style.setProperty('fill', themeVars['--wp-bg'], 'important');
+
+            // Verlauf der neutralen Panels ebenfalls dem Theme anpassen.
+            const panelGradient = svg.querySelector('#p');
+            if (panelGradient) {
+                const stops = panelGradient.querySelectorAll('stop');
+                if (stops[0]) stops[0].setAttribute('stop-color', themeVars['--wp-panel1']);
+                if (stops[1]) stops[1].setAttribute('stop-color', themeVars['--wp-panel2']);
+            }
+
+            const fanRotor = svg.querySelector('#pathHPFan');
+            if (fanRotor) fanRotor.style.setProperty('fill', themeVars['--wp-fan'], 'important');
+
             /*
              * Symcon-Design direkt in die SVG weiterreichen.
              */
@@ -3334,10 +3386,11 @@ window.SymconHeatPump = {
              */
             svg.querySelectorAll('*').forEach((element) => {
                 if (
-                    element.classList
-                    && element.classList.contains(
-                        'symcon-flow-overlay'
-                    )
+                    (element.classList && element.classList.contains('symcon-flow-overlay'))
+                    || (element.classList && element.classList.contains('pn'))
+                    || (element.classList && element.classList.contains('bt'))
+                    || element.id === 'symconThemeBackground'
+                    || element.id === 'pathHPFan'
                 ) {
                     return;
                 }
