@@ -418,7 +418,7 @@ class Waermepumpe extends IPSModuleStrict
     {
         if (!$this->ResourcesAvailable()) {
             return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
-                . 'Wärmepumpen-Ressource fehlt. Erwartet wird: heat-pump/heat-pump-card/heat-pump-v2-modern-test.svg.'
+                . 'Wärmepumpen-Ressource fehlt. Erwartet wird: heat-pump/heat-pump-card/heat-pump-v3-clean-test.svg.'
                 . '</div>';
         }
 
@@ -1205,7 +1205,7 @@ PHP
                 . DIRECTORY_SEPARATOR
                 . 'heat-pump-card'
                 . DIRECTORY_SEPARATOR
-                . 'heat-pump-v2-modern-test.svg'
+                . 'heat-pump-v3-clean-test.svg'
         ];
     }
 
@@ -2378,7 +2378,7 @@ class HeatPumpCard extends HTMLElement {
       this.tankColors(up, middle, down, '#stop3050', '#stop3070', '#stop3060');
 
       const valve = this.content.querySelector('#gWWHeatingValve');
-      if (valve) {
+      if (valve && this.content.getAttribute('data-symcon-modern') !== '3') {
         valve.setAttribute(
           'transform',
           'rotate(' + (this.binary(c.wwHeatingValve) ? '90' : '0') + ', 620, 450)'
@@ -2537,12 +2537,16 @@ class HeatPumpCard extends HTMLElement {
       var noHeating = (!type1 || type1 === 'off') && (!type2 || type2 === 'off') && (!type3 || type3 === 'off') && !config.tankHP;
       var noHotWater = !config.tankWW;
 
+      const modernGraphic = this.content.getAttribute('data-symcon-modern') === '3';
+
       if (noHeating && noHotWater) {
         this.content.querySelector("#gPipe").style.display = 'none';
         this.content.querySelector("#gPipeBuffer").style.display = 'none';
         this.content.querySelector("#gPipeLayeredChargeStorage").style.display = 'none';
-        this.content.querySelector("#gHP").setAttribute("transform", "translate(460 -300)");
-        this.content.querySelector("#gSettings").setAttribute("transform", "translate(-25)");
+        if (!modernGraphic) {
+          this.content.querySelector("#gHP").setAttribute("transform", "translate(460 -300)");
+          this.content.querySelector("#gSettings").setAttribute("transform", "translate(-25)");
+        }
       } else {
         this.content.querySelector("#pathPipeToBuffer").style.display = noHeating ? 'none' : 'inline';
         this.content.querySelector("#pathPipeFromBuffer").style.display = noHeating ? 'none' : 'inline';
@@ -2550,8 +2554,10 @@ class HeatPumpCard extends HTMLElement {
         this.content.querySelector("#gPipeBuffer").style.display = config.layeredChargeStorage ? 'none' : 'inline';
         this.content.querySelector("#gPipeLayeredChargeStorage").style.display = config.layeredChargeStorage ? 'inline' : 'none';
         this.content.querySelector("#gWWHeatingValve").style.display = config.layeredChargeStorage ? 'none' : 'inline';
-        this.content.querySelector("#gHP").removeAttribute("transform");
-        this.content.querySelector("#gSettings").removeAttribute("transform");
+        if (!modernGraphic) {
+          this.content.querySelector("#gHP").removeAttribute("transform");
+          this.content.querySelector("#gSettings").removeAttribute("transform");
+        }
       }
 
       if (!config.thermalSolarAvailable || config.thermalSolarAvailable === 'off') {
@@ -9006,32 +9012,51 @@ window.SymconHeatPump = {
                         const result = originalSetData.call(this, data);
 
                         if (this.content) {
-                            applyCoolingVisualization(this);
-                            updateRefrigerantValues(this);
-                            applyTerminology(this);
-                            applyThemeColors(this);
-                            applyRefrigerantCircuitMode(this);
-                            applyRefrigerantTemperatureColors(this);
-                            applyOptionalStatusVisibility(this);
-                            applyWWValvePipeGeometry(this);
-                            restoreOriginalTemperatureColors(this);
-                            applyHeatingCircuitTemperatureColors(this);
-                            applyTemperatureColorOpacity(this);
-                            applyThreeHeaterRods(this);
-                            applyHeaterRodStatusIcon(this);
-                            disableOriginalSettingsLink(this);
-                            applyControlIcons(this);
-                            applySetpointIcons(this);
-                            layoutTopIconBar(this);
-                            applyFanAnimation(this);
-                            applyHeatingReturnContinuity(this);
-                            applySingleCircuitTemperatureDisplay(this);
-                            applyThermalSolarVisualization(this);
-                            applyAdditionalValues(this);
-                            normalizeTemperatureUnits(this);
-                            positionHeatingCircuitTemperatures(this);
-                            applyFlowAnimations(this);
-                            applyHeatingFlowDiagnostic(this);
+                            const modernGraphic =
+                                this.content.getAttribute('data-symcon-modern') === '3';
+
+                            if (modernGraphic) {
+                                /*
+                                 * V3 besitzt eine eigene Geometrie. Funktionen, welche
+                                 * Koordinaten der alten Lovelace-SVG voraussetzen, werden
+                                 * hier bewusst nicht ausgeführt. Dadurch entstehen keine
+                                 * frei schwebenden Kreise, Hilfslinien oder verschobenen
+                                 * Rohrstücke mehr.
+                                 */
+                                updateRefrigerantValues(this);
+                                applyTerminology(this);
+                                applyThemeColors(this);
+                                applyCoolingVisualization(this);
+                                applyRefrigerantCircuitMode(this);
+                                normalizeTemperatureUnits(this);
+                            } else {
+                                applyCoolingVisualization(this);
+                                updateRefrigerantValues(this);
+                                applyTerminology(this);
+                                applyThemeColors(this);
+                                applyRefrigerantCircuitMode(this);
+                                applyRefrigerantTemperatureColors(this);
+                                applyOptionalStatusVisibility(this);
+                                applyWWValvePipeGeometry(this);
+                                restoreOriginalTemperatureColors(this);
+                                applyHeatingCircuitTemperatureColors(this);
+                                applyTemperatureColorOpacity(this);
+                                applyThreeHeaterRods(this);
+                                applyHeaterRodStatusIcon(this);
+                                disableOriginalSettingsLink(this);
+                                applyControlIcons(this);
+                                applySetpointIcons(this);
+                                layoutTopIconBar(this);
+                                applyFanAnimation(this);
+                                applyHeatingReturnContinuity(this);
+                                applySingleCircuitTemperatureDisplay(this);
+                                applyThermalSolarVisualization(this);
+                                applyAdditionalValues(this);
+                                normalizeTemperatureUnits(this);
+                                positionHeatingCircuitTemperatures(this);
+                                applyFlowAnimations(this);
+                                applyHeatingFlowDiagnostic(this);
+                            }
 
                             /*
                              * Die Kompaktansicht ist ein eigener Render.
