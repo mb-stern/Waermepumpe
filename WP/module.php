@@ -5,7 +5,7 @@
  *
  * Komponente | Lizenz | Verwendung |
  * ------------|---------|------------|
- * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Basis/Adapter; SVG-Layout V22b modernisiert |
+ * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Basis; modernes V24-SVG über Symcon-Adapter |
  */
 
 declare(strict_types=1);
@@ -353,7 +353,7 @@ class Waermepumpe extends IPSModuleStrict
 
     public function RequestAction(string $Ident, mixed $Value): void
     {
-        if (!in_array($Ident, ['SetControlMode', 'SetNumericControl'], true)) {
+        if (!in_array($Ident, ['SetControlMode', 'SetNumericControl', 'SetBinaryControl'], true)) {
             throw new InvalidArgumentException('Unbekannte Aktion: ' . $Ident);
         }
 
@@ -370,6 +370,12 @@ class Waermepumpe extends IPSModuleStrict
                 'heating'  => 'HeatingControlVariable',
                 'hotwater' => 'HotWaterControlVariable',
                 'cooling'  => 'CoolingControlVariable'
+            ];
+        } elseif ($Ident === 'SetBinaryControl') {
+            $propertyMap = [
+                'power' => 'HeatingPumpStatusOnOff',
+                'party' => 'HeatingPumpPartyMode',
+                'eco'   => 'HeatingPumpEnergySaveMode'
             ];
         } else {
             $propertyMap = [
@@ -1960,6 +1966,9 @@ HTML;
             'heating'                      => $this->BuildControlInfo('HeatingControlVariable'),
             'hotwater'                     => $this->BuildControlInfo('HotWaterControlVariable'),
             'cooling'                      => $this->BuildControlInfo('CoolingControlVariable'),
+            'power'                        => $this->BuildControlInfo('HeatingPumpStatusOnOff'),
+            'party'                        => $this->BuildControlInfo('HeatingPumpPartyMode'),
+            'eco'                          => $this->BuildControlInfo('HeatingPumpEnergySaveMode'),
             'warmWaterSetpoint'            => $this->BuildNumericControlInfo('WarmWaterSetpointVariable', 20.0, 80.0, 0.5),
             'heatingTemperatureCorrection' => $this->BuildNumericControlInfo('HeatingTemperatureCorrectionVariable', -10.0, 10.0, 0.5)
         ];
@@ -2302,92 +2311,11 @@ class HeatPumpCard extends HTMLElement {
     element.classList.toggle('rotate', !!active);
   }
 
-  isModernSymconSvg() {
-    return !!(this.content && this.content.getAttribute('data-symcon-modern'));
-  }
-
-  modernShow(selector, visible) {
-    const element = this.content ? this.content.querySelector(selector) : null;
-    if (element) element.style.display = visible ? 'inline' : 'none';
-  }
-
-  setModernConfig(config) {
-    const type1 = config.heatingCircuitType1;
-    const type2 = config.heatingCircuitType2;
-    const type3 = config.heatingCircuitType3;
-    const hk1 = !!type1 && type1 !== 'off';
-    const hk2 = !!type2 && type2 !== 'off';
-    const hk3 = !!type3 && type3 !== 'off';
-    const heating = hk1 || hk2 || hk3;
-
-    this.modernShow('#gBuffer', !!config.tankHP && heating);
-    this.modernShow('#gNoBuffer', !config.tankHP && heating);
-    this.modernShow('#gHeating', heating);
-    this.modernShow('#gHK1', hk1);
-    this.modernShow('#gHK2', hk2);
-    this.modernShow('#gHK3', hk3);
-    this.modernShow('#gDHW', !!config.tankWW);
-    this.modernShow('#gSolar', !!config.tankWW && !!config.thermalSolarAvailable);
-
-    // Warmwasser-/Solar-Bedienfelder verschwinden ebenfalls, wenn nicht vorhanden.
-    this.modernShow('#gHPStatusWW', !!config.tankWW);
-  }
-
-  setModernData(data) {
-    this.data = data || {};
-    const c = this.config || {};
-    const text = (id, key) => this.setText(id, this.format(key));
-
-    text('#textOutdoorTemperatureValue', c.outdoorTemperature);
-    const indoorKey = this.binary(c.heatingPumpPartyMode) && this.format(c.ambientTemperatureParty)
-      ? c.ambientTemperatureParty
-      : (this.binary(c.heatingPumpNightMode) && this.format(c.ambientTemperatureReduced)
-          ? c.ambientTemperatureReduced
-          : c.ambientTemperatureNormal);
-    text('#textIndoorTemperatureValue', indoorKey);
-    text('#textSupplyTemperatureValue', c.supplyTemperature);
-
-    // Rücklauf: bevorzugt HK1, weil das bestehende Modul keinen separaten
-    // allgemeinen Rücklaufwert besitzt.
-    text('#textReturnTemperatureValue', c.refluxTemperatureHeating);
-
-    text('#textTankTempHPUp', c.tankTempHPUp);
-    text('#textTankTempHPMiddle', c.tankTempHPMiddle);
-    text('#textTankTempHPDown', c.tankTempHPDown);
-    text('#textTankTempWWUp', c.tankTempWWUp);
-    text('#textTankTempWWDown', c.tankTempWWDown);
-
-    text('#textSupplyTemperatureHeating1', c.supplyTemperatureHeating);
-    text('#textRefluxTemperatureHeating1', c.refluxTemperatureHeating);
-    text('#textSupplyTemperatureHeating2', c.supplyTemperatureHeating2);
-    text('#textRefluxTemperatureHeating2', c.refluxTemperatureHeating2);
-    text('#textSupplyTemperatureHeating3', c.supplyTemperatureHeating3);
-    text('#textRefluxTemperatureHeating3', c.refluxTemperatureHeating3);
-
-    text('#textEvaporatorPressure', c.evaporatorPressure);
-    text('#textEvaporatorTemperature', c.evaporatorTemperature);
-    text('#textCondenserPressure', c.condenserPressure);
-    text('#textCondenserTemperature', c.condenserTemperature);
-    text('#textExpansionValveOpening', c.expansionValveOpening);
-
-    text('#textThermalSolarPanelTemp', c.thermalSolarPanelTemp);
-    text('#textThermalSolarPumpSpeed', c.thermalSolarPumpSpeed);
-
-    const pumpText = (selector, key) => {
-      const value = this.format(key);
-      if (value) this.setText(selector, value);
-    };
-    pumpText('#textHeatingPump1', c.heatingCircuitPumpRunning);
-    pumpText('#textHeatingPump2', c.heatingCircuitPumpRunning2);
-    pumpText('#textHeatingPump3', c.heatingCircuitPumpRunning3);
-  }
-
   setData(data) {
     this.data = data || {};
     if (!this.content) return;
 
-    if (this.isModernSymconSvg()) {
-      this.setModernData(data);
+    if (this.content.getAttribute('data-symcon-modern')) {
       return;
     }
 
@@ -2574,8 +2502,7 @@ class HeatPumpCard extends HTMLElement {
   setConfig(config) {
     this.config = config;
     if (this.content) {
-      if (this.isModernSymconSvg()) {
-        this.setModernConfig(config);
+      if (this.content.getAttribute('data-symcon-modern')) {
         return;
       }
       this.querySelector("ha-card").setAttribute("header", config.title);
@@ -8719,6 +8646,209 @@ window.SymconHeatPump = {
             );
         };
 
+
+        const applyModernDashboard = (card) => {
+            if (!card || !card.content || !card.content.getAttribute('data-symcon-modern')) {
+                return false;
+            }
+
+            const svg = card.content;
+            const cfg = currentConfig || {};
+            const data = currentData || {};
+            const controls = currentControls || {};
+
+            const show = (selector, visible) => {
+                const el = svg.querySelector(selector);
+                if (el) {
+                    el.style.setProperty('display', visible ? 'inline' : 'none', 'important');
+                }
+            };
+
+            const setText = (selector, value) => {
+                const el = svg.querySelector(selector);
+                if (el && value !== null && value !== undefined && String(value) !== '') {
+                    el.textContent = String(value);
+                }
+            };
+
+            const formatted = (key) => {
+                if (!key || !data[key]) return '';
+                const item = data[key];
+                if (item.formatted !== undefined && item.formatted !== null && String(item.formatted) !== '') {
+                    return String(item.formatted);
+                }
+                if (item.value === undefined || item.value === null) return '';
+                return String(item.value) + (item.unit ? ' ' + item.unit : '');
+            };
+
+            const raw = (key) => {
+                if (!key || !data[key]) return null;
+                return data[key].value;
+            };
+
+            const binary = (key) => {
+                const v = raw(key);
+                if (typeof v === 'boolean') return v;
+                if (typeof v === 'number') return v !== 0;
+                if (typeof v === 'string') {
+                    return ['1','true','on','yes','ja','ein','active','aktiv'].includes(v.trim().toLowerCase());
+                }
+                return false;
+            };
+
+            const optionName = (control) => {
+                if (!control || !control.configured) return '';
+                const current = control.currentValue;
+                const options = Array.isArray(control.options) ? control.options : [];
+                const found = options.find((o) => {
+                    const a = Number(o.value), b = Number(current);
+                    return (!Number.isNaN(a) && !Number.isNaN(b)) ? a === b : String(o.value) === String(current);
+                });
+                return found ? String(found.name) : String(current ?? '');
+            };
+
+            // Real mode values from the configured Symcon profiles.
+            setText('#textControlHeating', optionName(controls.heating));
+            setText('#textControlHotWater', optionName(controls.hotwater));
+            setText('#textControlCooling', optionName(controls.cooling));
+
+            // Binary buttons: real state, and completely hidden when no variable is configured.
+            const binaryDefs = [
+                ['power', '#gHPStatusOnOff', '#textControlPower', cfg.heatingPumpStatusOnOff],
+                ['party', '#gHPStatusParty', '#textControlParty', cfg.heatingPumpPartyMode],
+                ['eco',   '#gHPStatusSave', '#textControlEco', cfg.heatingPumpEnergySaveMode]
+            ];
+            binaryDefs.forEach(([name, groupSel, textSel, dataKey]) => {
+                const control = controls[name];
+                const configured = !!(control && control.configured && dataKey);
+                show(groupSel, configured);
+                if (!configured) return;
+                const on = binary(dataKey);
+                setText(textSel, on ? 'Ein' : 'Aus');
+                const group = svg.querySelector(groupSel);
+                if (group) group.style.opacity = on ? '1' : '0.55';
+            });
+
+            // Mode buttons are visible only if a real control exists.
+            [
+                ['heating', '#gHPStatusHeating'],
+                ['hotwater', '#gHPStatusWW'],
+                ['cooling', '#gHPStatusCooling']
+            ].forEach(([name, selector]) => {
+                const c = controls[name];
+                show(selector, !!(c && c.configured && Array.isArray(c.options) && c.options.length));
+            });
+
+            // Optional hydraulic components.
+            const hk1 = !!cfg.heatingCircuitType1 && cfg.heatingCircuitType1 !== 'off';
+            const hk2 = !!cfg.heatingCircuitType2 && cfg.heatingCircuitType2 !== 'off';
+            const hk3 = !!cfg.heatingCircuitType3 && cfg.heatingCircuitType3 !== 'off';
+            const heating = hk1 || hk2 || hk3;
+            show('#gHeating', heating);
+            show('#gHK1', hk1);
+            show('#gHK2', hk2);
+            show('#gHK3', hk3);
+            show('#gBuffer', heating && !!cfg.tankHP);
+            show('#gNoBuffer', heating && !cfg.tankHP);
+            show('#gDHW', !!cfg.tankWW);
+            show('#gSolar', !!cfg.tankWW && !!cfg.thermalSolarAvailable);
+
+            // Live values.
+            setText('#textOutdoorTemperatureValue', formatted(cfg.outdoorTemperature));
+            let indoorKey = cfg.ambientTemperatureNormal;
+            if (binary(cfg.heatingPumpPartyMode) && formatted(cfg.ambientTemperatureParty)) {
+                indoorKey = cfg.ambientTemperatureParty;
+            } else if (binary(cfg.heatingPumpNightMode) && formatted(cfg.ambientTemperatureReduced)) {
+                indoorKey = cfg.ambientTemperatureReduced;
+            }
+            setText('#textIndoorTemperatureValue', formatted(indoorKey));
+            setText('#textSupplyTemperatureValue', formatted(cfg.supplyTemperature));
+            setText('#textReturnTemperatureValue', formatted(cfg.refluxTemperatureHeating));
+
+            setText('#textTankTempHPUp', formatted(cfg.tankTempHPUp));
+            setText('#textTankTempHPMiddle', formatted(cfg.tankTempHPMiddle));
+            setText('#textTankTempHPDown', formatted(cfg.tankTempHPDown));
+            setText('#textTankTempWWUp', formatted(cfg.tankTempWWUp));
+            setText('#textTankTempWWDown', formatted(cfg.tankTempWWDown));
+
+            [
+                [1, cfg.supplyTemperatureHeating, cfg.refluxTemperatureHeating, cfg.heatingCircuitPumpRunning],
+                [2, cfg.supplyTemperatureHeating2, cfg.refluxTemperatureHeating2, cfg.heatingCircuitPumpRunning2],
+                [3, cfg.supplyTemperatureHeating3, cfg.refluxTemperatureHeating3, cfg.heatingCircuitPumpRunning3]
+            ].forEach(([n, supply, reflux, pump]) => {
+                setText('#textSupplyTemperatureHeating' + n, formatted(supply));
+                setText('#textRefluxTemperatureHeating' + n, formatted(reflux));
+                const pumpValue = formatted(pump);
+                if (pumpValue) setText('#textHeatingPump' + n, pumpValue);
+            });
+
+            setText('#textEvaporatorPressure', formatted(cfg.evaporatorPressure));
+            setText('#textEvaporatorTemperature', formatted(cfg.evaporatorTemperature));
+            setText('#textCondenserPressure', formatted(cfg.condenserPressure));
+            setText('#textCondenserTemperature', formatted(cfg.condenserTemperature));
+            setText('#textExpansionValveOpening', formatted(cfg.expansionValveOpening));
+            setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));
+            setText('#textThermalSolarPumpSpeed', formatted(cfg.thermalSolarPumpSpeed));
+
+            // Heat-pump status from real on/off value where configured.
+            if (cfg.heatingPumpStatusOnOff) {
+                setText('#textHPStatus', binary(cfg.heatingPumpStatusOnOff) ? 'In Betrieb' : 'Aus');
+            }
+
+            // Touch handling. Bind once per SVG element.
+            [
+                ['heating', '#gHPStatusHeating'],
+                ['hotwater', '#gHPStatusWW'],
+                ['cooling', '#gHPStatusCooling']
+            ].forEach(([name, selector]) => {
+                const el = svg.querySelector(selector);
+                const c = controls[name];
+                if (!el || !c || !c.configured || !Array.isArray(c.options) || !c.options.length) return;
+                el.style.cursor = 'pointer';
+                el.style.pointerEvents = 'all';
+                if (!el.dataset.symconModernBound) {
+                    bindTap(el, (event) => openModeMenu(name, event));
+                    el.dataset.symconModernBound = '1';
+                }
+            });
+
+            binaryDefs.forEach(([name, groupSel, _textSel, dataKey]) => {
+                const el = svg.querySelector(groupSel);
+                const c = controls[name];
+                if (!el || !c || !c.configured || !dataKey) return;
+                el.style.cursor = 'pointer';
+                el.style.pointerEvents = 'all';
+                if (!el.dataset.symconModernBound) {
+                    bindTap(el, (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        requestAction('SetBinaryControl', JSON.stringify({
+                            function: name,
+                            value: !binary(dataKey)
+                        }));
+                    });
+                    el.dataset.symconModernBound = '1';
+                }
+            });
+
+            // Fan animation: only while configured fan / HP state indicates operation.
+            const fan = svg.querySelector('#gHPFan');
+            if (fan) {
+                const running = binary(cfg.hpRunning) || binary(cfg.fanSpeed);
+                fan.style.transformBox = 'fill-box';
+                fan.style.transformOrigin = 'center';
+                fan.style.animation = running ? 'symcon-modern-fan 2s linear infinite' : 'none';
+            }
+            if (!svg.querySelector('#symconModernStyle')) {
+                const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+                style.setAttribute('id', 'symconModernStyle');
+                style.textContent = '@keyframes symcon-modern-fan{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+                svg.appendChild(style);
+            }
+
+            return true;
+        };
+
         const applyControlIcons = (card) => {
             if (!card || !card.content) {
                 return;
@@ -9095,13 +9225,8 @@ window.SymconHeatPump = {
                         const result = originalSetData.call(this, data);
 
                         if (this.content) {
-                            const modernSvg = !!this.content.getAttribute('data-symcon-modern');
-
-                            if (modernSvg) {
-                                this.setModernConfig(currentConfig);
-                                this.setModernData(data);
+                            if (applyModernDashboard(this)) {
                                 applyThemeColors(this);
-                                applyControlIcons(this);
                                 return result;
                             }
 
@@ -9156,6 +9281,7 @@ window.SymconHeatPump = {
 
                 card.setConfig(currentConfig);
                 card.setData(currentData);
+                applyModernDashboard(card);
             } catch (error) {
                 showError(
                     'Fehler beim Übergeben der Symcon-Daten an die Card:\\n'
