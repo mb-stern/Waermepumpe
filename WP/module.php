@@ -8768,29 +8768,42 @@ window.SymconHeatPump = {
             show('#gHK3', hk3);
 
             const heatingCircuitCount = [hk1, hk2, hk3].filter(Boolean).length;
+
+            // 1 HK: kein Verteiler. Roter Vorlauf direkt zum HK1;
+            // blauer Rücklauf wie im freigegebenen V33-Beispiel bis zur Hauptrücklaufleitung.
+            // 2/3 HK: Verteiler sichtbar und nur so lang wie benötigt.
             show('#gHeatingManifold', heatingCircuitCount > 1);
-            show('#gSingleCircuitMainBridge', heatingCircuitCount === 1);
 
             const hk1Supply = svg.querySelector('#pathHK1Supply');
             const hk1Return = svg.querySelector('#pathHK1Return');
-            if (hk1Supply) {
-                hk1Supply.setAttribute(
-                    'd',
-                    heatingCircuitCount > 1 ? 'M1124 245H1195' : 'M1100 245H1195'
-                );
-            }
-            if (hk1Return) {
-                hk1Return.setAttribute(
-                    'd',
-                    heatingCircuitCount > 1 ? 'M1195 295H1124' : 'M1195 295H1100'
-                );
+
+            if (heatingCircuitCount === 1) {
+                if (hk1Supply) {
+                    hk1Supply.setAttribute('d', 'M1080 245H1195');
+                }
+                if (hk1Return) {
+                    hk1Return.setAttribute('d', 'M1195 295H1100V440');
+                }
+            } else {
+                if (hk1Supply) {
+                    hk1Supply.setAttribute('d', 'M1124 245H1195');
+                }
+                if (hk1Return) {
+                    hk1Return.setAttribute('d', 'M1195 295H1124');
+                }
             }
 
             const manifoldBody = svg.querySelector('#heatingManifoldBody');
             if (manifoldBody) {
-                manifoldBody.setAttribute('y', '220');
-                manifoldBody.setAttribute('height', heatingCircuitCount >= 3 ? '335' : '215');
+                if (heatingCircuitCount === 2) {
+                    manifoldBody.setAttribute('y', '220');
+                    manifoldBody.setAttribute('height', '215');
+                } else if (heatingCircuitCount >= 3) {
+                    manifoldBody.setAttribute('y', '220');
+                    manifoldBody.setAttribute('height', '335');
+                }
             }
+
             show('#gBuffer', heating && !!cfg.tankHP);
             show('#gNoBuffer', heating && !cfg.tankHP);
             show('#gDHW', !!cfg.tankWW);
