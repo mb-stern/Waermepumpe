@@ -8739,6 +8739,37 @@ window.SymconHeatPump = {
                 show(selector, !!(c && c.configured && Array.isArray(c.options) && c.options.length));
             });
 
+            // Numerische Bedienungen: nur anzeigen, wenn wirklich konfiguriert.
+            [
+                ['warmWaterSetpoint', '#gSymconWarmWaterSetpoint', '#gSymconWarmWaterSetpointValue'],
+                ['heatingTemperatureCorrection', '#gSymconHeatingCorrection', '#gSymconHeatingCorrectionValue']
+            ].forEach(([name, groupSel, valueSel]) => {
+                const c = controls[name];
+                const configured = !!(c && c.configured);
+                show(groupSel, configured);
+                if (!configured) return;
+
+                let value = c.currentValue;
+                const numeric = Number(value);
+                if (Number.isFinite(numeric)) {
+                    value = new Intl.NumberFormat('de-CH', {
+                        minimumFractionDigits: Math.abs(numeric % 1) > 0 ? 1 : 0,
+                        maximumFractionDigits: 1
+                    }).format(numeric);
+                }
+                setText(valueSel, String(value ?? '') + (c.unit ? ' ' + c.unit : ''));
+
+                const el = svg.querySelector(groupSel);
+                if (el) {
+                    el.style.cursor = 'pointer';
+                    el.style.pointerEvents = 'all';
+                    if (!el.dataset.symconModernBound) {
+                        bindTap(el, (event) => openNumericMenu(name, event));
+                        el.dataset.symconModernBound = '1';
+                    }
+                }
+            });
+
             // Sichtbare Buttons lückenlos von links anordnen.
             const topButtons = [
                 ['#gHPStatusOnOff', 205],
@@ -8746,7 +8777,9 @@ window.SymconHeatPump = {
                 ['#gHPStatusHeating', 190],
                 ['#gHPStatusCooling', 165],
                 ['#gHPStatusParty', 160],
-                ['#gHPStatusSave', 165]
+                ['#gHPStatusSave', 165],
+                ['#gSymconWarmWaterSetpoint', 205],
+                ['#gSymconHeatingCorrection', 230]
             ];
             let nextButtonX = 28;
             const buttonGap = 12;
@@ -8936,20 +8969,46 @@ window.SymconHeatPump = {
                 }
             });
 
-            // Fan animation: only while configured fan / HP state indicates operation.
+            // Lüfter: im Modern-SVG dreht die komplette gHPFan-Gruppe.
+            // HpRunning hat Vorrang; wenn nicht konfiguriert, dient CompressorRunning als Fallback.
             const fan = svg.querySelector('#gHPFan');
-            if (fan) {
-                const running = binary(cfg.hpRunning) || binary(cfg.fanSpeed);
-                fan.style.transformBox = 'fill-box';
-                fan.style.transformOrigin = 'center';
-                fan.style.animation = running ? 'symcon-modern-fan 2s linear infinite' : 'none';
-            }
             if (!svg.querySelector('#symconModernStyle')) {
                 const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
                 style.setAttribute('id', 'symconModernStyle');
-                style.textContent = '@keyframes symcon-modern-fan{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}';
+                style.textContent = '@keyframes symcon-modern-fan{from{transform:translate(145px,690px) rotate(0deg)}to{transform:translate(145px,690px) rotate(360deg)}}';
                 svg.appendChild(style);
             }
+            if (fan) {
+                const running = cfg.hpRunning
+                    ? binary(cfg.hpRunning)
+                    : binary(cfg.compressorRunning);
+                fan.style.setProperty('transform-origin', '0px 0px', 'important');
+                fan.style.setProperty('animation', running ? 'symcon-modern-fan 2s linear infinite' : 'none', 'important');
+            }
+
+            // Fußzeile: ausschließlich echte konfigurierte Werte.
+            let footerStatus = '–';
+            if (controls.hotwaterActive) footerStatus = 'Warmwasser';
+            else if (controls.coolingActive) footerStatus = 'Kühlen';
+            else if (controls.heatingActive) footerStatus = 'Heizen';
+            else if (cfg.heatingPumpStatusOnOff && !binary(cfg.heatingPumpStatusOnOff)) footerStatus = 'Aus';
+            else if (cfg.heatingPumpStatusOnOff && binary(cfg.heatingPumpStatusOnOff)) footerStatus = 'In Betrieb';
+            setText('#textFooterStatus', footerStatus);
+
+            const footerCandidates = [
+                ['Außen', cfg.outdoorTemperature],
+                ['Vorlauf', cfg.supplyTemperature],
+                ['Kompressor', cfg.compressorValue],
+                ['Verdampfer', cfg.evaporatorTemperature],
+                ['Kondensator', cfg.condenserTemperature]
+            ].filter(([, key]) => !!key && !!formatted(key)).slice(0, 3);
+
+            ['#textFooterValue1','#textFooterValue2','#textFooterValue3'].forEach((selector, index) => {
+                const el = svg.querySelector(selector);
+                if (!el) return;
+                const item = footerCandidates[index];
+                el.textContent = item ? item[0] + ': ' + formatted(item[1]) : '';
+            });
 
             return true;
         };

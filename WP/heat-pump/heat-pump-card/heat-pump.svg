@@ -16,6 +16,16 @@
  <g transform="translate(1033 25)" id="gHPStatusSave"><rect class="bt" width="165" height="105" rx="10"/><circle cx="47" cy="54" r="21" class="w"/><circle cx="47" cy="54" r="8" class="w"/><text class="hd" x="82" y="49">Eco</text><text id="textControlEco" class="md" x="82" y="80">Aus</text></g>
  <g transform="translate(1210 25)" id="gSettings"><rect class="bt" width="360" height="105" rx="10"/><circle cx="54" cy="54" r="23" class="w"/><circle cx="54" cy="54" r="8" class="w"/><path class="w" d="M54 22v10M54 76v10M22 54h10M76 54h10"/><text class="hd" x="105" y="62">Einstellungen</text><text x="320" y="68" font-size="38">›</text></g>
 </g>
+<g id="gSymconWarmWaterSetpoint" transform="translate(1000 25)" display="none">
+ <rect class="bt" width="205" height="105" rx="10"/>
+ <text class="hd" x="18" y="45">WW Soll</text>
+ <text id="gSymconWarmWaterSetpointValue" class="md" x="18" y="78">–</text>
+</g>
+<g id="gSymconHeatingCorrection" transform="translate(1217 25)" display="none">
+ <rect class="bt" width="230" height="105" rx="10"/>
+ <text class="hd" x="18" y="45">Heizkorrektur</text>
+ <text id="gSymconHeatingCorrectionValue" class="md" x="18" y="78">–</text>
+</g>
 <!-- INFO -->
 <g id="info"><rect class="pn" x="28" y="145" width="610" height="285" rx="10"/><line class="thin" x1="335" y1="165" x2="335" y2="410"/>
  <text class="lb" x="55" y="185">Aussentemperatur</text><circle cx="105" cy="245" r="23" fill="#ffc51b"/><g stroke="#ffc51b" stroke-width="4"><path d="M105 207v-15M105 283v15M67 245H52M143 245h15M78 218l-11-11M132 272l11 11M132 218l11-11M78 272l-11 11"/></g><text id="textOutdoorTemperatureValue" class="bg" x="165" y="263">-1,3 °C</text><line class="thin" x1="55" y1="292" x2="305" y2="292"/><text class="lb" x="55" y="330">Innentemperatur</text><path class="w" d="M65 382l38-35 38 35M76 373v35h54v-35"/><text id="textIndoorTemperatureValue" class="bg" x="165" y="394">21,0 °C</text>
@@ -64,4 +74,12 @@
 <g id="gDHW"><path class="hot" d="M760 665H915"/><path class="cold" d="M915 835H605"/><g transform="translate(915 575)"><ellipse cx="82" cy="18" rx="82" ry="18" fill="url(#s)" stroke="#eef" stroke-width="2"/><rect y="18" width="164" height="260" fill="url(#t)" stroke="#eef" stroke-width="2"/><ellipse cx="82" cy="278" rx="82" ry="18" fill="#2422a6" stroke="#eef" stroke-width="2"/><text class="hd" x="82" y="-12" text-anchor="middle">Warmwasser</text><text id="textTankTempWWUp" class="md" x="82" y="85" text-anchor="middle">63,5 °C</text><text id="textTankTempWWMiddle" class="md" x="82" y="162" text-anchor="middle">47,5 °C</text><text id="textTankTempWWDown" class="md" x="82" y="240" text-anchor="middle">31,5 °C</text></g></g>
 <!-- SOLAR -->
 <g id="gSolar"><rect class="pn" x="1260" y="590" width="265" height="320" rx="10"/><text class="hd" x="1280" y="620">Solar</text><path class="sol" d="M1079 790H1185V680H1260M1260 820H1185V835H1079"/><g transform="translate(1325 650) skewX(-12)"><rect width="145" height="100" fill="#0b4b88" stroke="#e8eef0" stroke-width="3"/><path d="M25 0v100M50 0v100M75 0v100M100 0v100M125 0v100M0 25h145M0 50h145M0 75h145" stroke="#6ea8d2"/></g><circle cx="1185" cy="755" r="22" fill="#071015" stroke="#fff" stroke-width="2"/><path d="M1177 742l19 13-19 13z" fill="#e9eff2"/><rect class="bt" x="1280" y="805" width="220" height="75" rx="7"/><text class="sm" x="1295" y="832">Kollektor</text><text id="textThermalSolarPanelTemp" class="sm" x="1295" y="858">55,0 °C</text><text class="sm" x="1410" y="832">Pumpe</text><text id="textThermalSolarPumpSpeed" class="sm" x="1420" y="858">100 %</text></g>
+<!-- FOOTER -->
+<g id="gFooter">
+ <rect class="pn" x="28" y="930" width="1542" height="50" rx="8"/>
+ <text class="lb" x="55" y="963">Status:</text><text id="textFooterStatus" class="lb" x="130" y="963">–</text>
+ <text id="textFooterValue1" class="lb" x="430" y="963"></text>
+ <text id="textFooterValue2" class="lb" x="850" y="963"></text>
+ <text id="textFooterValue3" class="lb" x="1250" y="963"></text>
+</g>
 </svg>
