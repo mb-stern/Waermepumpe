@@ -8770,10 +8770,8 @@ window.SymconHeatPump = {
             const heatingCircuitCount = [hk1, hk2, hk3].filter(Boolean).length;
             show('#gHeatingManifold', heatingCircuitCount > 1);
             show('#gSingleHKConnector', heatingCircuitCount === 1);
-
             const manifoldBody = svg.querySelector('#heatingManifoldBody');
             if (manifoldBody) {
-                // Two circuits: only down to HK2 return. Three circuits: down to HK3 return.
                 manifoldBody.setAttribute('y', '220');
                 manifoldBody.setAttribute('height', heatingCircuitCount >= 3 ? '335' : '215');
             }
