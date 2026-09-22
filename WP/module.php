@@ -8969,45 +8969,115 @@ window.SymconHeatPump = {
                 }
             });
 
-            // Lüfter: im Modern-SVG dreht die komplette gHPFan-Gruppe.
-            // HpRunning hat Vorrang; wenn nicht konfiguriert, dient CompressorRunning als Fallback.
-            const fan = svg.querySelector('#gHPFan');
-            if (!svg.querySelector('#symconModernStyle')) {
+            // Lüfterlogik wie im ursprünglich geposteten Modul:
+            // FanSpeed steuert die Drehzahl. Nur wenn FanSpeed nicht konfiguriert
+            // ist, wird HpRunning als Fallback verwendet.
+            const fanRotor = svg.querySelector('#pathHPFan');
+            if (!svg.querySelector('#symconModernRotationStyle')) {
                 const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
-                style.setAttribute('id', 'symconModernStyle');
-                style.textContent = '@keyframes symcon-modern-fan{from{transform:translate(145px,690px) rotate(0deg)}to{transform:translate(145px,690px) rotate(360deg)}}';
+                style.setAttribute('id', 'symconModernRotationStyle');
+                style.textContent = `
+                    @keyframes symcon-modern-rotate {
+                        from { transform: rotate(0deg); }
+                        to   { transform: rotate(360deg); }
+                    }
+                `;
                 svg.appendChild(style);
             }
-            if (fan) {
-                const running = cfg.hpRunning
-                    ? binary(cfg.hpRunning)
-                    : binary(cfg.compressorRunning);
-                fan.style.setProperty('transform-origin', '0px 0px', 'important');
-                fan.style.setProperty('animation', running ? 'symcon-modern-fan 2s linear infinite' : 'none', 'important');
+
+            if (fanRotor) {
+                let rpm = 0;
+                if (cfg.fanSpeed && data[cfg.fanSpeed]) {
+                    const fanRaw = raw(cfg.fanSpeed);
+                    const normalized = String(fanRaw ?? '').trim().toLowerCase();
+                    if (['true','on','yes','ja','ein','active','aktiv'].includes(normalized)) {
+                        rpm = 250;
+                    } else if (!['false','off','no','nein','aus','inactive','inaktiv',''].includes(normalized)) {
+                        rpm = Number(fanRaw);
+                        if (!Number.isFinite(rpm)) rpm = 0;
+                    }
+                } else if (cfg.hpRunning && binary(cfg.hpRunning)) {
+                    rpm = 250;
+                }
+
+                let duration = 0;
+                if (rpm > 0) {
+                    const clamped = Math.max(0, Math.min(500, rpm));
+                    const points = [[0,3.0],[100,2.5],[200,1.8],[300,1.2],[400,0.8],[500,0.5]];
+                    duration = 3.0;
+                    for (let i = 0; i < points.length - 1; i++) {
+                        const [r1,d1] = points[i], [r2,d2] = points[i+1];
+                        if (clamped >= r1 && clamped <= r2) {
+                            const f = (clamped-r1)/(r2-r1);
+                            duration = d1 + (d2-d1)*f;
+                            break;
+                        }
+                    }
+                }
+
+                fanRotor.style.setProperty('transform-box', 'fill-box', 'important');
+                fanRotor.style.setProperty('transform-origin', 'center', 'important');
+                fanRotor.style.setProperty(
+                    'animation',
+                    duration > 0 ? 'symcon-modern-rotate ' + duration.toFixed(2) + 's linear infinite' : 'none',
+                    'important'
+                );
             }
 
-            // Fußzeile: ausschließlich echte konfigurierte Werte.
-            let footerStatus = '–';
-            if (controls.hotwaterActive) footerStatus = 'Warmwasser';
-            else if (controls.coolingActive) footerStatus = 'Kühlen';
-            else if (controls.heatingActive) footerStatus = 'Heizen';
-            else if (cfg.heatingPumpStatusOnOff && !binary(cfg.heatingPumpStatusOnOff)) footerStatus = 'Aus';
-            else if (cfg.heatingPumpStatusOnOff && binary(cfg.heatingPumpStatusOnOff)) footerStatus = 'In Betrieb';
-            setText('#textFooterStatus', footerStatus);
+            // Verdichterlogik wie im Original: CompressorRunning dreht das Verdichtersymbol.
+            const compressor = svg.querySelector('#pathCompressor');
+            if (compressor) {
+                const compressorRunning = !!cfg.compressorRunning && binary(cfg.compressorRunning);
+                compressor.style.setProperty('transform-box', 'fill-box', 'important');
+                compressor.style.setProperty('transform-origin', 'center', 'important');
+                compressor.style.setProperty(
+                    'animation',
+                    compressorRunning ? 'symcon-modern-rotate 1.4s linear infinite' : 'none',
+                    'important'
+                );
+            }
 
-            const footerCandidates = [
-                ['Außen', cfg.outdoorTemperature],
-                ['Vorlauf', cfg.supplyTemperature],
-                ['Kompressor', cfg.compressorValue],
-                ['Verdampfer', cfg.evaporatorTemperature],
-                ['Kondensator', cfg.condenserTemperature]
-            ].filter(([, key]) => !!key && !!formatted(key)).slice(0, 3);
+            // Fußzeile: exakt die 13 bereits in der Konfiguration vorhandenen
+            // Zusatzwerte 000...012 verwenden. Unkonfigurierte Plätze verschwinden.
+            const footerValues = [];
+            for (let index = 0; index < 13; index++) {
+                const suffix = String(index).padStart(3, '0');
+                const label = String(cfg['additionalLabel' + suffix] || '').trim();
+                const key = cfg['additionalValue' + suffix] || '';
+                const value = key ? formatted(key) : '';
+                if (value) {
+                    footerValues.push({
+                        label: label,
+                        value: value
+                    });
+                }
+            }
 
-            ['#textFooterValue1','#textFooterValue2','#textFooterValue3'].forEach((selector, index) => {
-                const el = svg.querySelector(selector);
+            for (let index = 0; index < 13; index++) {
+                const el = svg.querySelector('#textFooterAdditional' + String(index).padStart(3, '0'));
+                if (!el) continue;
+                const item = footerValues[index];
+                if (!item) {
+                    el.textContent = '';
+                    el.style.display = 'none';
+                    continue;
+                }
+                el.style.display = 'inline';
+                el.textContent = (item.label ? item.label + ': ' : '') + item.value;
+            }
+
+            // Gleichmäßig über die Fußzeile verteilen; bei vielen Werten in zwei Zeilen.
+            const count = footerValues.length;
+            const columns = count <= 6 ? Math.max(1, count) : Math.ceil(count / 2);
+            footerValues.forEach((item, index) => {
+                const el = svg.querySelector('#textFooterAdditional' + String(index).padStart(3, '0'));
                 if (!el) return;
-                const item = footerCandidates[index];
-                el.textContent = item ? item[0] + ': ' + formatted(item[1]) : '';
+                const row = count <= 6 ? 0 : Math.floor(index / columns);
+                const col = count <= 6 ? index : index % columns;
+                const x = 55 + col * (1480 / Math.max(1, columns));
+                const y = count <= 6 ? 962 : (row === 0 ? 950 : 970);
+                el.setAttribute('x', String(x));
+                el.setAttribute('y', String(y));
             });
 
             return true;
