@@ -3316,6 +3316,13 @@ window.SymconHeatPump = {
                 element.style.setProperty('fill', panelBackground, 'important');
                 element.style.setProperty('stroke', borderColor, 'important');
             });
+            svg.querySelectorAll('.theme-surface').forEach((element) => {
+                element.style.setProperty('fill', panelBackground, 'important');
+                element.style.setProperty('stroke', borderColor, 'important');
+            });
+            svg.querySelectorAll('.theme-dot, .hk-pump-rotor').forEach((element) => {
+                element.style.setProperty('fill', textColor, 'important');
+            });
 
             const fanRotor = svg.querySelector('#pathHPFan');
             if (fanRotor) {
@@ -3383,6 +3390,9 @@ window.SymconHeatPump = {
                     (element.classList && element.classList.contains('symcon-flow-overlay'))
                     || (element.classList && element.classList.contains('pn'))
                     || (element.classList && element.classList.contains('bt'))
+                    || (element.classList && element.classList.contains('theme-surface'))
+                    || (element.classList && element.classList.contains('theme-dot'))
+                    || (element.classList && element.classList.contains('hk-pump-rotor'))
                     || element.id === 'symconThemeBackground'
                     || element.id === 'pathHPFan'
                 ) {
@@ -9097,6 +9107,37 @@ window.SymconHeatPump = {
                     'important'
                 );
             }
+
+            // Heizkreispumpen: der neue Rotor dreht sichtbar, sobald die konfigurierte
+            // Pumpenvariable einen positiven Wert liefert. Bei Prozent-/Drehzahlwerten
+            // wird die Animationsgeschwindigkeit mit dem Messwert skaliert.
+            [
+                [1, cfg.heatingCircuitPumpRunning],
+                [2, cfg.heatingCircuitPumpRunning2],
+                [3, cfg.heatingCircuitPumpRunning3]
+            ].forEach(([n, key]) => {
+                const rotor = svg.querySelector('#hkPumpRotor' + n);
+                if (!rotor) return;
+                const value = raw(key);
+                let speed = 0;
+                if (typeof value === 'boolean') {
+                    speed = value ? 50 : 0;
+                } else {
+                    const parsed = Number(String(value ?? '').replace(',', '.'));
+                    if (Number.isFinite(parsed) && parsed > 0) speed = parsed;
+                    else if (binary(key)) speed = 50;
+                }
+                const duration = speed > 0
+                    ? Math.max(0.55, Math.min(2.8, 3.0 - Math.min(speed, 100) * 0.0245))
+                    : 0;
+                rotor.style.setProperty('transform-box', 'fill-box', 'important');
+                rotor.style.setProperty('transform-origin', 'center', 'important');
+                rotor.style.setProperty(
+                    'animation',
+                    duration > 0 ? 'symcon-modern-rotate ' + duration.toFixed(2) + 's linear infinite' : 'none',
+                    'important'
+                );
+            });
 
             // Verdichterlogik wie im Original: CompressorRunning dreht das Verdichtersymbol.
             const compressor = svg.querySelector('#pathCompressor');
