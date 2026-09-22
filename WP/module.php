@@ -3358,6 +3358,101 @@ window.SymconHeatPump = {
             });
         };
 
+        /*
+         * TEST: dezentes "Visual Polish" für die bestehende SVG.
+         * Keine Bedienlogik und keine Datenlogik werden verändert.
+         * Die Original-SVG-IDs bleiben vollständig erhalten.
+         */
+        const applyVisualPolish = (card) => {
+            if (!card || !card.content) {
+                return;
+            }
+
+            const svg = card.content;
+            const ns = 'http://www.w3.org/2000/svg';
+
+            if (!svg.querySelector('#symconVisualPolishStyle')) {
+                const style = document.createElementNS(ns, 'style');
+                style.id = 'symconVisualPolishStyle';
+                style.textContent = `
+                    #gHP, #gTankHP, #gWW {
+                        filter: drop-shadow(0 5px 7px rgba(0,0,0,.16));
+                    }
+
+                    #gHP path, #gHP rect, #gHP circle,
+                    #gTankHP path, #gTankHP rect, #gTankHP circle,
+                    #gWW path, #gWW rect, #gWW circle {
+                        stroke-linecap: round;
+                        stroke-linejoin: round;
+                    }
+
+                    #gPipe path, #gPipeBuffer path,
+                    #gPipeLayeredChargeStorage path,
+                    #gHeaterCircuit1 path, #gHeaterCircuit2 path,
+                    #gHeaterCircuit3 path, #gThermalSolar path {
+                        stroke-linecap: round;
+                        stroke-linejoin: round;
+                        filter: drop-shadow(0 1px 1.5px rgba(0,0,0,.18));
+                    }
+
+                    #pathCompressor,
+                    #gCirculatingPumpBladeWheel,
+                    #gStorageChargingPump,
+                    #gHeatingCircuitPump,
+                    #gHeatingCircuitPump2,
+                    #gHeatingCircuitPump3,
+                    #gThermalSolarPump {
+                        filter: drop-shadow(0 0 2.5px rgba(255,255,255,.20));
+                    }
+                `;
+                svg.insertBefore(style, svg.firstChild);
+            }
+
+            const ensureBackdrop = (selector, id, padX, padY, radius) => {
+                const group = svg.querySelector(selector);
+                if (!group || svg.querySelector('#' + id)) {
+                    return;
+                }
+
+                let box;
+                try {
+                    box = group.getBBox();
+                } catch (e) {
+                    return;
+                }
+
+                if (!box || box.width <= 0 || box.height <= 0) {
+                    return;
+                }
+
+                const rect = document.createElementNS(ns, 'rect');
+                rect.id = id;
+                rect.setAttribute('x', String(box.x - padX));
+                rect.setAttribute('y', String(box.y - padY));
+                rect.setAttribute('width', String(box.width + (padX * 2)));
+                rect.setAttribute('height', String(box.height + (padY * 2)));
+                rect.setAttribute('rx', String(radius));
+                rect.setAttribute('ry', String(radius));
+                rect.setAttribute('fill', 'var(--content-color)');
+                rect.setAttribute('fill-opacity', '0.025');
+                rect.setAttribute('stroke', 'var(--content-color)');
+                rect.setAttribute('stroke-opacity', '0.12');
+                rect.setAttribute('stroke-width', '1');
+                rect.setAttribute('vector-effect', 'non-scaling-stroke');
+                rect.style.pointerEvents = 'none';
+
+                group.parentNode.insertBefore(rect, group);
+            };
+
+            /*
+             * Nur die drei großen Anlagenkomponenten bekommen eine sehr
+             * dezente optische Fläche. Leitungen und Messwerte bleiben frei.
+             */
+            ensureBackdrop('#gHP', 'symconBackdropHP', 14, 12, 12);
+            ensureBackdrop('#gTankHP', 'symconBackdropTankHP', 10, 10, 10);
+            ensureBackdrop('#gWW', 'symconBackdropWW', 10, 10, 10);
+        };
+
         const renderCompactView = (card) => {
             const host =
                 document.getElementById('wp-compact-view');
@@ -9010,6 +9105,7 @@ window.SymconHeatPump = {
                             updateRefrigerantValues(this);
                             applyTerminology(this);
                             applyThemeColors(this);
+                            applyVisualPolish(this);
                             applyRefrigerantCircuitMode(this);
                             applyRefrigerantTemperatureColors(this);
                             applyOptionalStatusVisibility(this);
