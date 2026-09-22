@@ -8739,6 +8739,24 @@ window.SymconHeatPump = {
                 show(selector, !!(c && c.configured && Array.isArray(c.options) && c.options.length));
             });
 
+            // Sichtbare Buttons lückenlos von links anordnen.
+            const topButtons = [
+                ['#gHPStatusOnOff', 205],
+                ['#gHPStatusWW', 225],
+                ['#gHPStatusHeating', 190],
+                ['#gHPStatusCooling', 165],
+                ['#gHPStatusParty', 160],
+                ['#gHPStatusSave', 165]
+            ];
+            let nextButtonX = 28;
+            const buttonGap = 12;
+            topButtons.forEach(([selector, width]) => {
+                const el = svg.querySelector(selector);
+                if (!el || el.style.display === 'none') return;
+                el.setAttribute('transform', 'translate(' + nextButtonX + ' 25)');
+                nextButtonX += width + buttonGap;
+            });
+
             // Optional hydraulic components.
             const hk1 = !!cfg.heatingCircuitType1 && cfg.heatingCircuitType1 !== 'off';
             const hk2 = !!cfg.heatingCircuitType2 && cfg.heatingCircuitType2 !== 'off';
@@ -8748,6 +8766,17 @@ window.SymconHeatPump = {
             show('#gHK1', hk1);
             show('#gHK2', hk2);
             show('#gHK3', hk3);
+
+            const heatingCircuitCount = [hk1, hk2, hk3].filter(Boolean).length;
+            show('#gHeatingManifold', heatingCircuitCount > 1);
+            show('#gSingleHKConnector', heatingCircuitCount === 1);
+
+            const manifoldBody = svg.querySelector('#heatingManifoldBody');
+            if (manifoldBody) {
+                // Two circuits: only down to HK2 return. Three circuits: down to HK3 return.
+                manifoldBody.setAttribute('y', '220');
+                manifoldBody.setAttribute('height', heatingCircuitCount >= 3 ? '335' : '215');
+            }
             show('#gBuffer', heating && !!cfg.tankHP);
             show('#gNoBuffer', heating && !cfg.tankHP);
             show('#gDHW', !!cfg.tankWW);
@@ -8768,8 +8797,27 @@ window.SymconHeatPump = {
             setText('#textTankTempHPUp', formatted(cfg.tankTempHPUp));
             setText('#textTankTempHPMiddle', formatted(cfg.tankTempHPMiddle));
             setText('#textTankTempHPDown', formatted(cfg.tankTempHPDown));
-            setText('#textTankTempWWUp', formatted(cfg.tankTempWWUp));
-            setText('#textTankTempWWDown', formatted(cfg.tankTempWWDown));
+            const wwUpEl = svg.querySelector('#textTankTempWWUp');
+            const wwDownEl = svg.querySelector('#textTankTempWWDown');
+            const wwUpValue = formatted(cfg.tankTempWWUp);
+            const wwDownValue = formatted(cfg.tankTempWWDown);
+            const hasWwUp = !!wwUpValue;
+            const hasWwDown = !!wwDownValue;
+
+            if (wwUpEl) {
+                wwUpEl.style.display = hasWwUp ? 'inline' : 'none';
+                if (hasWwUp) {
+                    wwUpEl.textContent = wwUpValue;
+                    wwUpEl.setAttribute('y', hasWwDown ? '85' : '160');
+                }
+            }
+            if (wwDownEl) {
+                wwDownEl.style.display = hasWwDown ? 'inline' : 'none';
+                if (hasWwDown) {
+                    wwDownEl.textContent = wwDownValue;
+                    wwDownEl.setAttribute('y', hasWwUp ? '240' : '160');
+                }
+            }
 
             [
                 [1, cfg.supplyTemperatureHeating, cfg.refluxTemperatureHeating, cfg.heatingCircuitPumpRunning],
