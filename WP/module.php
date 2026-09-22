@@ -1323,7 +1323,7 @@ PHP
         overflow: hidden;
         align-items: center;
         justify-content: center;
-        padding: 8px 8px 48px;
+        padding: 0;
         background: transparent !important;
         color: var(--content-color);
     }
@@ -1337,33 +1337,6 @@ PHP
         overflow: visible;
     }
 
-    #wp-view-toggle {
-        position: absolute;
-        left: 50%;
-        right: auto;
-        bottom: 10px;
-        transform: translateX(-50%);
-        z-index: 10000;
-        min-width: 38px;
-        height: 30px;
-        padding: 0 10px;
-        border: 1px solid rgba(127,127,127,.25);
-        border-radius: 6px;
-        background: rgba(255,255,255,.07);
-        color: var(--content-color, #fff);
-        font: 600 18px Arial, sans-serif;
-        line-height: 28px;
-        text-align: center;
-        cursor: pointer;
-        touch-action: manipulation;
-        -webkit-tap-highlight-color: transparent;
-        user-select: none;
-    }
-
-    #wp-view-toggle:active {
-        transform: translateX(-50%) scale(.96);
-        opacity: .65;
-    }
 
     #wp-error {
         display: none;
@@ -1554,12 +1527,6 @@ PHP
     <div id="wp-error"></div>
     <heat-pump-card id="wp-card"></heat-pump-card>
     <div id="wp-compact-view" aria-hidden="true"></div>
-    <button
-        id="wp-view-toggle"
-        type="button"
-        title="Ansicht umschalten"
-        aria-label="Ansicht umschalten"
-    >⇄</button>
     <div id="wp-mode-menu"></div>
 </div>
 
@@ -2671,6 +2638,7 @@ window.SymconHeatPump = {
 
         let currentView = 'full';
 
+        /* V49: feste Vollansicht; der Ansichts-Umschaltbutton wurde entfernt. */
         try {
             /*
              * Instanzspezifischer Zustand hat Vorrang.
@@ -2688,8 +2656,7 @@ window.SymconHeatPump = {
                     );
 
             if (
-                storedView === 'compact'
-                || storedView === 'full'
+                storedView === 'full'
             ) {
                 currentView = storedView;
             }
@@ -9676,7 +9643,7 @@ window.SymconHeatPump = {
             }
         }
 
-        setupViewToggle();
+        // V49: kein Ansichts-Umschaltbutton mehr.
         applyCardData();
   }
 };
