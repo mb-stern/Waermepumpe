@@ -8769,6 +8769,7 @@ window.SymconHeatPump = {
 
             const heatingCircuitCount = [hk1, hk2, hk3].filter(Boolean).length;
             show('#gHeatingManifold', heatingCircuitCount > 1);
+            show('#gSingleCircuitMainBridge', heatingCircuitCount === 1);
 
             const hk1Supply = svg.querySelector('#pathHK1Supply');
             const hk1Return = svg.querySelector('#pathHK1Return');
