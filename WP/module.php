@@ -8767,6 +8767,15 @@ window.SymconHeatPump = {
             show('#gHK2', hk2);
             show('#gHK3', hk3);
 
+            [
+                [1, cfg.heatingCircuitType1],
+                [2, cfg.heatingCircuitType2],
+                [3, cfg.heatingCircuitType3]
+            ].forEach(([n, type]) => {
+                show('#gHKFloor' + n, type === 'underfloor');
+                show('#gHKRadiator' + n, type === 'radiator');
+            });
+
             const heatingCircuitCount = [hk1, hk2, hk3].filter(Boolean).length;
 
             // 1 HK: kein Verteiler. Roter Vorlauf direkt zum HK1;
@@ -8824,27 +8833,48 @@ window.SymconHeatPump = {
             setText('#textTankTempHPUp', formatted(cfg.tankTempHPUp));
             setText('#textTankTempHPMiddle', formatted(cfg.tankTempHPMiddle));
             setText('#textTankTempHPDown', formatted(cfg.tankTempHPDown));
-            const wwUpEl = svg.querySelector('#textTankTempWWUp');
-            const wwDownEl = svg.querySelector('#textTankTempWWDown');
-            const wwUpValue = formatted(cfg.tankTempWWUp);
-            const wwDownValue = formatted(cfg.tankTempWWDown);
-            const hasWwUp = !!wwUpValue;
-            const hasWwDown = !!wwDownValue;
+            // Speicherwerte nur anzeigen, wenn die jeweilige Variable konfiguriert ist.
+            // Bei nur einem Wert steht dieser mittig; bei zwei werden sie verteilt.
+            const placeTankValues = (definitions, positions) => {
+                const active = definitions
+                    .map(([selector, key]) => ({
+                        el: svg.querySelector(selector),
+                        value: formatted(key)
+                    }))
+                    .filter((item) => !!item.value);
 
-            if (wwUpEl) {
-                wwUpEl.style.display = hasWwUp ? 'inline' : 'none';
-                if (hasWwUp) {
-                    wwUpEl.textContent = wwUpValue;
-                    wwUpEl.setAttribute('y', hasWwDown ? '85' : '160');
-                }
-            }
-            if (wwDownEl) {
-                wwDownEl.style.display = hasWwDown ? 'inline' : 'none';
-                if (hasWwDown) {
-                    wwDownEl.textContent = wwDownValue;
-                    wwDownEl.setAttribute('y', hasWwUp ? '240' : '160');
-                }
-            }
+                definitions.forEach(([selector]) => {
+                    const el = svg.querySelector(selector);
+                    if (el) el.style.display = 'none';
+                });
+
+                const ys = positions[active.length] || [];
+                active.forEach((item, index) => {
+                    item.el.style.display = 'inline';
+                    item.el.textContent = item.value;
+                    item.el.setAttribute('y', String(ys[index]));
+                });
+            };
+
+            placeTankValues([
+                ['#textTankTempWWUp', cfg.tankTempWWUp],
+                ['#textTankTempWWMiddle', cfg.tankTempWWMiddle],
+                ['#textTankTempWWDown', cfg.tankTempWWDown]
+            ], {
+                1: [162],
+                2: [105, 220],
+                3: [85, 162, 240]
+            });
+
+            placeTankValues([
+                ['#textTankTempHPUp', cfg.tankTempHPUp],
+                ['#textTankTempHPMiddle', cfg.tankTempHPMiddle],
+                ['#textTankTempHPDown', cfg.tankTempHPDown]
+            ], {
+                1: [158],
+                2: [105, 215],
+                3: [82, 158, 232]
+            });
 
             [
                 [1, cfg.supplyTemperatureHeating, cfg.refluxTemperatureHeating, cfg.heatingCircuitPumpRunning],
