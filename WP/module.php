@@ -418,7 +418,7 @@ class Waermepumpe extends IPSModuleStrict
     {
         if (!$this->ResourcesAvailable()) {
             return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
-                . 'Wärmepumpen-Ressource fehlt. Erwartet wird: heat-pump/heat-pump-card/heat-pump.svg.'
+                . 'Wärmepumpen-Ressource fehlt. Erwartet wird: heat-pump/heat-pump-card/heat-pump-v2-modern-test.svg.'
                 . '</div>';
         }
 
@@ -1205,7 +1205,7 @@ PHP
                 . DIRECTORY_SEPARATOR
                 . 'heat-pump-card'
                 . DIRECTORY_SEPARATOR
-                . 'heat-pump.svg'
+                . 'heat-pump-v2-modern-test.svg'
         ];
     }
 
