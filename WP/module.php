@@ -95,6 +95,7 @@ class Waermepumpe extends IPSModuleStrict
         'ExpansionValveOpening',
         'CompressorValue',
         'HeatingPumpPower',
+        'CopValue',
 
         'WWHeatingValve',
         'HeaterRodWW',
@@ -259,6 +260,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ExpansionValveOpening', 0);
         $this->RegisterPropertyInteger('CompressorValue', 0);
         $this->RegisterPropertyInteger('HeatingPumpPower', 0);
+        $this->RegisterPropertyInteger('CopValue', 0);
 
         // Ventil / Heizstab
         $this->RegisterPropertyInteger('WWHeatingValve', 0);
@@ -512,7 +514,8 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableGrid([
                         ['caption' => 'Verdichter aktiv', 'name' => 'CompressorRunning'],
                         ['caption' => 'Verdichterdrehzahl', 'name' => 'CompressorValue'],
-                        ['caption' => 'Leistung', 'name' => 'HeatingPumpPower']
+                        ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
+                        ['caption' => 'COP', 'name' => 'CopValue']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Primärquelle'],
@@ -1614,6 +1617,7 @@ HTML;
             'expansionValveOpening'      => $this->DataKey('ExpansionValveOpening', 'expansionValveOpening'),
             'compressorValue'            => $this->DataKey('CompressorValue', 'compressorValue'),
             'heatingPumpPower'           => $this->DataKey('HeatingPumpPower', 'heatingPumpPower'),
+            'copValue'                    => $this->DataKey('CopValue', 'copValue'),
 
             'wwHeatingValve'             => $this->DataKey('WWHeatingValve', 'wwHeatingValve'),
             'heaterRodWW'                => $this->DataKey('HeaterRodWW', 'heaterRodWW'),
@@ -1705,6 +1709,7 @@ HTML;
             'fanSpeed'                   => 'FanSpeed',
             'compressorRunning'          => 'CompressorRunning',
             'heatingPumpPower'          => 'HeatingPumpPower',
+            'copValue'                   => 'CopValue',
             'circulatingPumpRunning'     => 'CirculatingPumpRunning',
             'storageChargingPumpRunning' => 'StorageChargingPumpRunning',
             'tankTempHPUp'               => 'TankTempHPUp',
@@ -1729,6 +1734,7 @@ HTML;
             'expansionValveOpening'      => 'ExpansionValveOpening',
             'compressorValue'            => 'CompressorValue',
             'heatingPumpPower'           => 'HeatingPumpPower',
+            'copValue'                    => 'CopValue',
             'wwHeatingValve'             => 'WWHeatingValve',
             'heaterRodWW'                => 'HeaterRodWW',
             'heaterRodHP'                => 'HeaterRodHP',
@@ -2401,6 +2407,7 @@ class HeatPumpCard extends HTMLElement {
     this.setText('#textCondenserTemperature', this.format(c.condenserTemperature));
     this.setText('#textExpansionValveOpening', this.format(c.expansionValveOpening));
     this.setText('#textCompressorValue', this.format(c.compressorValue));
+    this.setText('#textCopValue', this.format(c.copValue));
 
     if (c.thermalSolarAvailable) {
       this.rotate('#gThermalSolarPump', this.binary(c.thermalSolarPump));
@@ -9004,6 +9011,7 @@ window.SymconHeatPump = {
             setText('#textCondenserTemperature', formatted(cfg.condenserTemperature));
             setText('#textExpansionValveOpening', formatted(cfg.expansionValveOpening));
             setText('#textPowerValue', formatted(cfg.heatingPumpPower));
+            setText('#textCopValue', formatted(cfg.copValue));
             setText('#textCompressorSpeedValue', formatted(cfg.compressorValue));
             setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));
             setText('#textThermalSolarPumpSpeed', formatted(cfg.thermalSolarPumpSpeed));
