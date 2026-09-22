@@ -5,7 +5,7 @@
  *
  * Komponente | Lizenz | Verwendung |
  * ------------|---------|------------|
- * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Wärmepumpengrafik |
+ * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Basis/Adapter; SVG-Layout V22b modernisiert |
  */
 
 declare(strict_types=1);
@@ -2302,9 +2302,94 @@ class HeatPumpCard extends HTMLElement {
     element.classList.toggle('rotate', !!active);
   }
 
+  isModernSymconSvg() {
+    return !!(this.content && this.content.getAttribute('data-symcon-modern'));
+  }
+
+  modernShow(selector, visible) {
+    const element = this.content ? this.content.querySelector(selector) : null;
+    if (element) element.style.display = visible ? 'inline' : 'none';
+  }
+
+  setModernConfig(config) {
+    const type1 = config.heatingCircuitType1;
+    const type2 = config.heatingCircuitType2;
+    const type3 = config.heatingCircuitType3;
+    const hk1 = !!type1 && type1 !== 'off';
+    const hk2 = !!type2 && type2 !== 'off';
+    const hk3 = !!type3 && type3 !== 'off';
+    const heating = hk1 || hk2 || hk3;
+
+    this.modernShow('#gBuffer', !!config.tankHP && heating);
+    this.modernShow('#gNoBuffer', !config.tankHP && heating);
+    this.modernShow('#gHeating', heating);
+    this.modernShow('#gHK1', hk1);
+    this.modernShow('#gHK2', hk2);
+    this.modernShow('#gHK3', hk3);
+    this.modernShow('#gDHW', !!config.tankWW);
+    this.modernShow('#gSolar', !!config.tankWW && !!config.thermalSolarAvailable);
+
+    // Warmwasser-/Solar-Bedienfelder verschwinden ebenfalls, wenn nicht vorhanden.
+    this.modernShow('#gHPStatusWW', !!config.tankWW);
+  }
+
+  setModernData(data) {
+    this.data = data || {};
+    const c = this.config || {};
+    const text = (id, key) => this.setText(id, this.format(key));
+
+    text('#textOutdoorTemperatureValue', c.outdoorTemperature);
+    const indoorKey = this.binary(c.heatingPumpPartyMode) && this.format(c.ambientTemperatureParty)
+      ? c.ambientTemperatureParty
+      : (this.binary(c.heatingPumpNightMode) && this.format(c.ambientTemperatureReduced)
+          ? c.ambientTemperatureReduced
+          : c.ambientTemperatureNormal);
+    text('#textIndoorTemperatureValue', indoorKey);
+    text('#textSupplyTemperatureValue', c.supplyTemperature);
+
+    // Rücklauf: bevorzugt HK1, weil das bestehende Modul keinen separaten
+    // allgemeinen Rücklaufwert besitzt.
+    text('#textReturnTemperatureValue', c.refluxTemperatureHeating);
+
+    text('#textTankTempHPUp', c.tankTempHPUp);
+    text('#textTankTempHPMiddle', c.tankTempHPMiddle);
+    text('#textTankTempHPDown', c.tankTempHPDown);
+    text('#textTankTempWWUp', c.tankTempWWUp);
+    text('#textTankTempWWDown', c.tankTempWWDown);
+
+    text('#textSupplyTemperatureHeating1', c.supplyTemperatureHeating);
+    text('#textRefluxTemperatureHeating1', c.refluxTemperatureHeating);
+    text('#textSupplyTemperatureHeating2', c.supplyTemperatureHeating2);
+    text('#textRefluxTemperatureHeating2', c.refluxTemperatureHeating2);
+    text('#textSupplyTemperatureHeating3', c.supplyTemperatureHeating3);
+    text('#textRefluxTemperatureHeating3', c.refluxTemperatureHeating3);
+
+    text('#textEvaporatorPressure', c.evaporatorPressure);
+    text('#textEvaporatorTemperature', c.evaporatorTemperature);
+    text('#textCondenserPressure', c.condenserPressure);
+    text('#textCondenserTemperature', c.condenserTemperature);
+    text('#textExpansionValveOpening', c.expansionValveOpening);
+
+    text('#textThermalSolarPanelTemp', c.thermalSolarPanelTemp);
+    text('#textThermalSolarPumpSpeed', c.thermalSolarPumpSpeed);
+
+    const pumpText = (selector, key) => {
+      const value = this.format(key);
+      if (value) this.setText(selector, value);
+    };
+    pumpText('#textHeatingPump1', c.heatingCircuitPumpRunning);
+    pumpText('#textHeatingPump2', c.heatingCircuitPumpRunning2);
+    pumpText('#textHeatingPump3', c.heatingCircuitPumpRunning3);
+  }
+
   setData(data) {
     this.data = data || {};
     if (!this.content) return;
+
+    if (this.isModernSymconSvg()) {
+      this.setModernData(data);
+      return;
+    }
 
     const c = this.config || {};
 
@@ -2489,6 +2574,10 @@ class HeatPumpCard extends HTMLElement {
   setConfig(config) {
     this.config = config;
     if (this.content) {
+      if (this.isModernSymconSvg()) {
+        this.setModernConfig(config);
+        return;
+      }
       this.querySelector("ha-card").setAttribute("header", config.title);
       this.content.querySelector('#gHPFan').style.display = (!config.heatingPumpType || config.heatingPumpType === 'A2W' ? 'inline' : 'none');
       this.content.querySelector('#gHPW2W').style.display = (config.heatingPumpType === 'W2W' ? 'inline' : 'none');
@@ -9006,6 +9095,16 @@ window.SymconHeatPump = {
                         const result = originalSetData.call(this, data);
 
                         if (this.content) {
+                            const modernSvg = !!this.content.getAttribute('data-symcon-modern');
+
+                            if (modernSvg) {
+                                this.setModernConfig(currentConfig);
+                                this.setModernData(data);
+                                applyThemeColors(this);
+                                applyControlIcons(this);
+                                return result;
+                            }
+
                             applyCoolingVisualization(this);
                             updateRefrigerantValues(this);
                             applyTerminology(this);
