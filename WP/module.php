@@ -1847,9 +1847,10 @@ HTML;
         $value = GetValue($variableId);
 
         $data[$key] = [
-            'value'  => $binary ? $this->NormalizeBinaryValue($value) : $value,
-            'unit'   => $binary ? '' : $this->GetVariableUnit($variableId),
-            'binary' => $binary
+            'value'     => $binary ? $this->NormalizeBinaryValue($value) : $value,
+            'formatted' => $binary ? '' : GetValueFormatted($variableId),
+            'unit'      => $binary ? '' : $this->GetVariableUnit($variableId),
+            'binary'    => $binary
         ];
     }
 
@@ -2068,8 +2069,9 @@ HTML;
         return [
             'configured'   => true,
             'variableId'   => $variableId,
-            'currentValue' => GetValue($variableId),
-            'min'          => $min,
+            'currentValue'     => GetValue($variableId),
+            'formattedValue'   => GetValueFormatted($variableId),
+            'min'              => $min,
             'max'          => $max,
             'step'         => $step,
             'unit'         => $unit
@@ -2266,6 +2268,9 @@ class HeatPumpCard extends HTMLElement {
     const item = this.item(key);
     if (!item || item.value === null || item.value === undefined || item.value === '') {
       return '';
+    }
+    if (item.formatted !== undefined && item.formatted !== null && String(item.formatted) !== '') {
+      return String(item.formatted);
     }
 
     const numeric = this.number(key);
@@ -8364,30 +8369,10 @@ window.SymconHeatPump = {
                 );
 
                 if (valueElement) {
-                    const numeric = Number(control.currentValue);
-
-                    let formatted = Number.isFinite(numeric)
-                        ? new Intl.NumberFormat('de-CH', {
-                            minimumFractionDigits:
-                                Math.abs(numeric % 1) > 0 ? 1 : 0,
-                            maximumFractionDigits: 1
-                        }).format(numeric)
-                        : String(control.currentValue ?? '');
-
-                    if (
-                        definition.functionName
-                        === 'heatingTemperatureCorrection'
-                        && Number.isFinite(numeric)
-                        && numeric > 0
-                    ) {
-                        formatted = '+' + formatted;
-                    }
-
-                    /*
-                     * Im Kreis ausschließlich den Zahlenwert anzeigen.
-                     * Keine Einheit und kein Gradzeichen.
-                     */
-                    valueElement.textContent = formatted;
+                    valueElement.textContent =
+                        control.formattedValue !== undefined && control.formattedValue !== null
+                            ? String(control.formattedValue)
+                            : String(control.currentValue ?? '');
                 }
             });
         };
@@ -8820,15 +8805,10 @@ window.SymconHeatPump = {
                 show(groupSel, configured);
                 if (!configured) return;
 
-                let value = c.currentValue;
-                const numeric = Number(value);
-                if (Number.isFinite(numeric)) {
-                    value = new Intl.NumberFormat('de-CH', {
-                        minimumFractionDigits: Math.abs(numeric % 1) > 0 ? 1 : 0,
-                        maximumFractionDigits: 1
-                    }).format(numeric);
-                }
-                setText(valueSel, String(value ?? '') + (c.unit ? ' ' + c.unit : ''));
+                const value = c.formattedValue !== undefined && c.formattedValue !== null
+                    ? String(c.formattedValue)
+                    : String(c.currentValue ?? '');
+                setText(valueSel, value);
 
                 const el = svg.querySelector(groupSel);
                 if (el) {
