@@ -8826,20 +8826,34 @@ window.SymconHeatPump = {
 
             // Sichtbare Buttons lückenlos von links anordnen.
             const topButtons = [
-                ['#gHPStatusOnOff', 205],
-                ['#gHPStatusWW', 225],
-                ['#gHPStatusHeating', 190],
-                ['#gHPStatusCooling', 165],
-                ['#gHPStatusParty', 160],
-                ['#gHPStatusSave', 165],
-                ['#gSymconWarmWaterSetpoint', 205],
-                ['#gSymconHeatingCorrection', 230]
+                '#gHPStatusOnOff',
+                '#gHPStatusWW',
+                '#gHPStatusHeating',
+                '#gHPStatusCooling',
+                '#gHPStatusParty',
+                '#gHPStatusSave',
+                '#gSymconWarmWaterSetpoint',
+                '#gSymconHeatingCorrection'
             ];
             let nextButtonX = 28;
             const buttonGap = 12;
-            topButtons.forEach(([selector, width]) => {
+            const minButtonWidth = 135;
+            const horizontalPadding = 18;
+            topButtons.forEach((selector) => {
                 const el = svg.querySelector(selector);
                 if (!el || el.style.display === 'none') return;
+
+                const rect = el.querySelector('rect');
+                const texts = Array.from(el.querySelectorAll('text'));
+                let contentWidth = 0;
+                texts.forEach((textEl) => {
+                    try {
+                        contentWidth = Math.max(contentWidth, textEl.getBBox().width);
+                    } catch (_) {}
+                });
+
+                const width = Math.max(minButtonWidth, Math.ceil(contentWidth + (horizontalPadding * 2)));
+                if (rect) rect.setAttribute('width', String(width));
                 el.setAttribute('transform', 'translate(' + nextButtonX + ' 25)');
                 nextButtonX += width + buttonGap;
             });
