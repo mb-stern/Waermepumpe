@@ -3346,6 +3346,7 @@ window.SymconHeatPump = {
                 element.style.setProperty('stroke', borderColor, 'important');
             });
             svg.querySelectorAll('.pn').forEach((element) => {
+                element.style.setProperty('fill', panelBackground, 'important');
                 element.style.setProperty('stroke', borderColor, 'important');
             });
 
