@@ -94,6 +94,7 @@ class Waermepumpe extends IPSModuleStrict
         'CondenserTemperature',
         'ExpansionValveOpening',
         'CompressorValue',
+        'HeatingPumpPower',
 
         'WWHeatingValve',
         'HeaterRodWW',
@@ -257,6 +258,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('CondenserTemperature', 0);
         $this->RegisterPropertyInteger('ExpansionValveOpening', 0);
         $this->RegisterPropertyInteger('CompressorValue', 0);
+        $this->RegisterPropertyInteger('HeatingPumpPower', 0);
 
         // Ventil / Heizstab
         $this->RegisterPropertyInteger('WWHeatingValve', 0);
@@ -509,7 +511,8 @@ class Waermepumpe extends IPSModuleStrict
                     ['type' => 'Label', 'caption' => 'Verdichter'],
                     $this->VariableGrid([
                         ['caption' => 'Verdichter aktiv', 'name' => 'CompressorRunning'],
-                        ['caption' => 'Verdichterdrehzahl', 'name' => 'CompressorValue']
+                        ['caption' => 'Verdichterdrehzahl', 'name' => 'CompressorValue'],
+                        ['caption' => 'Leistung', 'name' => 'HeatingPumpPower']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Primärquelle'],
@@ -1606,6 +1609,7 @@ HTML;
             'hpRunning'                  => ($this->ReadPropertyInteger('FanSpeed') > 0 || $this->HasOperatingStatus()) ? 'hpRunning' : $this->DataKey('HpRunning', 'hpRunning'),
             'fanSpeed'                   => $this->DataKey('FanSpeed', 'fanSpeed'),
             'compressorRunning'          => $this->DataKey('CompressorRunning', 'compressorRunning'),
+            'heatingPumpPower'          => $this->DataKey('HeatingPumpPower', 'heatingPumpPower'),
             'circulatingPumpRunning'     => $this->DataKey('CirculatingPumpRunning', 'circulatingPumpRunning'),
             'storageChargingPumpRunning' => $this->DataKey('StorageChargingPumpRunning', 'storageChargingPumpRunning'),
 
@@ -1642,6 +1646,7 @@ HTML;
             'condenserTemperature'       => $this->DataKey('CondenserTemperature', 'condenserTemperature'),
             'expansionValveOpening'      => $this->DataKey('ExpansionValveOpening', 'expansionValveOpening'),
             'compressorValue'            => $this->DataKey('CompressorValue', 'compressorValue'),
+            'heatingPumpPower'           => $this->DataKey('HeatingPumpPower', 'heatingPumpPower'),
 
             'wwHeatingValve'             => $this->DataKey('WWHeatingValve', 'wwHeatingValve'),
             'heaterRodWW'                => $this->DataKey('HeaterRodWW', 'heaterRodWW'),
@@ -1732,6 +1737,7 @@ HTML;
             'hpRunning'                  => 'HpRunning',
             'fanSpeed'                   => 'FanSpeed',
             'compressorRunning'          => 'CompressorRunning',
+            'heatingPumpPower'          => 'HeatingPumpPower',
             'circulatingPumpRunning'     => 'CirculatingPumpRunning',
             'storageChargingPumpRunning' => 'StorageChargingPumpRunning',
             'tankTempHPUp'               => 'TankTempHPUp',
@@ -1755,6 +1761,7 @@ HTML;
             'condenserTemperature'       => 'CondenserTemperature',
             'expansionValveOpening'      => 'ExpansionValveOpening',
             'compressorValue'            => 'CompressorValue',
+            'heatingPumpPower'           => 'HeatingPumpPower',
             'wwHeatingValve'             => 'WWHeatingValve',
             'heaterRodWW'                => 'HeaterRodWW',
             'heaterRodHP'                => 'HeaterRodHP',
@@ -8925,6 +8932,8 @@ window.SymconHeatPump = {
             setText('#textCondenserPressure', formatted(cfg.condenserPressure));
             setText('#textCondenserTemperature', formatted(cfg.condenserTemperature));
             setText('#textExpansionValveOpening', formatted(cfg.expansionValveOpening));
+            setText('#textPowerValue', formatted(cfg.heatingPumpPower));
+            setText('#textCompressorSpeedValue', formatted(cfg.compressorValue));
             setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));
             setText('#textThermalSolarPumpSpeed', formatted(cfg.thermalSolarPumpSpeed));
 
@@ -8996,7 +9005,11 @@ window.SymconHeatPump = {
                         rpm = Number(fanRaw);
                         if (!Number.isFinite(rpm)) rpm = 0;
                     }
-                } else if (cfg.hpRunning && binary(cfg.hpRunning)) {
+                }
+
+                // Fallback: liefert FanSpeed keinen positiven Wert, aber die
+                // Wärmepumpe läuft, soll der Lüfter trotzdem sichtbar drehen.
+                if (rpm <= 0 && cfg.hpRunning && binary(cfg.hpRunning)) {
                     rpm = 250;
                 }
 
