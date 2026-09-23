@@ -26,8 +26,11 @@ class Waermepumpe extends IPSModuleStrict
         'CirculatingPumpRunning',
         'StorageChargingPumpRunning',
         'HeatingCircuitPumpRunning1',
+        'HeatingCircuitPumpValue1',
         'HeatingCircuitPumpRunning2',
+        'HeatingCircuitPumpValue2',
         'HeatingCircuitPumpRunning3',
+        'HeatingCircuitPumpValue3',
         'WWHeatingValve',
         'HeaterRodWW',
         'HeaterRodHP',
@@ -185,6 +188,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyString('HeatingCircuitType1', 'underfloor');
         $this->RegisterPropertyString('HeatingCircuitName1', 'HK1');
         $this->RegisterPropertyInteger('HeatingCircuitPumpRunning1', 0);
+        $this->RegisterPropertyInteger('HeatingCircuitPumpValue1', 0);
         $this->RegisterPropertyInteger('SupplyTemperatureHeating1', 0);
         $this->RegisterPropertyInteger('RefluxTemperatureHeating1', 0);
 
@@ -192,6 +196,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyString('HeatingCircuitType2', 'off');
         $this->RegisterPropertyString('HeatingCircuitName2', 'HK2');
         $this->RegisterPropertyInteger('HeatingCircuitPumpRunning2', 0);
+        $this->RegisterPropertyInteger('HeatingCircuitPumpValue2', 0);
         $this->RegisterPropertyInteger('SupplyTemperatureHeating2', 0);
         $this->RegisterPropertyInteger('RefluxTemperatureHeating2', 0);
 
@@ -199,6 +204,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyString('HeatingCircuitType3', 'off');
         $this->RegisterPropertyString('HeatingCircuitName3', 'HK3');
         $this->RegisterPropertyInteger('HeatingCircuitPumpRunning3', 0);
+        $this->RegisterPropertyInteger('HeatingCircuitPumpValue3', 0);
         $this->RegisterPropertyInteger('SupplyTemperatureHeating3', 0);
         $this->RegisterPropertyInteger('RefluxTemperatureHeating3', 0);
 
@@ -764,14 +770,14 @@ class Waermepumpe extends IPSModuleStrict
                 $this->VariableRow(
                     'Heizkreispumpe aktiv',
                     'HeatingCircuitPumpRunning' . $suffix,
-                    'Heizkreis Vorlauf',
-                    'SupplyTemperatureHeating' . $suffix
+                    'Pumpendrehzahl / Durchfluss',
+                    'HeatingCircuitPumpValue' . $suffix
                 ),
                 $this->VariableRow(
-                    'Heizkreis Rücklauf',
-                    'RefluxTemperatureHeating' . $suffix,
-                    '',
-                    ''
+                    'VL Temperatur',
+                    'SupplyTemperatureHeating' . $suffix,
+                    'RL Temperatur',
+                    'RefluxTemperatureHeating' . $suffix
                 )
                 ]
             )
@@ -1232,18 +1238,21 @@ HTML;
             'heatingCircuitType1'        => $this->ReadPropertyString('HeatingCircuitType1'),
             'heatingCircuitName1'             => $this->ReadPropertyString('HeatingCircuitName1'),
             'heatingCircuitPumpRunning'  => $this->DataKey('HeatingCircuitPumpRunning1', 'heatingCircuitPumpRunning'),
+            'heatingCircuitPumpValue' => $this->DataKey('HeatingCircuitPumpValue1', 'heatingCircuitPumpValue'),
             'supplyTemperatureHeating'   => $this->DataKey('SupplyTemperatureHeating1', 'supplyTemperatureHeating'),
             'refluxTemperatureHeating'   => $this->DataKey('RefluxTemperatureHeating1', 'refluxTemperatureHeating'),
 
             'heatingCircuitType2'        => $this->ReadPropertyString('HeatingCircuitType2'),
             'heatingCircuitName2'             => $this->ReadPropertyString('HeatingCircuitName2'),
             'heatingCircuitPumpRunning2' => $this->DataKey('HeatingCircuitPumpRunning2', 'heatingCircuitPumpRunning2'),
+            'heatingCircuitPumpValue2' => $this->DataKey('HeatingCircuitPumpValue2', 'heatingCircuitPumpValue2'),
             'supplyTemperatureHeating2'  => $this->DataKey('SupplyTemperatureHeating2', 'supplyTemperatureHeating2'),
             'refluxTemperatureHeating2'  => $this->DataKey('RefluxTemperatureHeating2', 'refluxTemperatureHeating2'),
 
             'heatingCircuitType3'        => $this->ReadPropertyString('HeatingCircuitType3'),
             'heatingCircuitName3'             => $this->ReadPropertyString('HeatingCircuitName3'),
             'heatingCircuitPumpRunning3' => $this->DataKey('HeatingCircuitPumpRunning3', 'heatingCircuitPumpRunning3'),
+            'heatingCircuitPumpValue3' => $this->DataKey('HeatingCircuitPumpValue3', 'heatingCircuitPumpValue3'),
             'supplyTemperatureHeating3'  => $this->DataKey('SupplyTemperatureHeating3', 'supplyTemperatureHeating3'),
             'refluxTemperatureHeating3'  => $this->DataKey('RefluxTemperatureHeating3', 'refluxTemperatureHeating3'),
 
@@ -1331,9 +1340,11 @@ HTML;
             'supplyTemperatureHeating'   => 'SupplyTemperatureHeating1',
             'refluxTemperatureHeating'   => 'RefluxTemperatureHeating1',
             'heatingCircuitPumpRunning2' => 'HeatingCircuitPumpRunning2',
+            'heatingCircuitPumpValue2' => 'HeatingCircuitPumpValue2',
             'supplyTemperatureHeating2'  => 'SupplyTemperatureHeating2',
             'refluxTemperatureHeating2'  => 'RefluxTemperatureHeating2',
             'heatingCircuitPumpRunning3' => 'HeatingCircuitPumpRunning3',
+            'heatingCircuitPumpValue3' => 'HeatingCircuitPumpValue3',
             'supplyTemperatureHeating3'  => 'SupplyTemperatureHeating3',
             'refluxTemperatureHeating3'  => 'RefluxTemperatureHeating3',
             'evaporatorPressure'         => 'EvaporatorPressure',
@@ -7133,16 +7144,19 @@ window.SymconHeatPump = {
             setText('#textHeatingCircuitName3', cfg.heatingCircuitName3 || 'HK3');
 
             [
-                [1, cfg.supplyTemperatureHeating, cfg.refluxTemperatureHeating, cfg.heatingCircuitPumpRunning],
-                [2, cfg.supplyTemperatureHeating2, cfg.refluxTemperatureHeating2, cfg.heatingCircuitPumpRunning2],
-                [3, cfg.supplyTemperatureHeating3, cfg.refluxTemperatureHeating3, cfg.heatingCircuitPumpRunning3]
-            ].forEach(([n, supply, reflux, pump]) => {
+                [1, cfg.supplyTemperatureHeating, cfg.refluxTemperatureHeating, cfg.heatingCircuitPumpValue],
+                [2, cfg.supplyTemperatureHeating2, cfg.refluxTemperatureHeating2, cfg.heatingCircuitPumpValue2],
+                [3, cfg.supplyTemperatureHeating3, cfg.refluxTemperatureHeating3, cfg.heatingCircuitPumpValue3]
+            ].forEach(([n, supply, reflux, pumpValueItem]) => {
                 const supplySelector = n === 1 ? '#textSupplyTemperatureHeating' : '#textSupplyTemperatureHeating' + n;
                 const refluxSelector = n === 1 ? '#textRefluxTemperatureHeating' : '#textRefluxTemperatureHeating' + n;
                 setText(supplySelector, formatted(supply));
                 setText(refluxSelector, formatted(reflux));
-                const pumpValue = formatted(pump);
-                if (pumpValue) setText('#textHeatingPump' + n, pumpValue);
+
+                // Unter der Pumpe nur die separat konfigurierte Drehzahl /
+                // den Durchfluss anzeigen. Nicht konfiguriert = leer.
+                const pumpText = pumpValueItem ? formatted(pumpValueItem) : '';
+                setText('#textHeatingPump' + n, pumpText);
             });
 
             setText('#textEvaporatorPressure', formatted(cfg.evaporatorPressure));
