@@ -8917,6 +8917,17 @@ window.SymconHeatPump = {
                     manifoldBody.setAttribute('y', '220');
                     manifoldBody.setAttribute('height', '335');
                 }
+
+            // Gemeinsamen blauen Rücklauf bei mehreren Heizkreisen exakt am
+            // letzten aktiven Heizkreis in den Verteiler führen.
+            const bufferColdPath = svg.querySelector('#gBuffer > path.cold');
+            const noBufferColdPath = svg.querySelector('#gNoBuffer > path.cold');
+            const manifoldReturnY = heatingCircuitCount === 2 ? 415 : (heatingCircuitCount >= 3 ? 535 : 440);
+            [bufferColdPath, noBufferColdPath].forEach((path) => {
+                if (!path || heatingCircuitCount <= 1) return;
+                const d = path.getAttribute('d') || '';
+                path.setAttribute('d', d.replace(/M1165\s+440/, 'M1165 ' + manifoldReturnY));
+            });
             }
 
             show('#gBuffer', heating && !!cfg.tankHP);
