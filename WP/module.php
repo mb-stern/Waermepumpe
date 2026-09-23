@@ -18,8 +18,6 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingPumpHotWaterMode',
         'HeatingPumpHeatingMode',
         'HeatingPumpCoolingMode',
-        'HeatingPumpPartyMode',
-        'HeatingPumpEnergySaveMode',
         'Error',
         'DefrostMode',
         'AdditionalHeating',
@@ -39,16 +37,10 @@ class Waermepumpe extends IPSModuleStrict
     ];
 
     private const VARIABLE_PROPERTIES = [
-        'TemperatureGroundWaterIn',
-        'TemperatureGroundWaterOut',
-
         'HeatingPumpStatusOnOff',
         'HeatingPumpHotWaterMode',
         'HeatingPumpHeatingMode',
         'HeatingPumpCoolingMode',
-        'HeatingPumpPartyMode',
-        'HeatingPumpEnergySaveMode',
-
         'Error',
         'DefrostMode',
         'AdditionalHeating',
@@ -56,8 +48,6 @@ class Waermepumpe extends IPSModuleStrict
         'OutdoorTemperature',
         'AmbientTemperatureNormal',
         'AmbientTemperatureActual',
-        'AmbientTemperatureReduced',
-        'AmbientTemperatureParty',
         'SupplyTemperature',
 
         'HpRunning',
@@ -155,15 +145,10 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('FanSpeed', 0);
 
         // Primärquelle / Wärmepumpe
-        $this->RegisterPropertyInteger('TemperatureGroundWaterIn', 0);
-        $this->RegisterPropertyInteger('TemperatureGroundWaterOut', 0);
-
         $this->RegisterPropertyInteger('HeatingPumpStatusOnOff', 0);
         $this->RegisterPropertyInteger('HeatingPumpHotWaterMode', 0);
         $this->RegisterPropertyInteger('HeatingPumpHeatingMode', 0);
         $this->RegisterPropertyInteger('HeatingPumpCoolingMode', 0);
-        $this->RegisterPropertyInteger('HeatingPumpPartyMode', 0);
-        $this->RegisterPropertyInteger('HeatingPumpEnergySaveMode', 0);
         // Heizprogramm-Status, z. B. Luxtronik opStateHeating / Calculation 125.
         // Die Werte können wie beim zentralen Betriebsstatus frei definiert werden.
         $this->RegisterPropertyInteger('Error', 0);
@@ -173,8 +158,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('OutdoorTemperature', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureNormal', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureActual', 0);
-        $this->RegisterPropertyInteger('AmbientTemperatureReduced', 0);
-        $this->RegisterPropertyInteger('AmbientTemperatureParty', 0);
         $this->RegisterPropertyInteger('SupplyTemperature', 0);
 
         $this->RegisterPropertyInteger('HpRunning', 0);
@@ -338,8 +321,6 @@ class Waermepumpe extends IPSModuleStrict
         } elseif ($Ident === 'SetBinaryControl') {
             $propertyMap = [
                 'power' => 'HeatingPumpStatusOnOff',
-                'party' => 'HeatingPumpPartyMode',
-                'eco'   => 'HeatingPumpEnergySaveMode'
             ];
         } else {
             $propertyMap = [
@@ -424,8 +405,6 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable'],
                         ['caption' => 'Warmwasser-Solltemperatur', 'name' => 'WarmWaterSetpointVariable'],
                         ['caption' => 'Heiztemperaturkorrektur', 'name' => 'HeatingTemperatureCorrectionVariable'],
-                        ['caption' => 'Partybetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
-                        ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Messwerte'],
@@ -433,10 +412,8 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
                         ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
                         ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
-                        ['caption' => 'Raumtemperatur Normal', 'name' => 'AmbientTemperatureNormal'],
+                        ['caption' => 'Raumtemperatur Soll', 'name' => 'AmbientTemperatureNormal'],
                         ['caption' => 'Raumtemperatur Ist (Fallback)', 'name' => 'AmbientTemperatureActual'],
-                        ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
-                        ['caption' => 'Raumtemperatur Party', 'name' => 'AmbientTemperatureParty']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Verdichter und Kältekreis'],
@@ -453,8 +430,6 @@ class Waermepumpe extends IPSModuleStrict
                     ['type' => 'Label', 'caption' => 'Primärquelle'],
                     $this->VariableGrid([
                         ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed'],
-                        ['caption' => 'Quelle Eingang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterIn'],
-                        ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Weitere Zustände'],
@@ -1219,24 +1194,17 @@ HTML;
             'title'                      => '',
             'heatingPumpType'            => 'A2W',
 
-            'temperatureGroundWaterIn'   => $this->DataKey('TemperatureGroundWaterIn', 'temperatureGroundWaterIn'),
-            'temperatureGroundWaterOut'  => $this->DataKey('TemperatureGroundWaterOut', 'temperatureGroundWaterOut'),
-
             'operatingStatus'             => $this->DataKey('OperatingStatusVariable', 'operatingStatus'),
             'heatingPumpStatusOnOff'     => $this->DataKey('HeatingPumpStatusOnOff', 'heatingPumpStatusOnOff'),
             'heatingPumpHotWaterMode'    => $this->HasOperatingStatus() ? 'heatingPumpHotWaterMode' : $this->DataKey('HeatingPumpHotWaterMode', 'heatingPumpHotWaterMode'),
             'heatingPumpHeatingMode'     => $this->HasOperatingStatus() ? 'heatingPumpHeatingMode' : $this->DataKey('HeatingPumpHeatingMode', 'heatingPumpHeatingMode'),
             'heatingPumpCoolingMode'     => $this->HasOperatingStatus() ? 'heatingPumpCoolingMode' : $this->DataKey('HeatingPumpCoolingMode', 'heatingPumpCoolingMode'),
-            'heatingPumpPartyMode'       => $this->DataKey('HeatingPumpPartyMode', 'heatingPumpPartyMode'),
-            'heatingPumpEnergySaveMode'  => $this->DataKey('HeatingPumpEnergySaveMode', 'heatingPumpEnergySaveMode'),
             'error'                      => $this->DataKey('Error', 'error'),
             'defrostMode'                => $this->HasOperatingStatus() ? 'defrostMode' : $this->DataKey('DefrostMode', 'defrostMode'),
             'additionalHeating'          => $this->DataKey('AdditionalHeating', 'additionalHeating'),
 
             'outdoorTemperature'         => $this->DataKey('OutdoorTemperature', 'outdoorTemperature'),
             'ambientTemperatureNormal'   => $this->DataKeyWithFallback('AmbientTemperatureNormal', 'AmbientTemperatureActual', 'ambientTemperatureNormal'),
-            'ambientTemperatureReduced'  => $this->DataKey('AmbientTemperatureReduced', 'ambientTemperatureReduced'),
-            'ambientTemperatureParty'    => $this->DataKey('AmbientTemperatureParty', 'ambientTemperatureParty'),
             'supplyTemperature'          => $this->DataKey('SupplyTemperature', 'supplyTemperature'),
 
             'hpRunning'                  => ($this->ReadPropertyInteger('FanSpeed') > 0 || $this->HasOperatingStatus()) ? 'hpRunning' : $this->DataKey('HpRunning', 'hpRunning'),
@@ -1333,22 +1301,16 @@ HTML;
         $data = [];
 
         $map = [
-            'temperatureGroundWaterIn'   => 'TemperatureGroundWaterIn',
-            'temperatureGroundWaterOut'  => 'TemperatureGroundWaterOut',
             'operatingStatus'             => 'OperatingStatusVariable',
             'heatingPumpStatusOnOff'     => 'HeatingPumpStatusOnOff',
             'heatingPumpHotWaterMode'    => 'HeatingPumpHotWaterMode',
             'heatingPumpHeatingMode'     => 'HeatingPumpHeatingMode',
             'heatingPumpCoolingMode'     => 'HeatingPumpCoolingMode',
-            'heatingPumpPartyMode'       => 'HeatingPumpPartyMode',
-            'heatingPumpEnergySaveMode'  => 'HeatingPumpEnergySaveMode',
             'error'                      => 'Error',
             'defrostMode'                => 'DefrostMode',
             'additionalHeating'          => 'AdditionalHeating',
             'outdoorTemperature'         => 'OutdoorTemperature',
             'ambientTemperatureNormal'   => 'AmbientTemperatureNormal',
-            'ambientTemperatureReduced'  => 'AmbientTemperatureReduced',
-            'ambientTemperatureParty'    => 'AmbientTemperatureParty',
             'supplyTemperature'          => 'SupplyTemperature',
             'hpRunning'                  => 'HpRunning',
             'fanSpeed'                   => 'FanSpeed',
@@ -1405,11 +1367,24 @@ HTML;
         ];
 
         foreach ($map as $key => $property) {
+            $binary = in_array($property, self::BINARY_PROPERTIES, true);
+
+            // Heizstäbe dürfen Boolean ODER Integer/Float sein.
+            // Bei Boolean wird true/false sauber normalisiert; bei numerischen
+            // Variablen bleibt der Wert für den konfigurierten Schwellwert erhalten.
+            if (in_array($property, ['HeaterRod1', 'HeaterRod2', 'HeaterRod3'], true)) {
+                $variableId = $this->ReadPropertyInteger($property);
+                if ($variableId > 0 && IPS_VariableExists($variableId)) {
+                    $variable = IPS_GetVariable($variableId);
+                    $binary = ((int) $variable['VariableType'] === 0);
+                }
+            }
+
             $this->AddVariableData(
                 $data,
                 $key,
                 $property,
-                in_array($property, self::BINARY_PROPERTIES, true)
+                $binary
             );
         }
 
@@ -1557,8 +1532,6 @@ HTML;
             'hotwater'                     => $this->BuildControlInfo('HotWaterControlVariable'),
             'cooling'                      => $this->BuildControlInfo('CoolingControlVariable'),
             'power'                        => $this->BuildControlInfo('HeatingPumpStatusOnOff'),
-            'party'                        => $this->BuildControlInfo('HeatingPumpPartyMode'),
-            'eco'                          => $this->BuildControlInfo('HeatingPumpEnergySaveMode'),
             'warmWaterSetpoint'            => $this->BuildNumericControlInfo('WarmWaterSetpointVariable', 20.0, 80.0, 0.5),
             'heatingTemperatureCorrection' => $this->BuildNumericControlInfo('HeatingTemperatureCorrectionVariable', -10.0, 10.0, 0.5)
         ];
@@ -1919,7 +1892,6 @@ class HeatPumpCard extends HTMLElement {
     this.setText('#textG2WWaterTempIn', this.format(c.temperatureGroundWaterIn));
     this.setText('#textG2WWaterTempOut', this.format(c.temperatureGroundWaterOut));
 
-    const party = this.binary(c.heatingPumpPartyMode);
     const night = this.binary(c.heatingPumpNightMode);
     const hasExplicitDayState = !!c.heatingPumpDayMode;
     const day = hasExplicitDayState
@@ -1935,8 +1907,8 @@ class HeatPumpCard extends HTMLElement {
     show('#gHPStatusWW', this.binary(c.heatingPumpHotWaterMode));
     show('#gHPStatusHeating', this.binary(c.heatingPumpHeatingMode));
     show('#gHPStatusCooling', this.binary(c.heatingPumpCoolingMode));
-    show('#gHPStatusParty', party);
-    show('#gHPStatusSave', this.binary(c.heatingPumpEnergySaveMode));
+    show('#gHPStatusParty', false);
+    show('#gHPStatusSave', false);
     show('#gTimeSymbolNight', night);
     show('#gTimeSymbolDay', day);
     show('#gWarning', false);
@@ -1946,10 +1918,6 @@ class HeatPumpCard extends HTMLElement {
 
     this.setText('#textOutdoorTemperatureValue', this.format(c.outdoorTemperature));
 
-    if (party && this.format(c.ambientTemperatureParty)) {
-      this.setText('#textIndoorTemperatureValue', this.format(c.ambientTemperatureParty));
-    } else if (night && this.format(c.ambientTemperatureReduced)) {
-      this.setText('#textIndoorTemperatureValue', this.format(c.ambientTemperatureReduced));
     } else {
       this.setText('#textIndoorTemperatureValue', this.format(c.ambientTemperatureNormal));
     }
@@ -5876,6 +5844,32 @@ window.SymconHeatPump = {
 
 
 
+        const heaterRodIsActive = (entity, threshold) => {
+            if (!entity || !currentData || !currentData[entity]) {
+                return false;
+            }
+
+            const item = currentData[entity];
+            const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : 1;
+
+            // Vom PHP als echte Boolean-Variable erkannt.
+            if (item.binary === true) {
+                return item.value === true
+                    || item.value === 1
+                    || String(item.value ?? '').trim().toLowerCase() === 'true';
+            }
+
+            // Integer/Float: konfigurierter Schwellwert.
+            const numeric = Number(item.value);
+            if (Number.isFinite(numeric)) {
+                return numeric >= limit;
+            }
+
+            // Zusätzlicher robuster Fallback für textuelle Zustände.
+            return ['1','true','on','yes','ja','ein','active','aktiv']
+                .includes(String(item.value ?? '').trim().toLowerCase());
+        };
+
         const applyHeaterRodInfoField = (card) => {
             if (!card || !card.content) return;
             const svg = card.content;
@@ -5890,12 +5884,7 @@ window.SymconHeatPump = {
             for (let i = 0; i < count; i++) {
                 const entity = entities[i];
                 if (!entity || !currentData || !currentData[entity]) continue;
-                const value = currentData[entity].value;
-                const numeric = Number(value);
-                const on = Number.isFinite(numeric)
-                    ? numeric >= thresholds[i]
-                    : ['1','true','on','yes','ja','ein','active','aktiv'].includes(String(value ?? '').trim().toLowerCase());
-                if (on) active++;
+                if (heaterRodIsActive(entity, thresholds[i])) active++;
             }
             const text = svg.querySelector('#textHeaterRodStatus');
             if (text) text.textContent = active > 0 ? String(active) : 'Aus';
@@ -6052,28 +6041,6 @@ window.SymconHeatPump = {
                 activeColor: rodColors[index]
             }));
 
-            const isActive = (entity, threshold) => {
-                if (!entity || !currentData || !currentData[entity]) {
-                    return false;
-                }
-
-                const raw = currentData[entity].value;
-                const value = String(raw ?? '').trim().toLowerCase();
-                const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : 1;
-
-                // Bool: true entspricht 1, false entspricht 0.
-                if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
-                    return 1 >= limit;
-                }
-
-                if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
-                    return 0 >= limit;
-                }
-
-                const numeric = Number(raw);
-                return Number.isFinite(numeric) && numeric >= limit;
-            };
-
             rods.forEach((rodInfo, index) => {
                 const exists = index < heaterRodCount;
 
@@ -6086,7 +6053,7 @@ window.SymconHeatPump = {
                     return;
                 }
 
-                const active = isActive(rodInfo.entity, rodInfo.threshold);
+                const active = heaterRodIsActive(rodInfo.entity, rodInfo.threshold);
 
                 rodInfo.element.style.setProperty('display', 'block', 'important');
                 rodInfo.element.style.setProperty('visibility', 'visible', 'important');
@@ -6611,16 +6578,6 @@ window.SymconHeatPump = {
                     originalX: 346.000
                 },
                 {
-                    selector: '#gHPStatusParty',
-                    custom: false,
-                    originalX: 437.380
-                },
-                {
-                    selector: '#gHPStatusSave',
-                    custom: false,
-                    originalX: 485.077
-                },
-                {
                     selector: '#gSymconWarmWaterSetpoint',
                     custom: true
                 },
@@ -6935,6 +6892,10 @@ window.SymconHeatPump = {
                 return found ? String(found.name) : String(current ?? '');
             };
 
+            // Alte Party-/Eco-Felder der Original-SVG dauerhaft ausblenden.
+            show('#gHPStatusParty', false);
+            show('#gHPStatusSave', false);
+
             // Real mode values from the configured Symcon profiles.
             setText('#textControlHeating', optionName(controls.heating));
             setText('#textControlHotWater', optionName(controls.hotwater));
@@ -6943,8 +6904,6 @@ window.SymconHeatPump = {
             // Binary buttons: real state, and completely hidden when no variable is configured.
             const binaryDefs = [
                 ['power', '#gHPStatusOnOff', '#textControlPower', cfg.heatingPumpStatusOnOff],
-                ['party', '#gHPStatusParty', '#textControlParty', cfg.heatingPumpPartyMode],
-                ['eco',   '#gHPStatusSave', '#textControlEco', cfg.heatingPumpEnergySaveMode]
             ];
             binaryDefs.forEach(([name, groupSel, textSel, dataKey]) => {
                 const control = controls[name];
@@ -6999,8 +6958,6 @@ window.SymconHeatPump = {
                 '#gHPStatusWW',
                 '#gHPStatusHeating',
                 '#gHPStatusCooling',
-                '#gHPStatusParty',
-                '#gHPStatusSave',
                 '#gSymconWarmWaterSetpoint',
                 '#gSymconHeatingCorrection'
             ];
@@ -7102,10 +7059,6 @@ window.SymconHeatPump = {
             // Live values.
             setText('#textOutdoorTemperatureValue', formatted(cfg.outdoorTemperature));
             let indoorKey = cfg.ambientTemperatureNormal;
-            if (binary(cfg.heatingPumpPartyMode) && formatted(cfg.ambientTemperatureParty)) {
-                indoorKey = cfg.ambientTemperatureParty;
-            } else if (binary(cfg.heatingPumpNightMode) && formatted(cfg.ambientTemperatureReduced)) {
-                indoorKey = cfg.ambientTemperatureReduced;
             }
             setText('#textIndoorTemperatureValue', formatted(indoorKey));
             setText('#textSupplyTemperatureValue', formatted(cfg.supplyTemperature));
