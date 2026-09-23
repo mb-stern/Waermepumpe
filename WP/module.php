@@ -6614,10 +6614,24 @@ window.SymconHeatPump = {
 
             // Umschaltventil: EIN = Warmwasser, AUS = Heizung.
             // Nur anzeigen, wenn eine Variable konfiguriert ist.
+            const wwValveToHotWater =
+                !!cfg.wwHeatingValve && binary(cfg.wwHeatingValve);
+
             setText(
                 '#textWWHeatingValveState',
-                cfg.wwHeatingValve ? (binary(cfg.wwHeatingValve) ? 'Warmwasser' : 'Heizung') : ''
+                cfg.wwHeatingValve ? (wwValveToHotWater ? 'Warmwasser' : 'Heizung') : ''
             );
+
+            // Ventilstellung auch grafisch darstellen:
+            // Heizung    = von links kommend nach oben
+            // Warmwasser = von links nach rechts durchgehend
+            const switchValveFlow = svg.querySelector('#switchValveFlow');
+            if (switchValveFlow) {
+                switchValveFlow.setAttribute(
+                    'd',
+                    wwValveToHotWater ? 'M-16 0H16' : 'M-16 0H0V-16'
+                );
+            }
             setText('#textPowerValue', formatted(cfg.heatingPumpPower));
             setText('#textCompressorSpeedValue', formatted(cfg.compressorValue));
             setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));

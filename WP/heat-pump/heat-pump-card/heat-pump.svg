@@ -67,7 +67,7 @@ text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{fon
 </g>
 </g>
 
-<g id="heatPump"><rect class="pn" x="28" y="445" width="650" height="465" rx="10" /><text class="hd" x="55" y="480">Wärmepumpe</text><text id="textHPStatus" class="md" x="55" y="515" fill="#25e85d" />
+<g id="heatPump"><rect class="pn" x="28" y="445" width="650" height="465" rx="10" /><text id="textHPStatus" class="md" x="55" y="480" fill="#25e85d" />
  
 <g id="gHPUnitCabinet">
  <defs>
@@ -93,13 +93,13 @@ text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{fon
    <path d="M4 11 C22 28 34 50 24 62 C15 72-2 64-9 48 C-14 36-9 21-4 11 C-1 9 1 9 4 11Z" />
    <path d="M-11 4 C-28 22-50 34-62 24 C-72 15-64-2-48-9 C-36-14-21-9-11-4 C-9-1-9 1-11 4Z" /></g><circle r="18" fill="#6c7882" stroke="#d4dade" stroke-width="2" /></g>
  <g id="gRefrigerantCircuit" transform="translate(30 0)">
-<rect id="refrigerantPanel" class="pn" x="210" y="515" width="425" height="350" rx="10" /><path class="cold" d="M260 665V620Q260 575 305 575H370" /><g id="pathCompressor"><circle class="theme-surface" cx="395" cy="575" r="21" fill="var(--wp-button)" stroke="var(--wp-border2)" stroke-width="3" /><circle cx="395" cy="575" r="9" fill="none" stroke="var(--wp-icon)" stroke-width="3" /><path class="theme-dot" d="M395 554L403 570L387 570Z" fill="var(--wp-icon)" /></g><path class="hot" d="M416 575H540Q585 575 585 620V665M585 720V775Q585 820 540 820H445" /><path class="cold" d="M385 820H305Q260 820 260 775V720" /><g id="evaporatorElement">
+<rect id="refrigerantPanel" class="pn" x="210" y="515" width="425" height="350" rx="10" /><path class="cold" d="M260 665V620Q260 575 305 575H401.5" /><g id="pathCompressor"><circle class="theme-surface" cx="422.5" cy="575" r="21" fill="var(--wp-button)" stroke="var(--wp-border2)" stroke-width="3" /><circle cx="422.5" cy="575" r="9" fill="none" stroke="var(--wp-icon)" stroke-width="3" /><path class="theme-dot" d="M422.5 554L430.5 570L414.5 570Z" fill="var(--wp-icon)" /></g><path class="hot" d="M443.5 575H540Q585 575 585 620V665M585 720V775Q585 820 540 820H445" /><path class="cold" d="M400.5 820H305Q260 820 260 775V720" /><g id="evaporatorElement">
 <rect class="theme-surface" x="230" y="665" width="55" height="55" rx="12" fill="var(--wp-button)" stroke="url(#evaporatorGradient)" stroke-width="5" />
 <path d="M240 676V709M250 676V709M260 676V709M270 676V709M280 676V709" fill="none" stroke="url(#evaporatorGradient)" stroke-width="4" stroke-linecap="round" />
 </g><g id="condenserElement">
 <rect class="theme-surface" x="565" y="665" width="55" height="55" rx="12" fill="var(--wp-button)" stroke="url(#condenserGradient)" stroke-width="5" />
 <path d="M575 676V709M585 676V709M595 676V709M605 676V709M615 676V709" fill="none" stroke="url(#condenserGradient)" stroke-width="4" stroke-linecap="round" />
-</g><text class="sm" x="295" y="674">Verdampfer</text><text class="sm" x="560" y="674" text-anchor="end">Kondensator</text><text id="textEvaporatorPressure" class="sm" x="295" y="698" /><text id="textEvaporatorTemperature" class="sm" x="295" y="720" /><text id="textCondenserPressure" class="sm" x="560" y="698" text-anchor="end" /><text id="textCondenserTemperature" class="sm" x="560" y="720" text-anchor="end" /><text class="sm" x="395" y="548" text-anchor="middle">Kompressor</text><text id="textCompressorSpeedValue" class="sm" x="395" y="620" text-anchor="middle" /><path class="w" d="M390 805l22 20 22-20v40l-22-20-22 20z" /><text class="sm" x="350" y="790">Expansionsventil</text><text id="textExpansionValveOpening" class="sm" x="560" y="790" text-anchor="end" />
+</g><text class="sm" x="295" y="674">Verdampfer</text><text class="sm" x="560" y="674" text-anchor="end">Kondensator</text><text id="textEvaporatorPressure" class="sm" x="295" y="698" /><text id="textEvaporatorTemperature" class="sm" x="295" y="720" /><text id="textCondenserPressure" class="sm" x="560" y="698" text-anchor="end" /><text id="textCondenserTemperature" class="sm" x="560" y="720" text-anchor="end" /><text class="sm" x="422.5" y="548" text-anchor="middle">Kompressor</text><text id="textCompressorSpeedValue" class="sm" x="422.5" y="620" text-anchor="middle" /><path class="w" d="M400.5 805l22 20 22-20v40l-22-20-22 20z" /><text class="sm" x="422.5" y="790" text-anchor="middle">Expansionsventil</text><text id="textExpansionValveOpening" class="sm" x="422.5" y="862" text-anchor="middle" />
 </g>
 </g>
 
