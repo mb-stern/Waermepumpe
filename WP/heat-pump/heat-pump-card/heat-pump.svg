@@ -13,7 +13,20 @@
  --wp-border:#557386;--wp-border2:#57798b;--wp-text:#f4f6f7;--wp-icon:#eef3f5;
  --wp-fan:#aeb8bf;--wp-fan-hub:#66737c
 }
-text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{font-size:21px}.md{font-size:25px}.bg{font-size:38px;font-weight:700}.hd{font-size:24px;font-weight:700}.pn{fill:url(#p);stroke:var(--wp-border);stroke-width:1.6}.bt{fill:var(--wp-button);stroke:var(--wp-border2);stroke-width:1.6}.on{fill:#063c1d;stroke:#00e75b;stroke-width:2}.hot{fill:none;stroke:#f22424;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}.cold{fill:none;stroke:#1687f4;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}.sol{fill:none;stroke:#ffb516;stroke-width:8;stroke-linecap:round;stroke-linejoin:round}.w{fill:none;stroke:var(--wp-icon);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.thin{stroke:#708b9b;stroke-width:1}</style>
+text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{font-size:21px}.md{font-size:25px}.bg{font-size:38px;font-weight:700}.hd{font-size:24px;font-weight:700}.pn{fill:url(#p);stroke:var(--wp-border);stroke-width:1.6}.bt{fill:var(--wp-button);stroke:var(--wp-border2);stroke-width:1.6}.on{fill:#063c1d;stroke:#00e75b;stroke-width:2}.hot{fill:none;stroke:#f22424;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}.cold{fill:none;stroke:#1687f4;stroke-width:9;stroke-linecap:round;stroke-linejoin:round}.sol{fill:none;stroke:#ffb516;stroke-width:8;stroke-linecap:round;stroke-linejoin:round}.w{fill:none;stroke:var(--wp-icon);stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.thin{stroke:#708b9b;stroke-width:1}
+.heater-rod-waves path{
+ stroke:#ff9800 !important;
+ stroke-width:2.4;
+ filter:drop-shadow(0 0 2px #ff9800);
+ animation:heater-rod-pulse 1.15s ease-in-out infinite;
+}
+.heater-rod-waves #heaterWave2{animation-delay:.18s}
+.heater-rod-waves #heaterWave3{animation-delay:.36s}
+@keyframes heater-rod-pulse{
+ 0%,100%{opacity:.35}
+ 50%{opacity:1}
+}
+</style>
 
 <linearGradient id="evaporatorGradient" gradientUnits="userSpaceOnUse" x1="245" y1="692" x2="300" y2="692">
   <stop offset="0" stop-color="#1687f4" />
@@ -47,7 +60,7 @@ text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{fon
  <text class="lb" x="55" y="185">Aussentemperatur</text><circle cx="105" cy="245" r="19" fill="#ffc51b" /><g stroke="#ffc51b" stroke-width="3"><path d="M105 214v-12M105 276v12M74 245H62M136 245h12M83 223l-9-9M127 267l9 9M127 223l9-9M83 267l-9 9" /></g><text id="textOutdoorTemperatureValue" class="bg" x="165" y="263" /><line class="thin" x1="55" y1="292" x2="305" y2="292" /><text class="lb" x="55" y="330">Innentemperatur</text><path class="w" d="M65 382l38-35 38 35M76 373v35h54v-35" /><text id="textIndoorTemperatureValue" class="bg" x="165" y="394" />
  <text class="lb" x="365" y="185">Vorlauf</text><text id="textSupplyTemperatureValue" class="md" x="495" y="185" fill="#ff4545" /><line class="thin" x1="365" y1="210" x2="650" y2="210" /><text class="lb" x="365" y="248">Rücklauf</text><text id="textReturnTemperatureValue" class="md" x="495" y="248" fill="#35a6ff" /><line class="thin" x1="365" y1="273" x2="650" y2="273" /><text class="lb" x="365" y="315">Leistung</text><text id="textPowerValue" class="md" x="495" y="315" /><line class="thin" x1="365" y1="340" x2="650" y2="340" /><text class="lb" x="365" y="385">Heizstäbe</text>
 <text id="textHeaterRodStatus" class="md" x="495" y="385">Aus</text>
-<g id="gHeaterRodWaves" transform="translate(545 374)" style="display:none">
+<g id="gHeaterRodWaves" class="heater-rod-waves" transform="translate(545 374)" style="display:none">
   <path id="heaterWave1" class="thin" d="M0 0 q6 -7 12 0 t12 0" fill="none" />
   <path id="heaterWave2" class="thin" d="M0 8 q6 -7 12 0 t12 0" fill="none" style="display:none" />
   <path id="heaterWave3" class="thin" d="M0 16 q6 -7 12 0 t12 0" fill="none" style="display:none" />
