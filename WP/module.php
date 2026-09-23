@@ -7020,18 +7020,27 @@ window.SymconHeatPump = {
 
             if (heatingCircuitCount === 1) {
                 if (hk1Supply) {
-                    hk1Supply.setAttribute('d', 'M1165 245H1260');
+                    hk1Supply.setAttribute('d', 'M1070 245H1260');
                 }
                 if (hk1Return) {
-                    hk1Return.setAttribute('d', 'M1260 295H1165V440');
+                    hk1Return.setAttribute('d', 'M1260 295H1105V440');
                 }
             } else {
                 if (hk1Supply) {
-                    hk1Supply.setAttribute('d', 'M1189 245H1260');
+                    hk1Supply.setAttribute('d', 'M1129 245H1260');
                 }
                 if (hk1Return) {
-                    hk1Return.setAttribute('d', 'M1260 295H1189');
+                    hk1Return.setAttribute('d', 'M1260 295H1129');
                 }
+            }
+
+            const hkPumpIcon1 = svg.querySelector('#gHKPumpIcon1');
+            if (hkPumpIcon1) {
+                hkPumpIcon1.setAttribute('transform', heatingCircuitCount === 1 ? 'translate(-30 0)' : '');
+            }
+            const hkPumpText1 = svg.querySelector('#textHeatingPump1');
+            if (hkPumpText1) {
+                hkPumpText1.setAttribute('x', heatingCircuitCount === 1 ? '1165' : '1195');
             }
 
             const manifoldBody = svg.querySelector('#heatingManifoldBody');
@@ -7052,7 +7061,7 @@ window.SymconHeatPump = {
             [bufferColdPath, noBufferColdPath].forEach((path) => {
                 if (!path || heatingCircuitCount <= 1) return;
                 const d = path.getAttribute('d') || '';
-                path.setAttribute('d', d.replace(/M1165\s+440/, 'M1165 ' + manifoldReturnY));
+                path.setAttribute('d', d.replace(/M1105\s+440/, 'M1105 ' + manifoldReturnY));
             });
             }
 
@@ -7118,6 +7127,10 @@ window.SymconHeatPump = {
                 2: [105, 215],
                 3: [82, 158, 232]
             });
+
+            setText('#textHeatingCircuitName1', cfg.heatingCircuitName1 || 'HK1');
+            setText('#textHeatingCircuitName2', cfg.heatingCircuitName2 || 'HK2');
+            setText('#textHeatingCircuitName3', cfg.heatingCircuitName3 || 'HK3');
 
             [
                 [1, cfg.supplyTemperatureHeating, cfg.refluxTemperatureHeating, cfg.heatingCircuitPumpRunning],
