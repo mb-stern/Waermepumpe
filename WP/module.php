@@ -1894,9 +1894,6 @@ class HeatPumpCard extends HTMLElement {
     const party = this.binary(c.heatingPumpPartyMode);
     const night = this.binary(c.heatingPumpNightMode);
     const hasExplicitDayState = !!c.heatingPumpDayMode;
-    const day = hasExplicitDayState
-      ? this.binary(c.heatingPumpDayMode)
-      : !night;
 
     const show = (selector, visible) => {
       const element = this.content.querySelector(selector);
@@ -2442,19 +2439,6 @@ window.SymconHeatPump = {
         };
 
 
-        const isEntityOn = (entityName) => {
-            if (!entityName || !currentData || !currentData[entityName]) {
-                return false;
-            }
-
-            const item = currentData[entityName];
-            if (item.binary) {
-                return !!item.value;
-            }
-
-            const value = String(item.value ?? '').trim().toLowerCase();
-            return ['1', 'true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value);
-        };
 
         const setStroke = (svg, selector, value) => {
             const element = svg.querySelector(selector);
@@ -2625,12 +2609,6 @@ window.SymconHeatPump = {
                 }
             };
 
-            const setFillColor = (selector, color) => {
-                const element = svg.querySelector(selector);
-                if (element) {
-                    element.style.setProperty('fill', color, 'important');
-                }
-            };
 
             // Heizwasserseite / Puffer / Heizkreise.
             // Selektoren, die in einer bestimmten Topologie nicht existieren,
@@ -3424,85 +3402,6 @@ window.SymconHeatPump = {
             }
         };
 
-        const setupViewToggle = () => {
-            const toggle =
-                document.getElementById('wp-view-toggle');
-
-            if (!toggle || toggle.dataset.symconBound) {
-                return;
-            }
-
-            toggle.dataset.symconBound = '1';
-
-            const switchView = (event) => {
-                event.preventDefault();
-                event.stopPropagation();
-
-                currentView =
-                    currentView === 'compact'
-                        ? 'full'
-                        : 'compact';
-
-                try {
-                    /*
-                     * Wenn die Instanz-ID bekannt ist, nur für diese
-                     * Wärmepumpen-Instanz speichern. Der bisherige globale
-                     * Key dient ausschließlich als Fallback.
-                     */
-                    window.localStorage.setItem(
-                        instanceViewStorageKey
-                            || VIEW_STORAGE_KEY,
-                        currentView
-                    );
-                } catch (error) {
-                    // LocalStorage ist optional.
-                }
-
-                const card =
-                    document.getElementById('wp-card');
-
-                if (currentView === 'compact') {
-                    renderCompactView(card);
-                }
-
-                applyViewMode(card);
-            };
-
-            if (window.PointerEvent) {
-                toggle.addEventListener(
-                    'pointerup',
-                    (event) => {
-                        if (
-                            event.pointerType === 'touch'
-                            || event.pointerType === 'pen'
-                        ) {
-                            switchView(event);
-                        }
-                    }
-                );
-            }
-
-            toggle.addEventListener(
-                'click',
-                (event) => {
-                    /*
-                     * Bei Touch wird der Klick nach pointerup teilweise
-                     * zusätzlich erzeugt. Dann nicht doppelt umschalten.
-                     */
-                    if (
-                        event.detail === 0
-                        && (
-                            'ontouchstart' in window
-                            || navigator.maxTouchPoints > 0
-                        )
-                    ) {
-                        return;
-                    }
-
-                    switchView(event);
-                }
-            );
-        };
 
         const rebuildCard = () => {
             const root = document.getElementById('wp-root');
@@ -3947,18 +3846,6 @@ window.SymconHeatPump = {
             }
         };
 
-        const saveStoredCircuitColors = (colors) => {
-            try {
-                if (window.sessionStorage) {
-                    window.sessionStorage.setItem(
-                        storedCircuitColorKey,
-                        JSON.stringify(colors)
-                    );
-                }
-            } catch (error) {
-                // Speicherung ist nur Komfort; Darstellung funktioniert auch ohne.
-            }
-        };
 
         let storedCircuitColors = loadStoredCircuitColors();
 
@@ -4413,15 +4300,6 @@ window.SymconHeatPump = {
                 element.style.setProperty('stroke-opacity', '1', 'important');
             };
 
-            const setFill = (selector, color) => {
-                const element = svg.querySelector(selector);
-                if (!element || !color) {
-                    return;
-                }
-
-                element.style.setProperty('fill', color, 'important');
-                element.style.setProperty('fill-opacity', '1', 'important');
-            };
 
             /*
              * Solarleitungen:
@@ -4688,86 +4566,6 @@ window.SymconHeatPump = {
          * die Animation im Heizkörper bzw. in der Fußbodenheizung.
          */
 
-        const ensureHeatingTestOverlay = (
-            svg,
-            selector,
-            id,
-            configured
-        ) => {
-            const source = svg.querySelector(selector);
-            if (!source) {
-                return;
-            }
-
-            let overlay = svg.querySelector('#' + id);
-
-            if (!overlay) {
-                overlay = source.cloneNode(false);
-                overlay.setAttribute('id', id);
-                overlay.removeAttribute('style');
-                overlay.removeAttribute('class');
-
-                if (source.parentNode) {
-                    source.parentNode.insertBefore(
-                        overlay,
-                        source.nextSibling
-                    );
-                }
-            }
-
-            overlay.classList.add('symcon-heating-test-flow');
-
-            overlay.style.setProperty(
-                'display',
-                configured ? 'inline' : 'none',
-                'important'
-            );
-            overlay.style.setProperty(
-                'visibility',
-                configured ? 'visible' : 'hidden',
-                'important'
-            );
-            overlay.style.setProperty(
-                'fill',
-                'none',
-                'important'
-            );
-            overlay.style.setProperty(
-                'stroke',
-                'rgba(255,255,255,.85)',
-                'important'
-            );
-            overlay.style.setProperty(
-                'stroke-width',
-                '2.2',
-                'important'
-            );
-            overlay.style.setProperty(
-                'stroke-dasharray',
-                '4 8',
-                'important'
-            );
-            overlay.style.setProperty(
-                'stroke-linecap',
-                'round',
-                'important'
-            );
-            overlay.style.setProperty(
-                'pointer-events',
-                'none',
-                'important'
-            );
-            overlay.style.setProperty(
-                'opacity',
-                '1',
-                'important'
-            );
-
-            // Ganz nach vorne innerhalb derselben SVG-Gruppe.
-            if (overlay.parentNode) {
-                overlay.parentNode.appendChild(overlay);
-            }
-        };
         const applyFlowAnimations = (card) => {
             if (!card || !card.content) {
                 return;
@@ -4803,12 +4601,6 @@ window.SymconHeatPump = {
                 circuit3Configured
                 && stateIsOn(currentConfig.heatingCircuitPumpRunning3);
 
-            const heatingModeActive =
-                stateIsOn('heatingPumpHeatingMode')
-                || !!(
-                    currentControls
-                    && currentControls.heatingActive === true
-                );
 
             const storagePump =
                 stateIsOn(currentConfig.storageChargingPumpRunning);
@@ -5680,10 +5472,6 @@ window.SymconHeatPump = {
                 }
             }
 
-            const boilerTemperature =
-                readStateNumber(currentConfig.tankTempWWUp)
-                ?? readStateNumber(currentConfig.tankTempWWMiddle)
-                ?? readStateNumber(currentConfig.tankTempWWDown);
 
             /*
              * Zwei zusätzliche Temperaturwerte neben der Boiler-Wendel.
@@ -6093,269 +5881,6 @@ window.SymconHeatPump = {
             });
         };
 
-        const applyHeaterRodStatusIcon = (card) => {
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-            const settings =
-                svg.querySelector('#gSettings');
-
-            if (!settings) {
-                return;
-            }
-
-            /*
-             * Zusatzanzeige im Bereich Tag/Nacht.
-             *
-             * Die Sonne bzw. der Mond liegen ungefähr bei x=100 / y=142.
-             * Die Heizwendel sitzt direkt daneben und gehört bewusst NICHT
-             * zur oberen dynamischen Status-Icon-Leiste.
-             */
-            let group =
-                svg.querySelector(
-                    '#gSymconHeaterRodStatus'
-                );
-
-            if (!group) {
-                group = document.createElementNS(
-                    'http://www.w3.org/2000/svg',
-                    'g'
-                );
-                group.setAttribute(
-                    'id',
-                    'gSymconHeaterRodStatus'
-                );
-                group.setAttribute(
-                    'transform',
-                    'translate(155 142)'
-                );
-
-                /*
-                 * Einfache Heizwendel:
-                 * Anschluss links/rechts mit vier weichen Bögen.
-                 */
-                const coil =
-                    document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'path'
-                    );
-
-                coil.setAttribute(
-                    'd',
-                    'M -22 6 '
-                    + 'H -17 '
-                    + 'C -14 6 -14 2 -14 -2 '
-                    + 'C -14 -8 -10 -10 -7 -10 '
-                    + 'C -4 -10 -2 -7 -2 -2 '
-                    + 'V 3 '
-                    + 'C -2 7 1 9 4 9 '
-                    + 'C 7 9 9 6 9 2 '
-                    + 'V -3 '
-                    + 'C 9 -7 12 -9 15 -9 '
-                    + 'C 18 -9 20 -6 20 -2 '
-                    + 'V 2 '
-                    + 'C 20 6 22 7 25 7 '
-                    + 'H 28'
-                );
-                coil.setAttribute(
-                    'fill',
-                    'none'
-                );
-                coil.setAttribute(
-                    'stroke-width',
-                    '2.6'
-                );
-                coil.setAttribute(
-                    'stroke-linecap',
-                    'round'
-                );
-                coil.setAttribute(
-                    'stroke-linejoin',
-                    'round'
-                );
-
-                group.appendChild(coil);
-                settings.appendChild(group);
-            }
-
-            const heaterRodCount = Math.max(
-                0,
-                Math.min(
-                    3,
-                    Number(
-                        currentConfig.heaterRodCount || 0
-                    )
-                )
-            );
-
-            /*
-             * Wenn überhaupt kein Heizstab konfiguriert ist,
-             * wird auch das Statussymbol nicht angezeigt.
-             */
-            if (heaterRodCount <= 0) {
-                group.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
-                return;
-            }
-
-            group.style.setProperty(
-                'display',
-                'inline',
-                'important'
-            );
-            group.style.setProperty(
-                'visibility',
-                'visible',
-                'important'
-            );
-
-            const rodEntities = [
-                currentConfig.heaterRod1,
-                currentConfig.heaterRod2,
-                currentConfig.heaterRod3
-            ];
-
-            const rodThresholds = [
-                currentConfig.heaterRod1Threshold,
-                currentConfig.heaterRod2Threshold,
-                currentConfig.heaterRod3Threshold
-            ];
-
-            const isActive = (
-                entity,
-                threshold
-            ) => {
-                if (
-                    !entity
-                    || !currentData
-                    || !currentData[entity]
-                ) {
-                    return false;
-                }
-
-                const raw =
-                    currentData[entity].value;
-
-                const value =
-                    String(raw ?? '')
-                        .trim()
-                        .toLowerCase();
-
-                const numericThreshold =
-                    Number(threshold);
-
-                const limit =
-                    Number.isFinite(
-                        numericThreshold
-                    )
-                        ? numericThreshold
-                        : 1;
-
-                if ([
-                    'true',
-                    'on',
-                    'yes',
-                    'ja',
-                    'ein',
-                    'active',
-                    'aktiv'
-                ].includes(value)) {
-                    return 1 >= limit;
-                }
-
-                if ([
-                    'false',
-                    'off',
-                    'no',
-                    'nein',
-                    'aus',
-                    'inactive',
-                    'inaktiv',
-                    ''
-                ].includes(value)) {
-                    return 0 >= limit;
-                }
-
-                const numeric =
-                    Number(raw);
-
-                return (
-                    Number.isFinite(numeric)
-                    && numeric >= limit
-                );
-            };
-
-            let anyActive = false;
-
-            for (
-                let index = 0;
-                index < heaterRodCount;
-                index++
-            ) {
-                if (
-                    isActive(
-                        rodEntities[index],
-                        rodThresholds[index]
-                    )
-                ) {
-                    anyActive = true;
-                    break;
-                }
-            }
-
-            const coil =
-                group.querySelector('path');
-
-            if (!coil) {
-                return;
-            }
-
-            if (anyActive) {
-                /*
-                 * Mindestens ein Heizstab läuft:
-                 * deutlich orange mit leichtem Leuchteffekt.
-                 */
-                coil.style.setProperty(
-                    'stroke',
-                    '#ff9800',
-                    'important'
-                );
-                coil.style.setProperty(
-                    'opacity',
-                    '1',
-                    'important'
-                );
-                coil.style.setProperty(
-                    'filter',
-                    'drop-shadow(0 0 2px rgba(255,152,0,.75)) '
-                    + 'drop-shadow(0 0 5px rgba(255,152,0,.45))',
-                    'important'
-                );
-            } else {
-                /*
-                 * Heizstäbe vorhanden, aber keiner aktiv:
-                 * Symbol bleibt dezent sichtbar.
-                 */
-                coil.style.setProperty(
-                    'stroke',
-                    resolveLayoutTextColor(),
-                    'important'
-                );
-                coil.style.setProperty(
-                    'opacity',
-                    '.38',
-                    'important'
-                );
-                coil.style.removeProperty(
-                    'filter'
-                );
-            }
-        };
 
 
         /*
