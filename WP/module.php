@@ -124,7 +124,6 @@ class Waermepumpe extends IPSModuleStrict
         'AdditionalValue009',
         'AdditionalValue010',
         'AdditionalValue011',
-        'AdditionalValue012',
 
         'OperatingStatusVariable',
         'HeatingControlVariable',
@@ -311,8 +310,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('AdditionalValue010', 0);
         $this->RegisterPropertyString('AdditionalLabel011', '');
         $this->RegisterPropertyInteger('AdditionalValue011', 0);
-        $this->RegisterPropertyString('AdditionalLabel012', '');
-        $this->RegisterPropertyInteger('AdditionalValue012', 0);
 
         // HTML-SDK Visualisierung
         $this->SetVisualizationType(1);
@@ -1035,17 +1032,7 @@ PHP
                     [
                         'type' => 'RowLayout',
                         'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel012',
-                                'caption' => 'Bezeichnung 13'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue012',
-                                'caption' => 'Variable 13'
-                            ]
-                        ]
+                                ]
                     ]
                 ]
             ],
@@ -1552,6 +1539,7 @@ HTML;
             'temperatureGroundWaterIn'   => $this->DataKey('TemperatureGroundWaterIn', 'temperatureGroundWaterIn'),
             'temperatureGroundWaterOut'  => $this->DataKey('TemperatureGroundWaterOut', 'temperatureGroundWaterOut'),
 
+            'operatingStatus'             => $this->DataKey('OperatingStatusVariable', 'operatingStatus'),
             'heatingPumpStatusOnOff'     => $this->DataKey('HeatingPumpStatusOnOff', 'heatingPumpStatusOnOff'),
             'heatingPumpHotWaterMode'    => $this->HasOperatingStatus() ? 'heatingPumpHotWaterMode' : $this->DataKey('HeatingPumpHotWaterMode', 'heatingPumpHotWaterMode'),
             'heatingPumpHeatingMode'     => $this->HasOperatingStatus() ? 'heatingPumpHeatingMode' : $this->DataKey('HeatingPumpHeatingMode', 'heatingPumpHeatingMode'),
@@ -1677,9 +1665,7 @@ HTML;
             'additionalLabel010'          => $this->ReadPropertyString('AdditionalLabel010'),
             'additionalValue010'          => $this->DataKey('AdditionalValue010', 'additionalValue010'),
             'additionalLabel011'          => $this->ReadPropertyString('AdditionalLabel011'),
-            'additionalValue011'          => $this->DataKey('AdditionalValue011', 'additionalValue011'),
-            'additionalLabel012'          => $this->ReadPropertyString('AdditionalLabel012'),
-            'additionalValue012'          => $this->DataKey('AdditionalValue012', 'additionalValue012')
+            'additionalValue011'          => $this->DataKey('AdditionalValue011', 'additionalValue011')
         ];
     }
 
@@ -1690,6 +1676,7 @@ HTML;
         $map = [
             'temperatureGroundWaterIn'   => 'TemperatureGroundWaterIn',
             'temperatureGroundWaterOut'  => 'TemperatureGroundWaterOut',
+            'operatingStatus'             => 'OperatingStatusVariable',
             'heatingPumpStatusOnOff'     => 'HeatingPumpStatusOnOff',
             'heatingPumpHotWaterMode'    => 'HeatingPumpHotWaterMode',
             'heatingPumpHeatingMode'     => 'HeatingPumpHeatingMode',
@@ -1760,8 +1747,7 @@ HTML;
             'additionalValue008'          => 'AdditionalValue008',
             'additionalValue009'          => 'AdditionalValue009',
             'additionalValue010'          => 'AdditionalValue010',
-            'additionalValue011'          => 'AdditionalValue011',
-            'additionalValue012'          => 'AdditionalValue012'
+            'additionalValue011'          => 'AdditionalValue011'
         ];
 
         foreach ($map as $key => $property) {
@@ -2575,7 +2561,6 @@ class HeatPumpCard extends HTMLElement {
       this.content.querySelector("#textLabel009").innerHTML = config.additionalLabel009 ? config.additionalLabel009 : '';
       this.content.querySelector("#textLabel010").innerHTML = config.additionalLabel010 ? config.additionalLabel010 : '';
       this.content.querySelector("#textLabel011").innerHTML = config.additionalLabel011 ? config.additionalLabel011 : '';
-      this.content.querySelector("#textLabel012").innerHTML = config.additionalLabel012 ? config.additionalLabel012 : '';
 
       this.setLinks();
     }
@@ -5138,7 +5123,7 @@ window.SymconHeatPump = {
 
             const svg = card.content;
 
-            for (let index = 0; index < 13; index++) {
+            for (let index = 0; index < 12; index++) {
                 const suffix = String(index).padStart(3, '0');
                 const labelKey = 'additionalLabel' + suffix;
                 const valueKey = 'additionalValue' + suffix;
@@ -8996,10 +8981,9 @@ window.SymconHeatPump = {
             setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));
             setText('#textThermalSolarPumpSpeed', formatted(cfg.thermalSolarPumpSpeed));
 
-            // Heat-pump status from real on/off value where configured.
-            if (cfg.heatingPumpStatusOnOff) {
-                setText('#textHPStatus', binary(cfg.heatingPumpStatusOnOff) ? 'In Betrieb' : 'Aus');
-            }
+            // Wärmepumpen-Status: ausschließlich der formatierte Profilwert
+            // der konfigurierten Betriebsstatusvariable. Keine erfundenen Texte.
+            setText('#textHPStatus', cfg.operatingStatus ? formatted(cfg.operatingStatus) : '');
 
             // Touch handling. Bind once per SVG element.
             [
@@ -9140,10 +9124,10 @@ window.SymconHeatPump = {
                 );
             }
 
-            // Fußzeile: exakt die 13 bereits in der Konfiguration vorhandenen
-            // Zusatzwerte 000...012 verwenden. Unkonfigurierte Plätze verschwinden.
+            // Fußzeile: exakt die 12 in der Konfiguration vorhandenen
+            // Zusatzwerte 000...011 verwenden. Unkonfigurierte Plätze verschwinden.
             const footerValues = [];
-            for (let index = 0; index < 13; index++) {
+            for (let index = 0; index < 12; index++) {
                 const suffix = String(index).padStart(3, '0');
                 const label = String(cfg['additionalLabel' + suffix] || '').trim();
                 const key = cfg['additionalValue' + suffix] || '';
@@ -9156,7 +9140,7 @@ window.SymconHeatPump = {
                 }
             }
 
-            for (let index = 0; index < 13; index++) {
+            for (let index = 0; index < 12; index++) {
                 const el = svg.querySelector('#textFooterAdditional' + String(index).padStart(3, '0'));
                 if (!el) continue;
                 const item = footerValues[index];
