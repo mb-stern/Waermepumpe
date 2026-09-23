@@ -1337,6 +1337,7 @@ HTML;
             'tankTempWWMiddle'           => 'TankTempWWMiddle',
             'tankTempWWDown'             => 'TankTempWWDown',
             'heatingCircuitPumpRunning'  => 'HeatingCircuitPumpRunning1',
+            'heatingCircuitPumpValue'    => 'HeatingCircuitPumpValue1',
             'supplyTemperatureHeating'   => 'SupplyTemperatureHeating1',
             'refluxTemperatureHeating'   => 'RefluxTemperatureHeating1',
             'heatingCircuitPumpRunning2' => 'HeatingCircuitPumpRunning2',
