@@ -20,7 +20,6 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingPumpCoolingMode',
         'HeatingPumpPartyMode',
         'HeatingPumpEnergySaveMode',
-        'Warning',
         'Error',
         'DefrostMode',
         'AdditionalHeating',
@@ -49,9 +48,7 @@ class Waermepumpe extends IPSModuleStrict
         'HeatingPumpCoolingMode',
         'HeatingPumpPartyMode',
         'HeatingPumpEnergySaveMode',
-        'HeatingProgramStatusVariable',
 
-        'Warning',
         'Error',
         'DefrostMode',
         'AdditionalHeating',
@@ -97,7 +94,6 @@ class Waermepumpe extends IPSModuleStrict
         'ExpansionValveOpening',
         'CompressorValue',
         'HeatingPumpPower',
-        'CopValue',
 
         'WWHeatingValve',
         'HeaterRodWW',
@@ -124,8 +120,6 @@ class Waermepumpe extends IPSModuleStrict
         'AdditionalValue007',
         'AdditionalValue008',
         'AdditionalValue009',
-        'AdditionalValue010',
-        'AdditionalValue011',
 
         'OperatingStatusVariable',
         'HeatingControlVariable',
@@ -160,7 +154,6 @@ class Waermepumpe extends IPSModuleStrict
 
         // Luft/Wasser: Lüfterdrehzahl > 0 hat Vorrang vor dem Status-Fallback.
         $this->RegisterPropertyInteger('FanSpeed', 0);
-        $this->RegisterPropertyString('FanActiveStatusValues', '0,1,2,4,7');
 
         // Primärquelle / Wärmepumpe
         $this->RegisterPropertyInteger('TemperatureGroundWaterIn', 0);
@@ -174,11 +167,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('HeatingPumpEnergySaveMode', 0);
         // Heizprogramm-Status, z. B. Luxtronik opStateHeating / Calculation 125.
         // Die Werte können wie beim zentralen Betriebsstatus frei definiert werden.
-        $this->RegisterPropertyInteger('HeatingProgramStatusVariable', 0);
-        $this->RegisterPropertyString('HeatingProgramDayValues', '1');
-        $this->RegisterPropertyString('HeatingProgramNightValues', '2');
-
-        $this->RegisterPropertyInteger('Warning', 0);
         $this->RegisterPropertyInteger('Error', 0);
         $this->RegisterPropertyInteger('DefrostMode', 0);
         $this->RegisterPropertyInteger('AdditionalHeating', 0);
@@ -207,29 +195,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('TankTempWWUp', 0);
         $this->RegisterPropertyInteger('TankTempWWMiddle', 0);
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
-
-        // Einheitlicher Temperatur-Farbverlauf für Heizkreis, Speicher und Wärmetauscher
-        $this->RegisterPropertyBoolean('UseCustomTemperatureColors', false);
-        $this->RegisterPropertyInteger('TemperaturePoint1', 15);
-        $this->RegisterPropertyInteger('TemperatureColor1', 26316);       // #0066CC
-        $this->RegisterPropertyInteger('TemperaturePoint2', 20);
-        $this->RegisterPropertyInteger('TemperatureColor2', 2730472);       // #29A9E8
-        $this->RegisterPropertyInteger('TemperaturePoint3', 25);
-        $this->RegisterPropertyInteger('TemperatureColor3', 3790293);       // #39D5D5
-        $this->RegisterPropertyInteger('TemperaturePoint4', 30);
-        $this->RegisterPropertyInteger('TemperatureColor4', 16765286);       // #FFD166
-        $this->RegisterPropertyInteger('TemperaturePoint5', 35);
-        $this->RegisterPropertyInteger('TemperatureColor5', 16769126);       // #FFE066
-        $this->RegisterPropertyInteger('TemperaturePoint6', 40);
-        $this->RegisterPropertyInteger('TemperatureColor6', 16761395);       // #FFC233
-        $this->RegisterPropertyInteger('TemperaturePoint7', 45);
-        $this->RegisterPropertyInteger('TemperatureColor7', 16750616);       // #FF9818
-        $this->RegisterPropertyInteger('TemperaturePoint8', 50);
-        $this->RegisterPropertyInteger('TemperatureColor8', 16734744);       // #FF5A18
-        $this->RegisterPropertyInteger('TemperaturePoint9', 55);
-        $this->RegisterPropertyInteger('TemperatureColor9', 15018795);       // #E52B2B
-        $this->RegisterPropertyInteger('TemperaturePoint10', 60);
-        $this->RegisterPropertyInteger('TemperatureColor10', 16711680);       // #FF0000
 
         // Heizkreis 1
         // Sonderdarstellung bei genau einem Heizkreis:
@@ -264,7 +229,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ExpansionValveOpening', 0);
         $this->RegisterPropertyInteger('CompressorValue', 0);
         $this->RegisterPropertyInteger('HeatingPumpPower', 0);
-        $this->RegisterPropertyInteger('CopValue', 0);
 
         // Ventil / Heizstab
         $this->RegisterPropertyInteger('WWHeatingValve', 0);
@@ -311,10 +275,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('AdditionalValue008', 0);
         $this->RegisterPropertyString('AdditionalLabel009', '');
         $this->RegisterPropertyInteger('AdditionalValue009', 0);
-        $this->RegisterPropertyString('AdditionalLabel010', '');
-        $this->RegisterPropertyInteger('AdditionalValue010', 0);
-        $this->RegisterPropertyString('AdditionalLabel011', '');
-        $this->RegisterPropertyInteger('AdditionalValue011', 0);
 
         // HTML-SDK Visualisierung
         $this->SetVisualizationType(1);
@@ -455,10 +415,10 @@ class Waermepumpe extends IPSModuleStrict
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Wärmepumpe',
                 'items'   => [
-
                     ['type' => 'Label', 'caption' => 'Betriebsstatus'],
                     $this->VariableGrid([
-                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable']
+                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable'],
+                        ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff']
                     ]),
                     [
                         'type'  => 'RowLayout',
@@ -470,83 +430,51 @@ class Waermepumpe extends IPSModuleStrict
                         ]
                     ],
 
-                    ['type' => 'Label', 'caption' => 'Betriebsarten und Steuerung'],
+                    ['type' => 'Label', 'caption' => 'Bedienung'],
                     $this->VariableGrid([
                         ['caption' => 'Betriebsart Heizen (Integer)', 'name' => 'HeatingControlVariable'],
                         ['caption' => 'Betriebsart Warmwasser (Integer)', 'name' => 'HotWaterControlVariable'],
-                        ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable']
-                    ]),
-
-                    ['type' => 'Label', 'caption' => 'Betriebszustände'],
-                    $this->VariableGrid([
-                        ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff'],
-                        ['caption' => 'Heizprogramm-Status (Integer)', 'name' => 'HeatingProgramStatusVariable'],
-                    ]),
-                    [
-                        'type'  => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'HeatingProgramDayValues',
-                                'caption' => 'Tagbetrieb – Statuswerte'
-                            ],
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'HeatingProgramNightValues',
-                                'caption' => 'Nachtbetrieb – Statuswerte'
-                            ]
-                        ]
-                    ],
-                    $this->VariableGrid([
-                        ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode'],
-                        ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
-
-                        ['caption' => 'Partybetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
-                        ['caption' => 'Raumtemperatur Party', 'name' => 'AmbientTemperatureParty'],
-
+                        ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable'],
                         ['caption' => 'Warmwasser-Solltemperatur', 'name' => 'WarmWaterSetpointVariable'],
                         ['caption' => 'Heiztemperaturkorrektur', 'name' => 'HeatingTemperatureCorrectionVariable'],
-
-                        ['caption' => 'Zusatzheizung aktiv', 'name' => 'AdditionalHeating'],
-                        ['caption' => 'Warnung aktiv', 'name' => 'Warning'],
-                        ['caption' => 'Fehler aktiv', 'name' => 'Error']
+                        ['caption' => 'Partybetrieb aktiv', 'name' => 'HeatingPumpPartyMode'],
+                        ['caption' => 'Energiesparbetrieb aktiv', 'name' => 'HeatingPumpEnergySaveMode']
                     ]),
 
-                    ['type' => 'Label', 'caption' => 'Verdichter'],
+                    ['type' => 'Label', 'caption' => 'Messwerte'],
+                    $this->VariableGrid([
+                        ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
+                        ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
+                        ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
+                        ['caption' => 'Raumtemperatur Normal', 'name' => 'AmbientTemperatureNormal'],
+                        ['caption' => 'Raumtemperatur Ist (Fallback)', 'name' => 'AmbientTemperatureActual'],
+                        ['caption' => 'Raumtemperatur Reduziert', 'name' => 'AmbientTemperatureReduced'],
+                        ['caption' => 'Raumtemperatur Party', 'name' => 'AmbientTemperatureParty']
+                    ]),
+
+                    ['type' => 'Label', 'caption' => 'Verdichter und Kältekreis'],
                     $this->VariableGrid([
                         ['caption' => 'Verdichter aktiv', 'name' => 'CompressorRunning'],
                         ['caption' => 'Verdichterdrehzahl', 'name' => 'CompressorValue'],
-                        ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
-                        ['caption' => 'COP', 'name' => 'CopValue']
-                    ]),
-
-                    ['type' => 'Label', 'caption' => 'Primärquelle'],
-                    $this->VariableGrid([
-                        ['caption' => 'Quelle Eingang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterIn'],
-                        ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut'],
-                        ['caption' => 'Lüfterdrehzahl / Lüfter aktiv', 'name' => 'FanSpeed']
-                    ]),
-                    ['type' => 'Label', 'caption' => 'Temperaturen'],
-                    $this->VariableGrid([
-                        ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
-                        ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature']
-                    ]),
-
-                    ['type' => 'Label', 'caption' => 'Raumtemperatur Normalbetrieb'],
-                    $this->VariableGrid([
-                        ['caption' => 'Raumtemperatur Normal', 'name' => 'AmbientTemperatureNormal'],
-                        ['caption' => 'Raumtemperatur Ist (Fallback)', 'name' => 'AmbientTemperatureActual']
-                    ]),
-
-                    ['type' => 'Label', 'caption' => 'Kältekreis'],
-                    $this->VariableGrid([
                         ['caption' => 'Niederdruck', 'name' => 'EvaporatorPressure'],
                         ['caption' => 'Verdampfungstemperatur', 'name' => 'EvaporatorTemperature'],
                         ['caption' => 'Hochdruck', 'name' => 'CondenserPressure'],
                         ['caption' => 'Kondensationstemperatur', 'name' => 'CondenserTemperature'],
                         ['caption' => 'Expansionsventil Öffnung', 'name' => 'ExpansionValveOpening']
-                    ])
+                    ]),
 
+                    ['type' => 'Label', 'caption' => 'Primärquelle'],
+                    $this->VariableGrid([
+                        ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed'],
+                        ['caption' => 'Quelle Eingang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterIn'],
+                        ['caption' => 'Quelle Ausgang (Sole-/Wasser-WP)', 'name' => 'TemperatureGroundWaterOut']
+                    ]),
+
+                    ['type' => 'Label', 'caption' => 'Weitere Zustände'],
+                    $this->VariableGrid([
+                        ['caption' => 'Zusatzheizung aktiv', 'name' => 'AdditionalHeating'],
+                        ['caption' => 'Fehler aktiv', 'name' => 'Error']
+                    ])
                 ]
             ],
 
@@ -628,214 +556,6 @@ class Waermepumpe extends IPSModuleStrict
 
             [
                 'type'    => 'ExpansionPanel',
-                'caption' => 'Temperaturfarben',
-                'items'   => [
-                    [
-                        'type' => 'CheckBox',
-                        'name' => 'UseCustomTemperatureColors',
-                        'caption' => 'Eigene Temperaturfarben verwenden'
-                    ],
-                    [
-                        'type' => 'Button',
-                        'caption' => 'Eigene Farben auf Standardvorlage zurücksetzen',
-                        'onClick' => <<<'PHP'
-$defaults = [
-    [15, 26316],
-    [20, 2730472],
-    [25, 3782101],
-    [30, 16765286],
-    [35, 16769126],
-    [40, 16761395],
-    [45, 16750616],
-    [50, 16734744],
-    [55, 15084331],
-    [60, 16711680]
-];
-
-foreach ($defaults as $index => $item) {
-    $number = $index + 1;
-    $this->UpdateFormField('TemperaturePoint' . $number, 'value', $item[0]);
-    $this->UpdateFormField('TemperatureColor' . $number, 'value', $item[1]);
-}
-
-echo 'Temperaturfarben wurden in der Konfiguration auf die Standardvorlage zurückgesetzt. Bitte prüfen und mit "Änderungen übernehmen" speichern.';
-PHP
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint1',
-                                'caption' => 'Stufe 1 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor1',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint2',
-                                'caption' => 'Stufe 2 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor2',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint3',
-                                'caption' => 'Stufe 3 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor3',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint4',
-                                'caption' => 'Stufe 4 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor4',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint5',
-                                'caption' => 'Stufe 5 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor5',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint6',
-                                'caption' => 'Stufe 6 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor6',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint7',
-                                'caption' => 'Stufe 7 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor7',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint8',
-                                'caption' => 'Stufe 8 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor8',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint9',
-                                'caption' => 'Stufe 9 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor9',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'NumberSpinner',
-                                'name' => 'TemperaturePoint10',
-                                'caption' => 'Stufe 10 Temperatur',
-                                'digits' => 0
-                            ],
-                            [
-                                'type' => 'SelectColor',
-                                'name' => 'TemperatureColor10',
-                                'caption' => 'Farbe',
-                                'allowTransparent' => false
-                            ]
-                        ]
-                    ]
-                ]
-            ],
-
-            [
-                'type'    => 'ExpansionPanel',
                 'caption' => 'Solarthermie',
                 'items'   => [
                     ['type' => 'CheckBox', 'name' => 'ThermalSolarAvailable', 'caption' => 'Solarthermie'],
@@ -852,7 +572,7 @@ PHP
                 'items'   => [
                     [
                         'type' => 'Label',
-                        'caption' => 'Bis zu 13 zusätzliche Werte an den vorgesehenen Positionen der Grafik anzeigen.'
+                        'caption' => 'Bis zu 10 zusätzliche Werte an den vorgesehenen Positionen der Grafik anzeigen.'
                     ],
                     [
                         'type' => 'RowLayout',
@@ -1004,42 +724,7 @@ PHP
                             ]
                         ]
                     ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel010',
-                                'caption' => 'Bezeichnung 11'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue010',
-                                'caption' => 'Variable 11'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel011',
-                                'caption' => 'Bezeichnung 12'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue011',
-                                'caption' => 'Variable 12'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                                ]
-                    ]
-                ]
+                                                        ]
             ],
             [
                 "type" => "RowLayout",
@@ -1558,14 +1243,6 @@ HTML;
             'heatingPumpCoolingMode'     => $this->HasOperatingStatus() ? 'heatingPumpCoolingMode' : $this->DataKey('HeatingPumpCoolingMode', 'heatingPumpCoolingMode'),
             'heatingPumpPartyMode'       => $this->DataKey('HeatingPumpPartyMode', 'heatingPumpPartyMode'),
             'heatingPumpEnergySaveMode'  => $this->DataKey('HeatingPumpEnergySaveMode', 'heatingPumpEnergySaveMode'),
-            'heatingPumpNightMode'       => $this->HasHeatingProgramStatus()
-                ? 'heatingPumpNightMode'
-                : '',
-            'heatingPumpDayMode'         => $this->HasHeatingProgramStatus()
-                ? 'heatingPumpDayMode'
-                : '',
-
-            'warning'                    => $this->DataKey('Warning', 'warning'),
             'error'                      => $this->DataKey('Error', 'error'),
             'defrostMode'                => $this->HasOperatingStatus() ? 'defrostMode' : $this->DataKey('DefrostMode', 'defrostMode'),
             'additionalHeating'          => $this->DataKey('AdditionalHeating', 'additionalHeating'),
@@ -1620,7 +1297,6 @@ HTML;
             'expansionValveOpening'      => $this->DataKey('ExpansionValveOpening', 'expansionValveOpening'),
             'compressorValue'            => $this->DataKey('CompressorValue', 'compressorValue'),
             'heatingPumpPower'           => $this->DataKey('HeatingPumpPower', 'heatingPumpPower'),
-            'copValue'                    => $this->DataKey('CopValue', 'copValue'),
 
             'wwHeatingValve'             => $this->DataKey('WWHeatingValve', 'wwHeatingValve'),
             'heaterRodWW'                => $this->DataKey('HeaterRodWW', 'heaterRodWW'),
@@ -1635,20 +1311,6 @@ HTML;
             'heaterRod2Threshold'        => $this->ReadPropertyInteger('HeaterRod2Threshold'),
             'heaterRod3'                 => $this->DataKey('HeaterRod3', 'heaterRod3'),
             'heaterRod3Threshold'        => $this->ReadPropertyInteger('HeaterRod3Threshold'),
-
-            'useCustomTemperatureColors' => $this->ReadPropertyBoolean('UseCustomTemperatureColors'),
-            'temperatureColorScale'      => [
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint1'), 'color' => $this->ReadPropertyInteger('TemperatureColor1')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint2'), 'color' => $this->ReadPropertyInteger('TemperatureColor2')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint3'), 'color' => $this->ReadPropertyInteger('TemperatureColor3')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint4'), 'color' => $this->ReadPropertyInteger('TemperatureColor4')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint5'), 'color' => $this->ReadPropertyInteger('TemperatureColor5')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint6'), 'color' => $this->ReadPropertyInteger('TemperatureColor6')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint7'), 'color' => $this->ReadPropertyInteger('TemperatureColor7')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint8'), 'color' => $this->ReadPropertyInteger('TemperatureColor8')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint9'), 'color' => $this->ReadPropertyInteger('TemperatureColor9')],
-                ['temperature' => $this->ReadPropertyInteger('TemperaturePoint10'), 'color' => $this->ReadPropertyInteger('TemperatureColor10')]
-            ],
 
             'thermalSolarAvailable'      => $this->ReadPropertyBoolean('ThermalSolarAvailable'),
             'thermalSolarPump'           => $this->DataKey('ThermalSolarPump', 'thermalSolarPump'),
@@ -1677,10 +1339,6 @@ HTML;
             'additionalValue008'          => $this->DataKey('AdditionalValue008', 'additionalValue008'),
             'additionalLabel009'          => $this->ReadPropertyString('AdditionalLabel009'),
             'additionalValue009'          => $this->DataKey('AdditionalValue009', 'additionalValue009'),
-            'additionalLabel010'          => $this->ReadPropertyString('AdditionalLabel010'),
-            'additionalValue010'          => $this->DataKey('AdditionalValue010', 'additionalValue010'),
-            'additionalLabel011'          => $this->ReadPropertyString('AdditionalLabel011'),
-            'additionalValue011'          => $this->DataKey('AdditionalValue011', 'additionalValue011')
         ];
     }
 
@@ -1698,7 +1356,6 @@ HTML;
             'heatingPumpCoolingMode'     => 'HeatingPumpCoolingMode',
             'heatingPumpPartyMode'       => 'HeatingPumpPartyMode',
             'heatingPumpEnergySaveMode'  => 'HeatingPumpEnergySaveMode',
-            'warning'                    => 'Warning',
             'error'                      => 'Error',
             'defrostMode'                => 'DefrostMode',
             'additionalHeating'          => 'AdditionalHeating',
@@ -1711,7 +1368,6 @@ HTML;
             'fanSpeed'                   => 'FanSpeed',
             'compressorRunning'          => 'CompressorRunning',
             'heatingPumpPower'          => 'HeatingPumpPower',
-            'copValue'                   => 'CopValue',
             'circulatingPumpRunning'     => 'CirculatingPumpRunning',
             'storageChargingPumpRunning' => 'StorageChargingPumpRunning',
             'tankTempHPUp'               => 'TankTempHPUp',
@@ -1736,7 +1392,6 @@ HTML;
             'expansionValveOpening'      => 'ExpansionValveOpening',
             'compressorValue'            => 'CompressorValue',
             'heatingPumpPower'           => 'HeatingPumpPower',
-            'copValue'                    => 'CopValue',
             'wwHeatingValve'             => 'WWHeatingValve',
             'heaterRodWW'                => 'HeaterRodWW',
             'heaterRodHP'                => 'HeaterRodHP',
@@ -1761,8 +1416,6 @@ HTML;
             'additionalValue007'          => 'AdditionalValue007',
             'additionalValue008'          => 'AdditionalValue008',
             'additionalValue009'          => 'AdditionalValue009',
-            'additionalValue010'          => 'AdditionalValue010',
-            'additionalValue011'          => 'AdditionalValue011'
         ];
 
         foreach ($map as $key => $property) {
@@ -1780,26 +1433,6 @@ HTML;
                 'ambientTemperatureNormal',
                 'AmbientTemperatureActual',
                 false
-            );
-        }
-
-        if ($this->HasHeatingProgramStatus()) {
-            $heatingProgramStatus = GetValue(
-                $this->ReadPropertyInteger('HeatingProgramStatusVariable')
-            );
-
-            $data['heatingPumpDayMode'] = $this->BinaryData(
-                $this->ValueMatchesCsv(
-                    $heatingProgramStatus,
-                    $this->ReadPropertyString('HeatingProgramDayValues')
-                )
-            );
-
-            $data['heatingPumpNightMode'] = $this->BinaryData(
-                $this->ValueMatchesCsv(
-                    $heatingProgramStatus,
-                    $this->ReadPropertyString('HeatingProgramNightValues')
-                )
             );
         }
 
@@ -1823,11 +1456,6 @@ HTML;
         $fanSpeedId = $this->ReadPropertyInteger('FanSpeed');
         if ($fanSpeedId > 0 && IPS_VariableExists($fanSpeedId)) {
             $data['hpRunning'] = $this->BinaryData((float) GetValue($fanSpeedId) > 0.0);
-        } elseif ($this->HasOperatingStatus()) {
-            $statusValue = GetValue($this->ReadPropertyInteger('OperatingStatusVariable'));
-            $data['hpRunning'] = $this->BinaryData(
-                $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('FanActiveStatusValues'))
-            );
         }
 
         return $data;
@@ -1885,12 +1513,6 @@ HTML;
     private function HasOperatingStatus(): bool
     {
         $variableId = $this->ReadPropertyInteger('OperatingStatusVariable');
-        return $variableId > 0 && IPS_VariableExists($variableId);
-    }
-
-    private function HasHeatingProgramStatus(): bool
-    {
-        $variableId = $this->ReadPropertyInteger('HeatingProgramStatusVariable');
         return $variableId > 0 && IPS_VariableExists($variableId);
     }
 
@@ -2317,7 +1939,6 @@ class HeatPumpCard extends HTMLElement {
     const day = hasExplicitDayState
       ? this.binary(c.heatingPumpDayMode)
       : !night;
-    const warning = this.binary(c.warning);
 
     const show = (selector, visible) => {
       const element = this.content.querySelector(selector);
@@ -2332,8 +1953,8 @@ class HeatPumpCard extends HTMLElement {
     show('#gHPStatusSave', this.binary(c.heatingPumpEnergySaveMode));
     show('#gTimeSymbolNight', night);
     show('#gTimeSymbolDay', day);
-    show('#gWarning', warning);
-    show('#gError', this.binary(c.error) || warning);
+    show('#gWarning', false);
+    show('#gError', this.binary(c.error));
     show('#gDefrost', this.binary(c.defrostMode));
     show('#gAdditionalHeating', this.binary(c.additionalHeating));
 
@@ -2417,7 +2038,6 @@ class HeatPumpCard extends HTMLElement {
     this.setText('#textCondenserTemperature', this.format(c.condenserTemperature));
     this.setText('#textExpansionValveOpening', this.format(c.expansionValveOpening));
     this.setText('#textCompressorValue', this.format(c.compressorValue));
-    this.setText('#textCopValue', this.format(c.copValue));
 
     if (c.thermalSolarAvailable) {
       this.rotate('#gThermalSolarPump', this.binary(c.thermalSolarPump));
@@ -2723,9 +2343,7 @@ window.SymconHeatPump = {
          * Dazwischen wird stufenlos interpoliert.
          */
         const getTemperatureColorStops = () => {
-            const configured = Array.isArray(currentConfig.temperatureColorScale)
-                ? currentConfig.temperatureColorScale
-                : [];
+            const configured = [];
 
             const defaults = [
                 {temperature: 15, color: 26316},
@@ -2854,7 +2472,7 @@ window.SymconHeatPump = {
          * Dadurch gilt automatisch dieselbe Skala für Puffer und Warmwasser.
          */
         HeatPumpClass.prototype.tempColor = function(temp) {
-            if (!currentConfig.useCustomTemperatureColors) {
+            if (!false) {
                 if (typeof originalTempColor === 'function') {
                     return originalTempColor.call(this, temp);
                 }
@@ -4386,759 +4004,6 @@ window.SymconHeatPump = {
 
         let storedCircuitColors = loadStoredCircuitColors();
 
-        const restoreOriginalTemperatureColors = (card) => {
-            if (!card || !card.content || currentConfig.useCustomTemperatureColors) {
-                return;
-            }
-
-            const svg = card.content;
-
-            /*
-             * Entfernt ausschließlich unsere Inline-Überschreibungen.
-             * Danach greifen wieder die im Original-SVG/der Original-Card
-             * definierten Farben und Gradienten.
-             */
-            [
-                '#pathPipeRefluxWW',
-                '#pathPipeToCirculatingPump',
-                '#pathPipeHotColdHeatpump',
-                '#pathPipeToBuffer',
-                '#pathPipeFromBuffer',
-                '#pathPipeHotWaterToTank',
-                '#pathPipeToHeatingCircuitPump',
-                '#pathPipeToHeatingCircuitPump2',
-                '#pathPipeToHeatingCircuitPump3',
-                '#pathPipeToHP',
-                '#pathPipeToHP2',
-                '#pathPipeBufferToHeating',
-                '#pathPipeHeatingToBuffer',
-                '#pathHPModelCondenserSymbol',
-                '#pathHPModelEvaporatorSymbol001',
-                '#pathHPModelEvaporatorSymbol002',
-                '#pathUnderfloorHeating1',
-                '#pathUnderfloorHeating2',
-                '#pathUnderfloorHeating3',
-                '#pathRadiatorPipeIn1',
-                '#pathRadiatorPipeIn2',
-                '#pathRadiatorPipeIn3',
-                '#pathRadiatorPipeOut1',
-                '#pathRadiatorPipeOut2',
-                '#pathRadiatorPipeOut3',
-                '#rectRadiator1',
-                '#rectRadiator2',
-                '#rectRadiator3',
-                '#pathTankWWChassis',
-                '#pathTankHPChassis'
-            ].forEach((selector) => {
-                const element = svg.querySelector(selector);
-                if (!element) {
-                    return;
-                }
-
-                element.style.removeProperty('stroke');
-                element.style.removeProperty('stroke-opacity');
-                element.style.removeProperty('fill');
-                element.style.removeProperty('fill-opacity');
-            });
-
-            /*
-             * Boiler-Wendel wieder an den Originalgradienten hängen.
-             */
-            const boilerCoil = svg.querySelector('#pathPipeHotWaterToTank');
-            if (boilerCoil) {
-                boilerCoil.style.removeProperty('display');
-                boilerCoil.style.removeProperty('visibility');
-                boilerCoil.style.removeProperty('stroke-width');
-                boilerCoil.style.removeProperty('stroke-opacity');
-                boilerCoil.style.setProperty(
-                    'stroke',
-                    'url(#linearGradientPipe1)'
-                );
-            }
-
-            const outline = svg.querySelector('#symconBoilerCoilOutline');
-            if (outline && outline.parentNode) {
-                outline.parentNode.removeChild(outline);
-            }
-
-            const customGradient = svg.querySelector('#symconLinearGradientBoilerCoil');
-            if (customGradient && customGradient.parentNode) {
-                customGradient.parentNode.removeChild(customGradient);
-            }
-        };
-
-        const applyTemperatureColorOpacity = (card) => {
-            if (!currentConfig.useCustomTemperatureColors) {
-                return;
-            }
-
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-
-            /*
-             * Die Original-Card verwendet bei Speicher und Hydraulik teilweise
-             * 50 % Deckkraft. Das verfälscht konfigurierte Temperaturfarben auf
-             * dunklem Hintergrund erheblich (Rot wirkt z.B. braun).
-             *
-             * Temperaturfarben deshalb überall mit voller Deckkraft darstellen.
-             */
-            [
-                '#pathTankWWChassis',
-                '#pathTankHPChassis'
-            ].forEach((selector) => {
-                const element = svg.querySelector(selector);
-                if (element) {
-                    element.style.setProperty('fill-opacity', '1', 'important');
-                }
-            });
-
-            [
-                '#pathPipeRefluxWW',
-                '#pathPipeToCirculatingPump',
-                '#pathPipeHotColdHeatpump',
-                '#pathPipeToBuffer',
-                '#pathPipeFromBuffer',
-                '#pathPipeHotWaterToTank',
-                '#pathPipeToHeatingCircuitPump',
-                '#pathPipeToHeatingCircuitPump2',
-                '#pathPipeToHeatingCircuitPump3',
-                '#pathPipeToHP',
-                '#pathPipeToHP2',
-                '#pathPipeBufferToHeating',
-                '#pathPipeHeatingToBuffer'
-            ].forEach((selector) => {
-                const element = svg.querySelector(selector);
-                if (element) {
-                    element.style.setProperty('stroke-opacity', '1', 'important');
-                }
-            });
-        };
-
-        const applyHeatingCircuitTemperatureColors = (card) => {
-            if (!currentConfig.useCustomTemperatureColors) {
-                return;
-            }
-
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-
-            /*
-             * Hydraulische Stellung ausschließlich über das konfigurierte
-             * Umschaltventil Warmwasser/Heizung bestimmen.
-             *
-             * Ventil aktiv = Boiler/Warmwasser
-             * Ventil inaktiv = Heizkreis
-             *
-             * Ist KEIN Ventil konfiguriert, gibt es keine unterscheidbare
-             * hydraulische Stellung. Dann verwenden Heizungs- und Boilerseite
-             * denselben Vorlauf-/Rücklauf-Farbverlauf.
-             */
-            const valveConfigured = !!currentConfig.wwHeatingValve;
-            const hotWaterActive =
-                valveConfigured && stateIsOn(currentConfig.wwHeatingValve);
-
-            setText('#textHeatingCircuitName1', currentConfig.heatingCircuitName1 || 'HK1');
-            setText('#textHeatingCircuitName2', currentConfig.heatingCircuitName2 || 'HK2');
-            setText('#textHeatingCircuitName3', currentConfig.heatingCircuitName3 || 'HK3');
-
-            const circuits = [
-                {
-                    key: '1',
-                    gradient: 'linearGradientCircuit1',
-                    supply: currentConfig.supplyTemperatureHeating,
-                    reflux: currentConfig.refluxTemperatureHeating,
-                    supplyPipes: ['#pathPipeToHeatingCircuitPump'],
-                    refluxPipes: ['#pathPipeToHP']
-                },
-                {
-                    key: '2',
-                    gradient: 'linearGradientCircuit2',
-                    supply: currentConfig.supplyTemperatureHeating2,
-                    reflux: currentConfig.refluxTemperatureHeating2,
-                    supplyPipes: ['#pathPipeToHeatingCircuitPump2'],
-                    refluxPipes: ['#pathPipeToHP2']
-                },
-                {
-                    key: '3',
-                    gradient: 'linearGradientCircuit3',
-                    supply: currentConfig.supplyTemperatureHeating3,
-                    reflux: currentConfig.refluxTemperatureHeating3,
-                    supplyPipes: ['#pathPipeToHeatingCircuitPump3'],
-                    refluxPipes: []
-                }
-            ];
-
-            const setStrokeColor = (selectors, color) => {
-                if (!color) {
-                    return;
-                }
-
-                selectors.forEach((selector) => {
-                    const element = svg.querySelector(selector);
-                    if (element) {
-                        element.style.setProperty('stroke', color, 'important');
-                        element.style.setProperty('stroke-opacity', '1', 'important');
-                    }
-                });
-            };
-
-            const setFillColor = (selectors, color) => {
-                if (!color) {
-                    return;
-                }
-
-                selectors.forEach((selector) => {
-                    const element = svg.querySelector(selector);
-                    if (element) {
-                        element.style.setProperty('fill', color, 'important');
-                        element.style.setProperty('fill-opacity', '1', 'important');
-                    }
-                });
-            };
-
-            const setGradient = (gradientId, supplyColor, refluxColor) => {
-                const gradient = svg.querySelector('#' + gradientId);
-                if (!gradient || !supplyColor || !refluxColor) {
-                    return;
-                }
-
-                const stops = gradient.querySelectorAll('stop');
-                if (stops.length < 2) {
-                    return;
-                }
-
-                stops[0].style.setProperty('stop-color', supplyColor, 'important');
-                stops[0].setAttribute('stop-color', supplyColor);
-
-                stops[stops.length - 1].style.setProperty(
-                    'stop-color',
-                    refluxColor,
-                    'important'
-                );
-                stops[stops.length - 1].setAttribute('stop-color', refluxColor);
-            };
-
-            const setGradientStops = (gradient, color1, color2) => {
-                if (!gradient || !color1 || !color2) {
-                    return;
-                }
-
-                const stops = gradient.querySelectorAll('stop');
-                if (stops.length < 2) {
-                    return;
-                }
-
-                stops[0].style.setProperty('stop-color', color1, 'important');
-                stops[0].setAttribute('stop-color', color1);
-
-                stops[stops.length - 1].style.setProperty(
-                    'stop-color',
-                    color2,
-                    'important'
-                );
-                stops[stops.length - 1].setAttribute('stop-color', color2);
-            };
-
-            const setHeatPumpCoilGradient = (hotColor, coolColor) => {
-                const gradient = svg.querySelector('#linearGradientPipe1');
-                setGradientStops(gradient, hotColor, coolColor);
-
-                const heatPumpCoil = svg.querySelector('#pathPipeHotColdHeatpump');
-                if (heatPumpCoil) {
-                    heatPumpCoil.style.setProperty(
-                        'stroke',
-                        'url(#linearGradientPipe1)',
-                        'important'
-                    );
-                    heatPumpCoil.style.setProperty(
-                        'stroke-opacity',
-                        '1',
-                        'important'
-                    );
-                }
-            };
-
-            const ensureBoilerCoilGradient = () => {
-                let gradient = svg.querySelector('#symconLinearGradientBoilerCoil');
-                if (gradient) {
-                    return gradient;
-                }
-
-                const original = svg.querySelector('#linearGradientPipe1');
-                if (!original) {
-                    return null;
-                }
-
-                gradient = original.cloneNode(true);
-                gradient.setAttribute('id', 'symconLinearGradientBoilerCoil');
-
-                gradient.querySelectorAll('stop').forEach((stop, index) => {
-                    stop.setAttribute(
-                        'id',
-                        'symconBoilerCoilStop' + (index + 1)
-                    );
-                });
-
-                original.parentNode.appendChild(gradient);
-                return gradient;
-            };
-
-            const setBoilerCoilGradient = (hotColor, coolColor) => {
-                const gradient = ensureBoilerCoilGradient();
-                setGradientStops(gradient, hotColor, coolColor);
-
-                const boilerCoil = svg.querySelector('#pathPipeHotWaterToTank');
-                if (!boilerCoil) {
-                    return;
-                }
-
-                /*
-                 * Die Original-Card blendet diese Wendel nicht abhängig vom
-                 * Ventil aus. Bei gleicher Farbe von Boiler und Wendel würde sie
-                 * aber optisch vollständig im Speicher verschwinden.
-                 *
-                 * Deshalb eine schmale Kontur UNTER der eigentlichen Wendel.
-                 * Die sichtbare Wendel selbst behält exakt ihre Temperaturfarbe.
-                 */
-                let outline = svg.querySelector('#symconBoilerCoilOutline');
-
-                if (!outline) {
-                    outline = boilerCoil.cloneNode(false);
-                    outline.setAttribute('id', 'symconBoilerCoilOutline');
-                    boilerCoil.parentNode.insertBefore(outline, boilerCoil);
-                }
-
-                const dark = window.matchMedia
-                    && window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-                outline.style.setProperty(
-                    'stroke',
-                    dark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)',
-                    'important'
-                );
-                outline.style.setProperty('stroke-width', '7', 'important');
-                outline.style.setProperty('stroke-opacity', '1', 'important');
-                outline.style.setProperty('fill', 'none', 'important');
-                outline.style.setProperty('display', 'inline', 'important');
-                outline.style.setProperty('visibility', 'visible', 'important');
-
-                boilerCoil.style.setProperty(
-                    'stroke',
-                    'url(#symconLinearGradientBoilerCoil)',
-                    'important'
-                );
-                boilerCoil.style.setProperty('stroke-width', '5', 'important');
-                boilerCoil.style.setProperty('stroke-opacity', '1', 'important');
-                boilerCoil.style.setProperty('fill', 'none', 'important');
-                boilerCoil.style.setProperty('display', 'inline', 'important');
-                boilerCoil.style.setProperty('visibility', 'visible', 'important');
-            };
-
-            let firstHeatingColors = null;
-            let storedChanged = false;
-
-            circuits.forEach((circuit) => {
-                const supplyTemperature = readStateNumber(circuit.supply);
-                const refluxTemperature = readStateNumber(circuit.reflux);
-
-                let colors = storedCircuitColors[circuit.key] || null;
-
-                /*
-                 * Nur im Heizbetrieb werden die gespeicherten Heizkreisfarben
-                 * aktualisiert. Beim Umschalten auf Warmwasser bleiben Heizkörper/
-                 * Fußbodenheizung optisch auf ihrem letzten Heiz-Zustand stehen.
-                 */
-                if (
-                    !hotWaterActive
-                    && supplyTemperature !== null
-                    && refluxTemperature !== null
-                ) {
-                    colors = {
-                        supply: temperatureColor(supplyTemperature),
-                        reflux: temperatureColor(refluxTemperature)
-                    };
-
-                    storedCircuitColors[circuit.key] = colors;
-                    storedChanged = true;
-                }
-
-                /*
-                 * Falls die Seite erstmals während Warmwasserladung geöffnet wird
-                 * und noch nichts gespeichert ist, nehmen wir einmal die aktuell
-                 * vorhandenen Werte als Startzustand.
-                 */
-                if (
-                    !colors
-                    && supplyTemperature !== null
-                    && refluxTemperature !== null
-                ) {
-                    colors = {
-                        supply: temperatureColor(supplyTemperature),
-                        reflux: temperatureColor(refluxTemperature)
-                    };
-                }
-
-                if (!colors || !colors.supply || !colors.reflux) {
-                    return;
-                }
-
-                if (!firstHeatingColors) {
-                    firstHeatingColors = colors;
-                }
-
-                setGradient(circuit.gradient, colors.supply, colors.reflux);
-
-                [
-                    '#pathUnderfloorHeating' + circuit.key,
-                    '#pathRadiatorPipeIn' + circuit.key,
-                    '#pathRadiatorPipeOut' + circuit.key
-                ].forEach((selector) => {
-                    const element = svg.querySelector(selector);
-                    if (element) {
-                        element.style.setProperty('stroke-opacity', '1', 'important');
-                    }
-                });
-
-                const radiator = svg.querySelector('#rectRadiator' + circuit.key);
-                if (radiator) {
-                    radiator.style.setProperty('stroke-opacity', '1', 'important');
-                    radiator.style.setProperty('fill-opacity', '1', 'important');
-                }
-
-                setStrokeColor(circuit.supplyPipes, colors.supply);
-                setStrokeColor(circuit.refluxPipes, colors.reflux);
-            });
-
-            if (storedChanged) {
-                saveStoredCircuitColors(storedCircuitColors);
-            }
-
-            /*
-             * Gemeinsame Hydraulik am Umschaltventil:
-             *
-             * Heizung aktiv:
-             *   letzte/aktuelle Heizkreisfarbe.
-             *
-             * Warmwasser aktiv:
-             *   die Wärmepumpen-Vorlauftemperatur färbt die Leitung zum Boiler
-             *   und die Heizwendel im Boiler. Die Heizkreisfarben bleiben stehen.
-             */
-            if (hotWaterActive) {
-                /*
-                 * Während der Warmwasserladung bleiben die Heizkreis-Symbole auf
-                 * ihren gespeicherten Heizfarben. Für Wärmepumpe und Boiler-Wendel
-                 * verwenden wir dagegen die AKTUELLEN Vorlauf-/Rücklaufwerte.
-                 *
-                 * Priorität:
-                 *   Heizkreis 1 -> Heizkreis 2 -> Heizkreis 3 -> WP-Vorlauf
-                 */
-                const currentSupplyTemperature =
-                    readStateNumber(currentConfig.supplyTemperatureHeating)
-                    ?? readStateNumber(currentConfig.supplyTemperatureHeating2)
-                    ?? readStateNumber(currentConfig.supplyTemperatureHeating3)
-                    ?? readStateNumber(currentConfig.supplyTemperature);
-
-                const currentRefluxTemperature =
-                    readStateNumber(currentConfig.refluxTemperatureHeating)
-                    ?? readStateNumber(currentConfig.refluxTemperatureHeating2)
-                    ?? readStateNumber(currentConfig.refluxTemperatureHeating3);
-
-                const boilerTemperature =
-                    readStateNumber(currentConfig.tankTempWWUp)
-                    ?? readStateNumber(currentConfig.tankTempWWMiddle)
-                    ?? readStateNumber(currentConfig.tankTempWWDown);
-
-                const hotColor =
-                    temperatureColor(currentSupplyTemperature)
-                    || temperatureColor(boilerTemperature);
-
-                const refluxColor =
-                    temperatureColor(currentRefluxTemperature)
-                    || temperatureColor(boilerTemperature)
-                    || hotColor;
-
-                const boilerColor =
-                    temperatureColor(boilerTemperature)
-                    || hotColor;
-
-                /*
-                 * Warmwasserleitung aus dem Boiler zum Zapfhahn:
-                 * immer mit der aktuellen Boilertemperaturfarbe darstellen.
-                 */
-                setStrokeColor(
-                    ['#pathPipeToCirculatingPump'],
-                    boilerColor
-                );
-
-                /*
-                 * Wärmepumpen-Wendel:
-                 * aktuelle Vorlauf-/Rücklauftemperatur, unabhängig vom
-                 * separaten Boiler-Gradienten.
-                 */
-                if (hotColor && refluxColor) {
-                    setHeatPumpCoilGradient(
-                        hotColor,
-                        refluxColor
-                    );
-                }
-
-                /*
-                 * Warmwasserladung aktiv:
-                 * Boiler-Wendel = aktuelle Vorlauf-/Rücklauftemperatur.
-                 */
-                setBoilerCoilGradient(
-                    hotColor,
-                    refluxColor
-                );
-
-                // Heizseite während Boilerladung vollständig eingefroren lassen.
-                if (firstHeatingColors) {
-                    setStrokeColor(
-                        ['#pathPipeToBuffer'],
-                        firstHeatingColors.supply
-                    );
-                    setStrokeColor(
-                        [
-                            '#pathPipeFromBuffer',
-                            '#pathPipeToHP',
-                            '#pathPipeToHP2'
-                        ],
-                        firstHeatingColors.reflux
-                    );
-                }
-
-                /*
-                 * Die Wärmeübertrager-Symbole in der Wärmepumpe übernehmen
-                 * ebenfalls die gemeinsame Temperaturskala.
-                 */
-                const condenserTemperature =
-                    readStateNumber(currentConfig.condenserTemperature);
-                const evaporatorTemperature =
-                    readStateNumber(currentConfig.evaporatorTemperature);
-
-                const condenserColor = temperatureColor(condenserTemperature);
-                const evaporatorColor = temperatureColor(evaporatorTemperature);
-
-                setFillColor(
-                    ['#pathHPModelCondenserSymbol'],
-                    condenserColor
-                );
-                setStrokeColor(
-                    [
-                        '#pathHPModelEvaporatorSymbol001',
-                        '#pathHPModelEvaporatorSymbol002'
-                    ],
-                    evaporatorColor
-                );
-
-                // Zusätzliche Boilerfarbe am Speicher-Heizstab, falls vorhanden.
-                if (boilerColor) {
-                    const heaterRodWW = svg.querySelector('#pathHeaterRodWW');
-                    if (heaterRodWW) {
-                        heaterRodWW.style.setProperty(
-                            'stroke',
-                            boilerColor,
-                            'important'
-                        );
-                    }
-                }
-
-                return;
-            }
-
-            /*
-             * Heizbetrieb: gemeinsame Leitungen folgen wieder dem Heizkreis.
-             */
-            if (firstHeatingColors) {
-                setStrokeColor(
-                    ['#pathPipeToBuffer'],
-                    firstHeatingColors.supply
-                );
-                setStrokeColor(
-                    [
-                        '#pathPipeFromBuffer',
-                        '#pathPipeToHP',
-                        '#pathPipeToHP2'
-                    ],
-                    firstHeatingColors.reflux
-                );
-
-                setHeatPumpCoilGradient(
-                    firstHeatingColors.supply,
-                    firstHeatingColors.reflux
-                );
-            }
-
-            /*
-             * Warmwasserleitung aus dem Boiler zum Zapfhahn:
-             * unabhängig vom Betriebsmodus mit der aktuellen Boilertemperatur.
-             */
-            const boilerTemperature =
-                readStateNumber(currentConfig.tankTempWWUp)
-                ?? readStateNumber(currentConfig.tankTempWWMiddle)
-                ?? readStateNumber(currentConfig.tankTempWWDown);
-
-            const boilerColor = temperatureColor(boilerTemperature);
-
-            setStrokeColor(
-                ['#pathPipeToCirculatingPump'],
-                boilerColor
-            );
-
-            /*
-             * Kein Umschaltventil konfiguriert:
-             * Boiler- und Heizungsseite verwenden denselben Vorlauf-/Rücklauf-
-             * Farbverlauf. So entstehen ohne Ventil keine widersprüchlichen
-             * Farben für dieselbe hydraulische Verbindung.
-             *
-             * Ventil konfiguriert und auf Heizung:
-             * Boiler-Wendel zeigt die aktuelle Boilertemperaturfarbe.
-             */
-            if (!valveConfigured && firstHeatingColors) {
-                setBoilerCoilGradient(
-                    firstHeatingColors.supply,
-                    firstHeatingColors.reflux
-                );
-            } else if (boilerColor) {
-                setBoilerCoilGradient(
-                    boilerColor,
-                    boilerColor
-                );
-            }
-
-            /*
-             * Wärmepumpen-Wärmetauscher ebenfalls immer mit Temperaturfarbe.
-             */
-            const condenserTemperature =
-                readStateNumber(currentConfig.condenserTemperature);
-            const evaporatorTemperature =
-                readStateNumber(currentConfig.evaporatorTemperature);
-
-            setFillColor(
-                ['#pathHPModelCondenserSymbol'],
-                temperatureColor(condenserTemperature)
-            );
-            setStrokeColor(
-                [
-                    '#pathHPModelEvaporatorSymbol001',
-                    '#pathHPModelEvaporatorSymbol002'
-                ],
-                temperatureColor(evaporatorTemperature)
-            );
-        };
-
-        const applyHeatingReturnContinuity = (card) => {
-            if (!currentConfig.useCustomTemperatureColors) {
-                return;
-            }
-
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-
-            const hotWaterActive =
-                !!currentConfig.wwHeatingValve
-                && stateIsOn(currentConfig.wwHeatingValve);
-
-            const readFirstNumber = (entities) => {
-                for (const entity of entities) {
-                    const value = readStateNumber(entity);
-                    if (value !== null) {
-                        return value;
-                    }
-                }
-
-                return null;
-            };
-
-            let refluxColor = null;
-
-            if (hotWaterActive) {
-                /*
-                 * Während Warmwasserladung die zuletzt gespeicherte Heizfarbe
-                 * verwenden, damit der Heizkreis optisch eingefroren bleibt.
-                 */
-                const stored =
-                    storedCircuitColors['1']
-                    || storedCircuitColors['2']
-                    || storedCircuitColors['3'];
-
-                refluxColor = stored && stored.reflux
-                    ? stored.reflux
-                    : null;
-            } else {
-                const refluxTemperature = readFirstNumber([
-                    currentConfig.refluxTemperatureHeating,
-                    currentConfig.refluxTemperatureHeating2,
-                    currentConfig.refluxTemperatureHeating3
-                ]);
-
-                refluxColor = temperatureColor(refluxTemperature);
-            }
-
-            if (!refluxColor) {
-                return;
-            }
-
-            /*
-             * Diese SVG-Elemente bilden die sichtbare Rücklaufkette rechts.
-             * Besonders pathPipeToHP2 ist das kurze Teilstück, das sonst gerne
-             * in der ursprünglichen blauen Card-Farbe stehen bleibt.
-             */
-            [
-                '#pathPipeFromBuffer',
-                '#pathPipeToHP',
-                '#pathPipeToHP2'
-            ].forEach((selector) => {
-                const element = svg.querySelector(selector);
-
-                if (!element) {
-                    return;
-                }
-
-                element.setAttribute('stroke', refluxColor);
-                element.style.setProperty('stroke', refluxColor, 'important');
-            });
-        };
-
-        const storedHeatingTemperatureKey =
-            'symconHeatPumpStoredHeatingTemperatures';
-
-        const loadStoredHeatingTemperatures = () => {
-            try {
-                const raw = window.sessionStorage
-                    ? window.sessionStorage.getItem(storedHeatingTemperatureKey)
-                    : null;
-
-                return raw ? JSON.parse(raw) : {};
-            } catch (error) {
-                return {};
-            }
-        };
-
-        const saveStoredHeatingTemperatures = (values) => {
-            try {
-                if (window.sessionStorage) {
-                    window.sessionStorage.setItem(
-                        storedHeatingTemperatureKey,
-                        JSON.stringify(values)
-                    );
-                }
-            } catch (error) {
-                // Anzeige funktioniert auch ohne Session-Speicher.
-            }
-        };
-
-        let storedHeatingTemperatures = loadStoredHeatingTemperatures();
-
         const applyAdditionalValues = (card) => {
             if (!card || !card.content) {
                 return;
@@ -5146,7 +4011,7 @@ window.SymconHeatPump = {
 
             const svg = card.content;
 
-            for (let index = 0; index < 12; index++) {
+            for (let index = 0; index < 10; index++) {
                 const suffix = String(index).padStart(3, '0');
                 const labelKey = 'additionalLabel' + suffix;
                 const valueKey = 'additionalValue' + suffix;
@@ -5513,7 +4378,7 @@ window.SymconHeatPump = {
              * Bei abgeschalteten eigenen Temperaturfarben bleibt die originale
              * Farbgebung der Heat-Pump-Card bestehen.
              */
-            if (!currentConfig.useCustomTemperatureColors) {
+            if (!false) {
                 [
                     '#pathPipeThermalSolarHotWater',
                     '#pathPipeThermalSolarColdWater',
@@ -5853,521 +4718,6 @@ window.SymconHeatPump = {
                 }
             );
         };
-
-        const applyRefrigerantTemperatureColors = (card) => {
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-            const outer =
-                svg.querySelector('#pathHPModelOuterCircle');
-            const inner =
-                svg.querySelector('#pathHPModelInnerCircle');
-
-            /*
-             * Unsere vollständige Kältekreis-Mittellinie.
-             *
-             * Die beiden Originalpfade sind zwei Konturen derselben
-             * schematischen Leitung. Je nachdem, welchen davon man allein
-             * verwendet, fehlt jeweils an Verdampfer / Verdichter /
-             * Expansionsventil die andere Hälfte.
-             *
-             * Deshalb verwenden wir im erweiterten Modus KEINEN der beiden
-             * Originalpfade als Leitung, sondern eine einzige Mittellinie,
-             * die alle vier Bauteile vollständig miteinander verbindet.
-             */
-            const ensureCircuitPipe = () => {
-                let pipe =
-                    svg.querySelector('#symconRefrigerantCircuitPipe');
-
-                if (pipe) {
-                    return pipe;
-                }
-
-                const parent =
-                    (outer && outer.parentNode)
-                    || (inner && inner.parentNode)
-                    || svg;
-
-                pipe = document.createElementNS(
-                    'http://www.w3.org/2000/svg',
-                    'path'
-                );
-
-                pipe.setAttribute(
-                    'id',
-                    'symconRefrigerantCircuitPipe'
-                );
-
-                /*
-                 * Eine durchgehende Leitung:
-                 * - obere Hälfte um den Verdichter
-                 * - äußere linke Hälfte um den Verdampfer
-                 * - komplette untere Führung durchs Expansionsventil
-                 * - äußere rechte Hälfte um den Kondensator
-                 *
-                 * Damit wird nicht mehr abwechselnd eine der beiden
-                 * Originalkonturen "vergessen".
-                 */
-                pipe.setAttribute(
-                    'd',
-                    'M 414 378 '
-                    + 'A 25 25 0 0 0 364 378 '
-                    + 'C 315 390 280 430 264 462 '
-                    + 'A 25 25 0 0 0 264 512 '
-                    + 'C 282 560 325 594 369 600 '
-                    + 'L 369 620 '
-                    + 'L 389 600 '
-                    + 'L 409 620 '
-                    + 'L 409 600 '
-                    + 'C 454 594 497 560 514 512 '
-                    + 'A 25 25 0 0 0 514 462 '
-                    + 'C 498 430 463 390 414 378 Z'
-                );
-
-                pipe.setAttribute('fill', 'none');
-
-                if (outer) {
-                    parent.insertBefore(pipe, outer);
-                } else {
-                    parent.appendChild(pipe);
-                }
-
-                return pipe;
-            };
-
-            const pipe = ensureCircuitPipe();
-
-            /*
-             * Vier kurze Brücken schließen exakt die Innenlücken an den
-             * Bauteilen. Die Hauptleitung bleibt unverändert bestehen.
-             */
-            const bridgeDefinitions = [
-                /*
-                 * Verdichter: obere UND untere Hälfte um den Verdichter.
-                 * Keine Linie mehr quer durch das Bauteil.
-                 */
-                {
-                    id: 'symconRefrigerantBridgeCompressorOuter',
-                    d: 'M 364 378 A 25 25 0 0 0 414 378'
-                },
-                {
-                    id: 'symconRefrigerantBridgeCompressorInner',
-                    d: 'M 364 378 A 25 25 0 0 1 414 378'
-                },
-
-                /*
-                 * Verdampfer: linke UND rechte Hälfte.
-                 */
-                {
-                    id: 'symconRefrigerantBridgeEvaporatorOuter',
-                    d: 'M 264 462 A 25 25 0 0 0 264 512'
-                },
-                {
-                    id: 'symconRefrigerantBridgeEvaporatorInner',
-                    d: 'M 264 462 A 25 25 0 0 1 264 512'
-                },
-
-                /*
-                 * Kondensator: rechte UND linke Hälfte.
-                 */
-                {
-                    id: 'symconRefrigerantBridgeCondenserOuter',
-                    d: 'M 514 462 A 25 25 0 0 1 514 512'
-                },
-                {
-                    id: 'symconRefrigerantBridgeCondenserInner',
-                    d: 'M 514 462 A 25 25 0 0 0 514 512'
-                },
-
-                /*
-                 * Expansionsventil: unterer UND oberer Weg um das Ventil.
-                 * Damit entsteht keine gerade Linie durch das Symbol.
-                 */
-                {
-                    id: 'symconRefrigerantBridgeExpansionOuter',
-                    d: 'M 369 600 L 369 620 L 389 600 L 409 620 L 409 600'
-                },
-                {
-                    id: 'symconRefrigerantBridgeExpansionInner',
-                    d: 'M 369 600 L 389 580 L 409 600'
-                }
-            ];
-            const bridges = bridgeDefinitions.map((definition) => {
-                let bridge = svg.querySelector('#' + definition.id);
-
-                if (!bridge) {
-                    bridge = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'path'
-                    );
-                    bridge.setAttribute('id', definition.id);
-                    bridge.setAttribute('d', definition.d);
-                    bridge.setAttribute('fill', 'none');
-
-                    if (pipe.parentNode) {
-                        pipe.parentNode.insertBefore(
-                            bridge,
-                            pipe.nextSibling
-                        );
-                    }
-                }
-
-                return bridge;
-            });
-
-            if (!currentConfig.useCustomTemperatureColors) {
-                if (outer) {
-                    outer.style.removeProperty('display');
-                    outer.style.removeProperty('visibility');
-                }
-
-                if (inner) {
-                    inner.style.removeProperty('display');
-                    inner.style.removeProperty('visibility');
-                }
-
-                if (pipe) {
-                    pipe.style.setProperty(
-                        'display',
-                        'none',
-                        'important'
-                    );
-                    pipe.style.setProperty(
-                        'visibility',
-                        'hidden',
-                        'important'
-                    );
-                    pipe.removeAttribute(
-                        'data-symcon-refrigerant-pipe'
-                    );
-                }
-
-                bridges.forEach((bridge) => {
-                    bridge.style.setProperty(
-                        'display',
-                        'none',
-                        'important'
-                    );
-                    bridge.style.setProperty(
-                        'visibility',
-                        'hidden',
-                        'important'
-                    );
-                    bridge.removeAttribute(
-                        'data-symcon-refrigerant-pipe'
-                    );
-                });
-
-                [
-                    '#pathHPModelEvaporatorSymbol001',
-                    '#pathHPModelEvaporatorSymbol002',
-                    '#pathHPModelCondenserSymbol',
-                    '#pathCompressor'
-                ].forEach((selector) => {
-                    const element = svg.querySelector(selector);
-
-                    if (element) {
-                        element.style.removeProperty('stroke');
-                        element.style.removeProperty('fill');
-                    }
-                });
-
-                return;
-            }
-
-            /*
-             * Die beiden weißen Originalkonturen vollständig ausblenden.
-             * Sichtbar bleibt ausschließlich unsere einzelne 5-px-Leitung.
-             */
-            [outer, inner].forEach((element) => {
-                if (!element) {
-                    return;
-                }
-
-                element.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
-                element.style.setProperty(
-                    'visibility',
-                    'hidden',
-                    'important'
-                );
-                element.removeAttribute(
-                    'data-symcon-refrigerant-pipe'
-                );
-            });
-
-            const evaporatorTemperature =
-                readStateNumber(
-                    currentConfig.evaporatorTemperature
-                );
-            const condenserTemperature =
-                readStateNumber(
-                    currentConfig.condenserTemperature
-                );
-
-            const evaporatorColor =
-                temperatureColor(evaporatorTemperature);
-            const condenserColor =
-                temperatureColor(condenserTemperature);
-
-            if (!evaporatorColor || !condenserColor) {
-                return;
-            }
-
-            const setStroke = (selector, color) => {
-                const element = svg.querySelector(selector);
-
-                if (!element) {
-                    return;
-                }
-
-                element.style.setProperty(
-                    'stroke',
-                    color,
-                    'important'
-                );
-                element.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
-            };
-
-            setStroke(
-                '#pathHPModelEvaporatorSymbol001',
-                evaporatorColor
-            );
-            setStroke(
-                '#pathHPModelEvaporatorSymbol002',
-                evaporatorColor
-            );
-            setStroke(
-                '#pathHPModelCondenserSymbol',
-                condenserColor
-            );
-
-            let defs = svg.querySelector('defs');
-
-            if (!defs) {
-                defs = document.createElementNS(
-                    'http://www.w3.org/2000/svg',
-                    'defs'
-                );
-                svg.insertBefore(defs, svg.firstChild);
-            }
-
-            const createPaletteGradient = (
-                id,
-                lowTemperature,
-                highTemperature
-            ) => {
-                let gradient = svg.querySelector('#' + id);
-
-                if (!gradient) {
-                    gradient = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'linearGradient'
-                    );
-
-                    gradient.setAttribute('id', id);
-                    gradient.setAttribute(
-                        'gradientUnits',
-                        'userSpaceOnUse'
-                    );
-                    gradient.setAttribute('x1', '240');
-                    gradient.setAttribute('y1', '0');
-                    gradient.setAttribute('x2', '540');
-                    gradient.setAttribute('y2', '0');
-
-                    defs.appendChild(gradient);
-                }
-
-                while (gradient.firstChild) {
-                    gradient.removeChild(gradient.firstChild);
-                }
-
-                const low = Number(lowTemperature);
-                const high = Number(highTemperature);
-                const min = Math.min(low, high);
-                const max = Math.max(low, high);
-                const span = Math.max(0.001, max - min);
-
-                let configured = getTemperatureColorStops()
-                    .filter((stop) =>
-                        Number(stop.temperature) > min
-                        && Number(stop.temperature) < max
-                    );
-
-                if (low > high) {
-                    configured = configured.reverse();
-                }
-
-                const stops = [
-                    {
-                        temperature: low,
-                        color: temperatureColor(low)
-                    },
-                    ...configured,
-                    {
-                        temperature: high,
-                        color: temperatureColor(high)
-                    }
-                ];
-
-                stops.forEach((item) => {
-                    const stop =
-                        document.createElementNS(
-                            'http://www.w3.org/2000/svg',
-                            'stop'
-                        );
-
-                    const offset =
-                        Math.abs(
-                            Number(item.temperature) - low
-                        ) / span;
-
-                    stop.setAttribute(
-                        'offset',
-                        Math.max(
-                            0,
-                            Math.min(1, offset)
-                        ) * 100 + '%'
-                    );
-                    stop.setAttribute(
-                        'stop-color',
-                        item.color
-                    );
-
-                    gradient.appendChild(stop);
-                });
-
-                return 'url(#' + id + ')';
-            };
-
-            const pipeGradient = createPaletteGradient(
-                'symconRefrigerantTemperatureGradient',
-                evaporatorTemperature,
-                condenserTemperature
-            );
-
-            pipe.style.setProperty(
-                'display',
-                'inline',
-                'important'
-            );
-            pipe.style.setProperty(
-                'visibility',
-                'visible',
-                'important'
-            );
-            pipe.style.setProperty(
-                'fill',
-                'none',
-                'important'
-            );
-            pipe.style.setProperty(
-                'stroke',
-                pipeGradient,
-                'important'
-            );
-            pipe.style.setProperty(
-                'stroke-width',
-                '5',
-                'important'
-            );
-            pipe.style.setProperty(
-                'stroke-opacity',
-                '1',
-                'important'
-            );
-            pipe.style.setProperty(
-                'stroke-linecap',
-                'round',
-                'important'
-            );
-            pipe.style.setProperty(
-                'stroke-linejoin',
-                'round',
-                'important'
-            );
-
-            pipe.setAttribute(
-                'data-symcon-refrigerant-pipe',
-                '1'
-            );
-
-            bridges.forEach((bridge) => {
-                bridge.style.setProperty(
-                    'display',
-                    'inline',
-                    'important'
-                );
-                bridge.style.setProperty(
-                    'visibility',
-                    'visible',
-                    'important'
-                );
-                bridge.style.setProperty(
-                    'fill',
-                    'none',
-                    'important'
-                );
-                bridge.style.setProperty(
-                    'stroke',
-                    pipeGradient,
-                    'important'
-                );
-                bridge.style.setProperty(
-                    'stroke-width',
-                    '5',
-                    'important'
-                );
-                bridge.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
-                bridge.style.setProperty(
-                    'stroke-linecap',
-                    'round',
-                    'important'
-                );
-                bridge.setAttribute(
-                    'data-symcon-refrigerant-pipe',
-                    '1'
-                );
-            });
-
-            const compressorGradient =
-                createPaletteGradient(
-                    'symconCompressorTemperatureGradient',
-                    evaporatorTemperature,
-                    condenserTemperature
-                );
-
-            const compressor =
-                svg.querySelector('#pathCompressor');
-
-            if (compressor) {
-                compressor.style.setProperty(
-                    'stroke',
-                    compressorGradient,
-                    'important'
-                );
-                compressor.style.setProperty(
-                    'stroke-opacity',
-                    '1',
-                    'important'
-                );
-            }
-        };
-
-
         /*
          * ROBUSTER HEIZKREIS-FLUSS FÜR HEIZKÖRPER / FUSSBODENHEIZUNG
          *
@@ -6379,8 +4729,6 @@ window.SymconHeatPump = {
          * jeweiligen Heizkreispumpe. Steht die Pumpe, steht damit auch
          * die Animation im Heizkörper bzw. in der Fußbodenheizung.
          */
-        let symconHeatingFlowRaf = 0;
-        let symconHeatingFlowOffset = 0;
 
         const ensureHeatingTestOverlay = (
             svg,
@@ -6462,193 +4810,6 @@ window.SymconHeatPump = {
                 overlay.parentNode.appendChild(overlay);
             }
         };
-
-        const applyHeatingFlowDiagnostic = (card) => {
-            if (!card || !card.content) {
-                return;
-            }
-
-            const svg = card.content;
-
-            /*
-             * Die zusätzlichen gestrichelten Heizkreis-Flüsse gehören zur
-             * eigenen Temperaturfarb-Darstellung und werden deshalb nur
-             * angezeigt, wenn "Eigene Temperaturfarben verwenden" aktiv ist.
-             */
-            const customColorsEnabled =
-                currentConfig.useCustomTemperatureColors === true;
-
-            const storagePumpRunning =
-                stateIsOn(currentConfig.storageChargingPumpRunning);
-
-            const valveToBoiler =
-                !!currentConfig.wwHeatingValve
-                && stateIsOn(currentConfig.wwHeatingValve);
-
-            const pump1Configured =
-                !!currentConfig.heatingCircuitPumpRunning;
-            const pump2Configured =
-                !!currentConfig.heatingCircuitPumpRunning2;
-            const pump3Configured =
-                !!currentConfig.heatingCircuitPumpRunning3;
-
-            const anyHeatingCircuitPumpConfigured =
-                pump1Configured
-                || pump2Configured
-                || pump3Configured;
-
-            /*
-             * Dieselbe hydraulische Freigabe wie im normalen Heizkreisfluss:
-             * - keine Heizkreispumpe konfiguriert:
-             *   Speicherladepumpe treibt alle vorhandenen Heizkreise;
-             * - Heizkreispumpen vorhanden:
-             *   nur die jeweilige laufende Heizkreispumpe treibt ihren Kreis;
-             * - Boiler-Ventil aktiv:
-             *   Heizkörper/Fußbodenheizung bleiben immer stehen.
-             */
-            const configured = [
-                false,
-                customColorsEnabled
-                    && !valveToBoiler
-                    && String(currentConfig.heatingCircuitType1 || 'off') !== 'off'
-                    && (
-                        anyHeatingCircuitPumpConfigured
-                            ? (
-                                pump1Configured
-                                && stateIsOn(
-                                    currentConfig.heatingCircuitPumpRunning
-                                )
-                            )
-                            : storagePumpRunning
-                    ),
-                customColorsEnabled
-                    && !valveToBoiler
-                    && String(currentConfig.heatingCircuitType2 || 'off') !== 'off'
-                    && (
-                        anyHeatingCircuitPumpConfigured
-                            ? (
-                                pump2Configured
-                                && stateIsOn(
-                                    currentConfig.heatingCircuitPumpRunning2
-                                )
-                            )
-                            : storagePumpRunning
-                    ),
-                customColorsEnabled
-                    && !valveToBoiler
-                    && String(currentConfig.heatingCircuitType3 || 'off') !== 'off'
-                    && (
-                        anyHeatingCircuitPumpConfigured
-                            ? (
-                                pump3Configured
-                                && stateIsOn(
-                                    currentConfig.heatingCircuitPumpRunning3
-                                )
-                            )
-                            : storagePumpRunning
-                    )
-            ];
-
-            for (let number = 1; number <= 3; number++) {
-                const suffix = number === 1 ? '' : String(number);
-
-                /*
-                 * Leitung vom Verteiler/Pumpe zur Heizfläche.
-                 */
-                ensureHeatingTestOverlay(
-                    svg,
-                    '#pathPipeToHeatingCircuitPump' + suffix,
-                    'symconHeatingTestPump' + number,
-                    configured[number]
-                );
-
-                /*
-                 * Fußbodenheizung. Ist sie in der SVG ausgeblendet, bleibt
-                 * auch unser Klon durch den ausgeblendeten Eltern-<g> unsichtbar.
-                 */
-                ensureHeatingTestOverlay(
-                    svg,
-                    '#pathUnderfloorHeating' + number,
-                    'symconHeatingTestFloor' + number,
-                    configured[number]
-                );
-
-                /*
-                 * Heizkörper: Original-Zuleitung, Original-Heizkörper und
-                 * Original-Rückleitung. Keine erfundenen Koordinaten.
-                 */
-                ensureHeatingTestOverlay(
-                    svg,
-                    '#pathRadiatorPipeIn' + number,
-                    'symconHeatingTestRadiatorIn' + number,
-                    configured[number]
-                );
-                ensureHeatingTestOverlay(
-                    svg,
-                    '#rectRadiator' + number,
-                    'symconHeatingTestRadiatorBody' + number,
-                    configured[number]
-                );
-                ensureHeatingTestOverlay(
-                    svg,
-                    '#pathRadiatorPipeOut' + number,
-                    'symconHeatingTestRadiatorOut' + number,
-                    configured[number]
-                );
-            }
-
-            /*
-             * Rücklaufstücke ebenfalls mitnehmen.
-             */
-            ensureHeatingTestOverlay(
-                svg,
-                '#pathPipeToHP',
-                'symconHeatingTestReturn1',
-                configured[1]
-            );
-            ensureHeatingTestOverlay(
-                svg,
-                '#pathPipeToHP2',
-                'symconHeatingTestReturnShared',
-                configured[1] || configured[2]
-            );
-
-            /*
-             * EIN globaler requestAnimationFrame-Loop.
-             * Keine CSS-Keyframes, keine SVG-animate-Abhängigkeit.
-             */
-            if (!symconHeatingFlowRaf) {
-                let lastTime = performance.now();
-
-                const animate = (time) => {
-                    const delta = Math.min(50, time - lastTime);
-                    lastTime = time;
-
-                    // ungefähr gleiche Geschwindigkeit wie 1.4 s / 24 px
-                    symconHeatingFlowOffset -= (24 / 1400) * delta;
-
-                    if (symconHeatingFlowOffset <= -24) {
-                        symconHeatingFlowOffset += 24;
-                    }
-
-                    document
-                        .querySelectorAll('heat-pump-card svg .symcon-heating-test-flow')
-                        .forEach((element) => {
-                            element.setAttribute(
-                                'stroke-dashoffset',
-                                String(symconHeatingFlowOffset)
-                            );
-                        });
-
-                    symconHeatingFlowRaf =
-                        requestAnimationFrame(animate);
-                };
-
-                symconHeatingFlowRaf =
-                    requestAnimationFrame(animate);
-            }
-        };
-
         const applyFlowAnimations = (card) => {
             if (!card || !card.content) {
                 return;
@@ -6659,7 +4820,7 @@ window.SymconHeatPump = {
             /*
              * Flussanimation nur zusammen mit den eigenen Temperaturfarben.
              */
-            if (!currentConfig.useCustomTemperatureColors) {
+            if (!false) {
                 removeFlowOverlays(svg);
                 return;
             }
@@ -7709,6 +5870,8 @@ window.SymconHeatPump = {
                 }
             };
 
+            setConfiguredVisibility('#gWarning', false);
+
             // Wärmepumpe Ein/Aus:
             // Ohne Datenpunkt kein "Aus"-Symbol anzeigen.
             setConfiguredVisibility(
@@ -7716,18 +5879,6 @@ window.SymconHeatPump = {
                 !!currentConfig.heatingPumpStatusOnOff
             );
 
-            // Tag/Nacht:
-            // Die Original-Card zeigt ohne Variable automatisch die Sonne.
-            // In Symcon werden Sonne UND Mond nur angezeigt, wenn eine
-            // Nachtbetriebsvariable tatsächlich konfiguriert ist.
-            const nightModeConfigured =
-                !!currentConfig.heatingPumpNightMode
-                || !!currentConfig.heatingPumpDayMode;
-
-            if (!nightModeConfigured) {
-                setConfiguredVisibility('#gTimeSymbolDay', false);
-                setConfiguredVisibility('#gTimeSymbolNight', false);
-            }
 
             // Warmwasser-/Heizungs-Umschaltventil:
             // Die Original-Card zeichnet es in Grundstellung auch ohne Datenpunkt.
@@ -7737,6 +5888,38 @@ window.SymconHeatPump = {
             }
         };
 
+
+
+        const applyHeaterRodInfoField = (card) => {
+            if (!card || !card.content) return;
+            const svg = card.content;
+            const count = Math.max(0, Math.min(3, Number(currentConfig.heaterRodCount || 0)));
+            const entities = [currentConfig.heaterRod1, currentConfig.heaterRod2, currentConfig.heaterRod3];
+            const thresholds = [
+                Number(currentConfig.heaterRod1Threshold || 1),
+                Number(currentConfig.heaterRod2Threshold || 1),
+                Number(currentConfig.heaterRod3Threshold || 1)
+            ];
+            let active = 0;
+            for (let i = 0; i < count; i++) {
+                const entity = entities[i];
+                if (!entity || !currentData || !currentData[entity]) continue;
+                const value = currentData[entity].value;
+                const numeric = Number(value);
+                const on = Number.isFinite(numeric)
+                    ? numeric >= thresholds[i]
+                    : ['1','true','on','yes','ja','ein','active','aktiv'].includes(String(value ?? '').trim().toLowerCase());
+                if (on) active++;
+            }
+            const text = svg.querySelector('#textHeaterRodStatus');
+            if (text) text.textContent = active > 0 ? String(active) : 'Aus';
+            const waves = svg.querySelector('#gHeaterRodWaves');
+            if (waves) waves.style.display = active > 0 ? 'inline' : 'none';
+            for (let i = 1; i <= 3; i++) {
+                const wave = svg.querySelector('#heaterWave' + i);
+                if (wave) wave.style.display = i <= active ? 'inline' : 'none';
+            }
+        };
 
         const applyThreeHeaterRods = (card) => {
             if (!card || !card.content) {
@@ -8442,11 +6625,6 @@ window.SymconHeatPump = {
                     originalX: 346.000
                 },
                 {
-                    selector: '#gWarning',
-                    custom: false,
-                    originalX: 391.560
-                },
-                {
                     selector: '#gHPStatusParty',
                     custom: false,
                     originalX: 437.380
@@ -9012,7 +7190,6 @@ window.SymconHeatPump = {
             setText('#textCondenserTemperature', formatted(cfg.condenserTemperature));
             setText('#textExpansionValveOpening', formatted(cfg.expansionValveOpening));
             setText('#textPowerValue', formatted(cfg.heatingPumpPower));
-            setText('#textCopValue', formatted(cfg.copValue));
             setText('#textCompressorSpeedValue', formatted(cfg.compressorValue));
             setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));
             setText('#textThermalSolarPumpSpeed', formatted(cfg.thermalSolarPumpSpeed));
@@ -9163,7 +7340,7 @@ window.SymconHeatPump = {
             // Fußzeile: exakt die 12 in der Konfiguration vorhandenen
             // Zusatzwerte 000...011 verwenden. Unkonfigurierte Plätze verschwinden.
             const footerValues = [];
-            for (let index = 0; index < 12; index++) {
+            for (let index = 0; index < 10; index++) {
                 const suffix = String(index).padStart(3, '0');
                 const label = String(cfg['additionalLabel' + suffix] || '').trim();
                 const key = cfg['additionalValue' + suffix] || '';
@@ -9176,7 +7353,7 @@ window.SymconHeatPump = {
                 }
             }
 
-            for (let index = 0; index < 12; index++) {
+            for (let index = 0; index < 10; index++) {
                 const el = svg.querySelector('#textFooterAdditional' + String(index).padStart(3, '0'));
                 if (!el) continue;
                 const item = footerValues[index];
@@ -9592,27 +7769,22 @@ window.SymconHeatPump = {
                             applyTerminology(this);
                             applyThemeColors(this);
                             applyRefrigerantCircuitMode(this);
-                            applyRefrigerantTemperatureColors(this);
                             applyOptionalStatusVisibility(this);
                             applyWWValvePipeGeometry(this);
-                            restoreOriginalTemperatureColors(this);
-                            applyHeatingCircuitTemperatureColors(this);
-                            applyTemperatureColorOpacity(this);
                             applyThreeHeaterRods(this);
+                            applyHeaterRodInfoField(this);
                             applyHeaterRodStatusIcon(this);
                             disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
                             layoutTopIconBar(this);
                             applyFanAnimation(this);
-                            applyHeatingReturnContinuity(this);
                             applySingleCircuitTemperatureDisplay(this);
                             applyThermalSolarVisualization(this);
                             applyAdditionalValues(this);
                             normalizeTemperatureUnits(this);
                             positionHeatingCircuitTemperatures(this);
                             applyFlowAnimations(this);
-                            applyHeatingFlowDiagnostic(this);
 
                             /*
                              * Die Kompaktansicht ist ein eigener Render.
