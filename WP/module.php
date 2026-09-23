@@ -6500,6 +6500,48 @@ window.SymconHeatPump = {
             show('#gDHW', previewAll || !!cfg.tankWW);
             show('#gSolar', previewAll || (!!cfg.tankWW && !!cfg.thermalSolarAvailable));
 
+            // Optionale Pumpen nur dort zeigen, wo sie hydraulisch hingehören.
+            show(
+                '#gStorageChargingPumpVisual',
+                previewAll || (!!cfg.tankHP && !!cfg.storageChargingPumpRunning)
+            );
+            show(
+                '#gCirculatingPumpVisual',
+                previewAll || (!!cfg.tankWW && !!cfg.circulatingPumpRunning)
+            );
+
+            // Vollansicht bedeutet bewusst: maximale Anlagenkonfiguration.
+            // Komponenten werden zur Layoutkontrolle gezeigt, auch wenn keine
+            // Symcon-Variable dafür konfiguriert ist. Unkonfigurierte Werte bleiben leer.
+            if (previewAll) {
+                [
+                    '#gBuffer',
+                    '#gDHW',
+                    '#gSolar',
+                    '#gStorageChargingPumpVisual',
+                    '#gCirculatingPumpVisual',
+                    '#gHeating',
+                    '#gHeatingManifold',
+                    '#gHK1',
+                    '#gHK2',
+                    '#gHK3'
+                ].forEach((selector) => show(selector, true));
+
+                // In der Maximalansicht drei unterschiedliche Heizflächen zeigen.
+                show('#gHKFloor1', true);
+                show('#gHKRadiator1', false);
+                show('#gHKFloor2', false);
+                show('#gHKRadiator2', true);
+                show('#gHKFloor3', true);
+                show('#gHKRadiator3', false);
+
+                const manifoldBodyPreview = svg.querySelector('#heatingManifoldBody');
+                if (manifoldBodyPreview) {
+                    manifoldBodyPreview.setAttribute('y', '220');
+                    manifoldBodyPreview.setAttribute('height', '335');
+                }
+            }
+
             // Live values.
             setText('#textOutdoorTemperatureValue', formatted(cfg.outdoorTemperature));
             let indoorKey = cfg.ambientTemperatureNormal;
@@ -6714,6 +6756,23 @@ window.SymconHeatPump = {
                 rotor.style.setProperty(
                     'animation',
                     duration > 0 ? 'symcon-modern-rotate ' + duration.toFixed(2) + 's linear infinite' : 'none',
+                    'important'
+                );
+            });
+
+            // Speicherlade- und Warmwasser-Zirkulationspumpe.
+            [
+                ['#storageChargingPumpRotor', cfg.storageChargingPumpRunning],
+                ['#circulatingPumpRotor', cfg.circulatingPumpRunning]
+            ].forEach(([selector, key]) => {
+                const rotor = svg.querySelector(selector);
+                if (!rotor) return;
+                const running = !!key && binary(key);
+                rotor.style.setProperty('transform-box', 'view-box', 'important');
+                rotor.style.setProperty('transform-origin', '0px 0px', 'important');
+                rotor.style.setProperty(
+                    'animation',
+                    running ? 'symcon-modern-rotate 1.4s linear infinite' : 'none',
                     'important'
                 );
             });
