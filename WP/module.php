@@ -99,7 +99,6 @@ class Waermepumpe extends IPSModuleStrict
         // Ventil / Heizstab
         $this->RegisterPropertyInteger('WWHeatingValve', 0);
         $this->RegisterPropertyInteger('HeaterRodWW', 0);
-        $this->RegisterPropertyInteger('HeaterRodHP', 0);
         $this->RegisterPropertyInteger('HeaterRodLevel1', 0);
         $this->RegisterPropertyInteger('HeaterRodLevel2', 0);
 
@@ -336,7 +335,9 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableRow('Puffer Mitte', 'TankTempHPMiddle', 'Warmwasser Mitte', 'TankTempWWMiddle'),
                     $this->VariableRow('Puffer unten', 'TankTempHPDown', 'Warmwasser unten', 'TankTempWWDown'),
                     $this->VariableRow('Speicherladepumpe aktiv', 'StorageChargingPumpRunning', 'Zirkulationspumpe aktiv', 'CirculatingPumpRunning'),
-                    $this->VariableRow('Umschaltventil Warmwasser/Heizung', 'WWHeatingValve', 'Heizstab Puffer aktiv', 'HeaterRodHP'),
+                    $this->VariableGrid([
+                        ['caption' => 'Umschaltventil Warmwasser/Heizung', 'name' => 'WWHeatingValve']
+                    ]),
                     ['type' => 'Label', 'caption' => 'Heizstäbe Warmwasserspeicher'],
                     [
                         'type' => 'RowLayout',
@@ -1153,7 +1154,6 @@ HTML;
 
             'wwHeatingValve'             => $this->DataKey('WWHeatingValve', 'wwHeatingValve'),
             'heaterRodWW'                => $this->DataKey('HeaterRodWW', 'heaterRodWW'),
-            'heaterRodHP'                => $this->DataKey('HeaterRodHP', 'heaterRodHP'),
             'heaterRodLevel1'            => $this->DataKey('HeaterRodLevel1', 'heaterRodLevel1'),
             'heaterRodLevel2'            => $this->DataKey('HeaterRodLevel2', 'heaterRodLevel2'),
 
@@ -1242,7 +1242,6 @@ HTML;
             'heatingPumpPower' => ['HeatingPumpPower', false],
             'wwHeatingValve' => ['WWHeatingValve', true],
             'heaterRodWW' => ['HeaterRodWW', true],
-            'heaterRodHP' => ['HeaterRodHP', true],
             'heaterRodLevel1' => ['HeaterRodLevel1', true],
             'heaterRodLevel2' => ['HeaterRodLevel2', true],
             'heaterRod1' => ['HeaterRod1', false],
@@ -1824,7 +1823,6 @@ class HeatPumpCard extends HTMLElement {
       this.setText('#textTankTempHPMiddle', this.format(c.tankTempHPMiddle));
       this.setText('#textTankTempHPDown', this.format(c.tankTempHPDown));
       this.tankColors(up, middle, down, '#stop3020', '#stop3040', '#stop3030');
-      show('#pathHeaterRodHP', this.binary(c.heaterRodHP));
     }
 
     if (c.tankWW) {
@@ -6613,6 +6611,13 @@ window.SymconHeatPump = {
             setText('#textCondenserPressure', formatted(cfg.condenserPressure));
             setText('#textCondenserTemperature', formatted(cfg.condenserTemperature));
             setText('#textExpansionValveOpening', formatted(cfg.expansionValveOpening));
+
+            // Umschaltventil: EIN = Warmwasser, AUS = Heizung.
+            // Nur anzeigen, wenn eine Variable konfiguriert ist.
+            setText(
+                '#textWWHeatingValveState',
+                cfg.wwHeatingValve ? (binary(cfg.wwHeatingValve) ? 'Warmwasser' : 'Heizung') : ''
+            );
             setText('#textPowerValue', formatted(cfg.heatingPumpPower));
             setText('#textCompressorSpeedValue', formatted(cfg.compressorValue));
             setText('#textThermalSolarPanelTemp', formatted(cfg.thermalSolarPanelTemp));
