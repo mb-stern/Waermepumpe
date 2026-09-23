@@ -229,6 +229,7 @@ class Waermepumpe extends IPSModuleStrict
 
         // Solarthermie
         $this->RegisterPropertyBoolean('ThermalSolarAvailable', false);
+        $this->RegisterPropertyBoolean('FullConfigurationPreview', false);
         $this->RegisterPropertyInteger('ThermalSolarPump', 0);
         $this->RegisterPropertyInteger('ThermalSolarPumpSpeed', 0);
         $this->RegisterPropertyInteger('ThermalSolarPanelTemp', 0);
@@ -379,6 +380,11 @@ class Waermepumpe extends IPSModuleStrict
     public function GetConfigurationForm(): string
     {
         $elements = [
+            [
+                'type' => 'CheckBox',
+                'name' => 'FullConfigurationPreview',
+                'caption' => 'Vollansicht / Vorschau – alle vorhandenen Komponenten einblenden'
+            ],
             [
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Wärmepumpe',
@@ -1188,6 +1194,7 @@ HTML;
     {
         return [
             'title'                      => '',
+            'fullConfigurationPreview'   => $this->ReadPropertyBoolean('FullConfigurationPreview'),
             'heatingPumpType'            => 'A2W',
 
             'operatingStatus'             => $this->DataKey('OperatingStatusVariable', 'operatingStatus'),
@@ -6843,6 +6850,7 @@ window.SymconHeatPump = {
             const cfg = currentConfig || {};
             const data = currentData || {};
             const controls = currentControls || {};
+            const previewAll = cfg.fullConfigurationPreview === true;
 
             const show = (selector, visible) => {
                 const el = svg.querySelector(selector);
@@ -6921,7 +6929,7 @@ window.SymconHeatPump = {
                 ['cooling', '#gHPStatusCooling']
             ].forEach(([name, selector]) => {
                 const c = controls[name];
-                show(selector, !!(c && c.configured && Array.isArray(c.options) && c.options.length));
+                show(selector, previewAll || !!(c && c.configured && Array.isArray(c.options) && c.options.length));
             });
 
             // Numerische Bedienungen: nur anzeigen, wenn wirklich konfiguriert.
@@ -6931,7 +6939,7 @@ window.SymconHeatPump = {
             ].forEach(([name, groupSel, valueSel]) => {
                 const c = controls[name];
                 const configured = !!(c && c.configured);
-                show(groupSel, configured);
+                show(groupSel, previewAll || configured);
                 if (!configured) return;
 
                 const value = c.formattedValue !== undefined && c.formattedValue !== null
@@ -6982,9 +6990,9 @@ window.SymconHeatPump = {
             });
 
             // Optional hydraulic components.
-            const hk1 = !!cfg.heatingCircuitType1 && cfg.heatingCircuitType1 !== 'off';
-            const hk2 = !!cfg.heatingCircuitType2 && cfg.heatingCircuitType2 !== 'off';
-            const hk3 = !!cfg.heatingCircuitType3 && cfg.heatingCircuitType3 !== 'off';
+            const hk1 = previewAll || (!!cfg.heatingCircuitType1 && cfg.heatingCircuitType1 !== 'off');
+            const hk2 = previewAll || (!!cfg.heatingCircuitType2 && cfg.heatingCircuitType2 !== 'off');
+            const hk3 = previewAll || (!!cfg.heatingCircuitType3 && cfg.heatingCircuitType3 !== 'off');
             const heating = hk1 || hk2 || hk3;
             show('#gHeating', heating);
             show('#gHK1', hk1);
@@ -6992,9 +7000,9 @@ window.SymconHeatPump = {
             show('#gHK3', hk3);
 
             [
-                [1, cfg.heatingCircuitType1],
-                [2, cfg.heatingCircuitType2],
-                [3, cfg.heatingCircuitType3]
+                [1, previewAll && (!cfg.heatingCircuitType1 || cfg.heatingCircuitType1 === 'off') ? 'underfloor' : cfg.heatingCircuitType1],
+                [2, previewAll && (!cfg.heatingCircuitType2 || cfg.heatingCircuitType2 === 'off') ? 'radiator' : cfg.heatingCircuitType2],
+                [3, previewAll && (!cfg.heatingCircuitType3 || cfg.heatingCircuitType3 === 'off') ? 'underfloor' : cfg.heatingCircuitType3]
             ].forEach(([n, type]) => {
                 show('#gHKFloor' + n, type === 'underfloor');
                 show('#gHKRadiator' + n, type === 'radiator');
@@ -7048,10 +7056,10 @@ window.SymconHeatPump = {
             });
             }
 
-            show('#gBuffer', heating && !!cfg.tankHP);
-            show('#gNoBuffer', heating && !cfg.tankHP);
-            show('#gDHW', !!cfg.tankWW);
-            show('#gSolar', !!cfg.tankWW && !!cfg.thermalSolarAvailable);
+            show('#gBuffer', heating && (previewAll || !!cfg.tankHP));
+            show('#gNoBuffer', heating && !previewAll && !cfg.tankHP);
+            show('#gDHW', previewAll || !!cfg.tankWW);
+            show('#gSolar', previewAll || (!!cfg.tankWW && !!cfg.thermalSolarAvailable));
 
             // Live values.
             setText('#textOutdoorTemperatureValue', formatted(cfg.outdoorTemperature));
