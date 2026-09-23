@@ -7358,7 +7358,6 @@ window.SymconHeatPump = {
             // weil applyModernDashboard() vorher mit true zurückkehrt.
             applyHeaterRodInfoField(card);
             applyThreeHeaterRods(card);
-            applyHeaterRodStatusIcon(card);
 
             return true;
         };
@@ -7753,7 +7752,6 @@ window.SymconHeatPump = {
                             applyWWValvePipeGeometry(this);
                             applyThreeHeaterRods(this);
                             applyHeaterRodInfoField(this);
-                            applyHeaterRodStatusIcon(this);
                             disableOriginalSettingsLink(this);
                             applyControlIcons(this);
                             applySetpointIcons(this);
