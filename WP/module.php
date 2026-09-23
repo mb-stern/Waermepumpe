@@ -7353,6 +7353,13 @@ window.SymconHeatPump = {
                 el.setAttribute('y', String(y));
             });
 
+            // Heizstab-Anzeige im modernen Renderer ebenfalls aktualisieren.
+            // Bisher wurde diese Funktion nur im klassischen Renderer aufgerufen,
+            // weil applyModernDashboard() vorher mit true zurückkehrt.
+            applyHeaterRodInfoField(card);
+            applyThreeHeaterRods(card);
+            applyHeaterRodStatusIcon(card);
+
             return true;
         };
 
