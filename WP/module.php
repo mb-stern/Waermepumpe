@@ -135,7 +135,6 @@ class Waermepumpe extends IPSModuleStrict
         parent::Create();
 
         // Allgemein
-        $this->RegisterPropertyString('HeatingPumpType', 'A2W');
 
         // Zentrale Status- und Steuerungszuordnung
         $this->RegisterPropertyInteger('OperatingStatusVariable', 0);
@@ -191,7 +190,6 @@ class Waermepumpe extends IPSModuleStrict
 
         // Warmwasserspeicher
         $this->RegisterPropertyBoolean('TankWW', true);
-        $this->RegisterPropertyBoolean('LayeredChargeStorage', false);
         $this->RegisterPropertyInteger('TankTempWWUp', 0);
         $this->RegisterPropertyInteger('TankTempWWMiddle', 0);
         $this->RegisterPropertyInteger('TankTempWWDown', 0);
@@ -402,7 +400,6 @@ class Waermepumpe extends IPSModuleStrict
         $elements = [
             [
                 'type'    => 'Select',
-                'name'    => 'HeatingPumpType',
                 'caption' => 'Wärmepumpentyp',
                 'options' => [
                     ['caption' => 'Luft / Wasser', 'value' => 'A2W'],
@@ -487,7 +484,6 @@ class Waermepumpe extends IPSModuleStrict
                         'items' => [
                             ['type' => 'CheckBox', 'name' => 'TankHP', 'caption' => 'Pufferspeicher'],
                             ['type' => 'CheckBox', 'name' => 'TankWW', 'caption' => 'Warmwasserspeicher'],
-                            ['type' => 'CheckBox', 'name' => 'LayeredChargeStorage', 'caption' => 'Schichtspeicher']
                         ]
                     ],
                     $this->VariableRow('Puffer oben', 'TankTempHPUp', 'Warmwasser oben', 'TankTempWWUp'),
@@ -1231,7 +1227,6 @@ HTML;
     {
         return [
             'title'                      => '',
-            'heatingPumpType'            => $this->ReadPropertyString('HeatingPumpType'),
 
             'temperatureGroundWaterIn'   => $this->DataKey('TemperatureGroundWaterIn', 'temperatureGroundWaterIn'),
             'temperatureGroundWaterOut'  => $this->DataKey('TemperatureGroundWaterOut', 'temperatureGroundWaterOut'),
@@ -1266,7 +1261,6 @@ HTML;
             'tankTempHPDown'             => $this->DataKey('TankTempHPDown', 'tankTempHPDown'),
 
             'tankWW'                     => $this->ReadPropertyBoolean('TankWW'),
-            'layeredChargeStorage'       => $this->ReadPropertyBoolean('LayeredChargeStorage'),
             'tankTempWWUp'               => $this->DataKey('TankTempWWUp', 'tankTempWWUp'),
             'tankTempWWMiddle'           => $this->DataKey('TankTempWWMiddle', 'tankTempWWMiddle'),
             'tankTempWWDown'             => $this->DataKey('TankTempWWDown', 'tankTempWWDown'),
@@ -1929,7 +1923,6 @@ class HeatPumpCard extends HTMLElement {
 
     const c = this.config || {};
 
-    this.changeHeatPumpRunning(c.heatingPumpType, c.hpRunning);
     this.setText('#textG2WWaterTempIn', this.format(c.temperatureGroundWaterIn));
     this.setText('#textG2WWaterTempOut', this.format(c.temperatureGroundWaterOut));
 
@@ -2117,9 +2110,6 @@ class HeatPumpCard extends HTMLElement {
         return;
       }
       this.querySelector("ha-card").setAttribute("header", config.title);
-      this.content.querySelector('#gHPFan').style.display = (!config.heatingPumpType || config.heatingPumpType === 'A2W' ? 'inline' : 'none');
-      this.content.querySelector('#gHPW2W').style.display = (config.heatingPumpType === 'W2W' ? 'inline' : 'none');
-      this.content.querySelector('#gHPG2W').style.display = (config.heatingPumpType === 'G2W' ? 'inline' : 'none');
       this.content.querySelector("#gCirculatingPump").style.display = config.circulatingPumpRunning ? 'inline' : 'none';
       this.content.querySelector('#gCirculatingPumpBladeWheel').classList.remove("rotate");
       this.content.querySelector("#gStorageChargingPump").style.display = config.storageChargingPumpRunning ? 'inline' : 'none';
@@ -2174,9 +2164,6 @@ class HeatPumpCard extends HTMLElement {
         this.content.querySelector("#pathPipeToBuffer").style.display = noHeating ? 'none' : 'inline';
         this.content.querySelector("#pathPipeFromBuffer").style.display = noHeating ? 'none' : 'inline';
         this.content.querySelector("#gPipe").style.display = 'inline';
-        this.content.querySelector("#gPipeBuffer").style.display = config.layeredChargeStorage ? 'none' : 'inline';
-        this.content.querySelector("#gPipeLayeredChargeStorage").style.display = config.layeredChargeStorage ? 'inline' : 'none';
-        this.content.querySelector("#gWWHeatingValve").style.display = config.layeredChargeStorage ? 'none' : 'inline';
         this.content.querySelector("#gHP").removeAttribute("transform");
         this.content.querySelector("#gSettings").removeAttribute("transform");
       }
@@ -7615,7 +7602,6 @@ window.SymconHeatPump = {
         };
 
         const applyFanAnimation = (card) => {
-            if (!card || !card.content || currentConfig.heatingPumpType !== 'A2W') {
                 return;
             }
 
