@@ -1367,24 +1367,11 @@ HTML;
         ];
 
         foreach ($map as $key => $property) {
-            $binary = in_array($property, self::BINARY_PROPERTIES, true);
-
-            // Heizstäbe dürfen Boolean ODER Integer/Float sein.
-            // Bei Boolean wird true/false sauber normalisiert; bei numerischen
-            // Variablen bleibt der Wert für den konfigurierten Schwellwert erhalten.
-            if (in_array($property, ['HeaterRod1', 'HeaterRod2', 'HeaterRod3'], true)) {
-                $variableId = $this->ReadPropertyInteger($property);
-                if ($variableId > 0 && IPS_VariableExists($variableId)) {
-                    $variable = IPS_GetVariable($variableId);
-                    $binary = ((int) $variable['VariableType'] === 0);
-                }
-            }
-
             $this->AddVariableData(
                 $data,
                 $key,
                 $property,
-                $binary
+                in_array($property, self::BINARY_PROPERTIES, true)
             );
         }
 
@@ -5844,32 +5831,6 @@ window.SymconHeatPump = {
 
 
 
-        const heaterRodIsActive = (entity, threshold) => {
-            if (!entity || !currentData || !currentData[entity]) {
-                return false;
-            }
-
-            const item = currentData[entity];
-            const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : 1;
-
-            // Vom PHP als echte Boolean-Variable erkannt.
-            if (item.binary === true) {
-                return item.value === true
-                    || item.value === 1
-                    || String(item.value ?? '').trim().toLowerCase() === 'true';
-            }
-
-            // Integer/Float: konfigurierter Schwellwert.
-            const numeric = Number(item.value);
-            if (Number.isFinite(numeric)) {
-                return numeric >= limit;
-            }
-
-            // Zusätzlicher robuster Fallback für textuelle Zustände.
-            return ['1','true','on','yes','ja','ein','active','aktiv']
-                .includes(String(item.value ?? '').trim().toLowerCase());
-        };
-
         const applyHeaterRodInfoField = (card) => {
             if (!card || !card.content) return;
             const svg = card.content;
@@ -5884,7 +5845,20 @@ window.SymconHeatPump = {
             for (let i = 0; i < count; i++) {
                 const entity = entities[i];
                 if (!entity || !currentData || !currentData[entity]) continue;
-                if (heaterRodIsActive(entity, thresholds[i])) active++;
+                const value = currentData[entity].value;
+                let on = false;
+                if (typeof value === 'boolean') {
+                    on = value;
+                } else {
+                    const text = String(value ?? '').trim().toLowerCase();
+                    if (['true','on','yes','ja','ein','active','aktiv'].includes(text)) {
+                        on = true;
+                    } else if (!['false','off','no','nein','aus','inactive','inaktiv',''].includes(text)) {
+                        const numeric = Number(value);
+                        on = Number.isFinite(numeric) && numeric >= thresholds[i];
+                    }
+                }
+                if (on) active++;
             }
             const text = svg.querySelector('#textHeaterRodStatus');
             if (text) text.textContent = active > 0 ? String(active) : 'Aus';
@@ -6041,6 +6015,34 @@ window.SymconHeatPump = {
                 activeColor: rodColors[index]
             }));
 
+            const isActive = (entity, threshold) => {
+                if (!entity || !currentData || !currentData[entity]) {
+                    return false;
+                }
+
+                const raw = currentData[entity].value;
+                const value = String(raw ?? '').trim().toLowerCase();
+                const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : 1;
+
+                // Echte Boolean-Variable: true = aktiv, false = aus.
+                // Der Integer-Schwellwert gilt bei Boolean bewusst nicht.
+                if (typeof raw === 'boolean') {
+                    return raw;
+                }
+
+                if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
+                    return true;
+                }
+
+                if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
+                    return false;
+                }
+
+                // Integer/Float: konfigurierten Schwellwert verwenden.
+                const numeric = Number(raw);
+                return Number.isFinite(numeric) && numeric >= limit;
+            };
+
             rods.forEach((rodInfo, index) => {
                 const exists = index < heaterRodCount;
 
@@ -6053,7 +6055,7 @@ window.SymconHeatPump = {
                     return;
                 }
 
-                const active = heaterRodIsActive(rodInfo.entity, rodInfo.threshold);
+                const active = isActive(rodInfo.entity, rodInfo.threshold);
 
                 rodInfo.element.style.setProperty('display', 'block', 'important');
                 rodInfo.element.style.setProperty('visibility', 'visible', 'important');
