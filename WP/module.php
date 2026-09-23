@@ -6911,6 +6911,8 @@ window.SymconHeatPump = {
             setText('#textControlCooling', optionName(controls.cooling));
 
             // Betrieb/Party/Eco sind bewusst keine Elemente der oberen Bedienleiste.
+            // Die spätere Event-Bindung erwartet diese Liste weiterhin.
+            const binaryDefs = [];
 
             // Mode buttons are visible only if a real control exists.
             [
