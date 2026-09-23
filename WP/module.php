@@ -1596,7 +1596,7 @@ HTML;
 
             'singleCircuitHotWaterTemperatureSwitch' => $this->ReadPropertyBoolean('SingleCircuitHotWaterTemperatureSwitch'),
             'heatingCircuitType1'        => $this->ReadPropertyString('HeatingCircuitType1'),
-            'heatingCircuitName'              => $this->ReadPropertyString('HeatingCircuitName1'),
+            'heatingCircuitName1'             => $this->ReadPropertyString('HeatingCircuitName1'),
             'heatingCircuitPumpRunning'  => $this->DataKey('HeatingCircuitPumpRunning1', 'heatingCircuitPumpRunning'),
             'supplyTemperatureHeating'   => $this->DataKey('SupplyTemperatureHeating1', 'supplyTemperatureHeating'),
             'refluxTemperatureHeating'   => $this->DataKey('RefluxTemperatureHeating1', 'refluxTemperatureHeating'),
@@ -2385,7 +2385,7 @@ class HeatPumpCard extends HTMLElement {
       }
     }
 
-    this.setText('#textHeatingCircuitName1', c.heatingCircuitName || 'HK1');
+    this.setText('#textHeatingCircuitName1', c.heatingCircuitName1 || 'HK1');
     this.setText('#textHeatingCircuitName2', c.heatingCircuitName2 || 'HK2');
     this.setText('#textHeatingCircuitName3', c.heatingCircuitName3 || 'HK3');
 
@@ -4543,7 +4543,7 @@ window.SymconHeatPump = {
             const hotWaterActive =
                 valveConfigured && stateIsOn(currentConfig.wwHeatingValve);
 
-            setText('#textHeatingCircuitName1', currentConfig.heatingCircuitName || 'HK1');
+            setText('#textHeatingCircuitName1', currentConfig.heatingCircuitName1 || 'HK1');
             setText('#textHeatingCircuitName2', currentConfig.heatingCircuitName2 || 'HK2');
             setText('#textHeatingCircuitName3', currentConfig.heatingCircuitName3 || 'HK3');
 
