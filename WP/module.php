@@ -8894,17 +8894,17 @@ window.SymconHeatPump = {
 
             if (heatingCircuitCount === 1) {
                 if (hk1Supply) {
-                    hk1Supply.setAttribute('d', 'M1080 245H1195');
+                    hk1Supply.setAttribute('d', 'M1165 245H1260');
                 }
                 if (hk1Return) {
-                    hk1Return.setAttribute('d', 'M1195 295H1100V440');
+                    hk1Return.setAttribute('d', 'M1260 295H1165V440');
                 }
             } else {
                 if (hk1Supply) {
-                    hk1Supply.setAttribute('d', 'M1124 245H1195');
+                    hk1Supply.setAttribute('d', 'M1189 245H1260');
                 }
                 if (hk1Return) {
-                    hk1Return.setAttribute('d', 'M1195 295H1124');
+                    hk1Return.setAttribute('d', 'M1260 295H1189');
                 }
             }
 
