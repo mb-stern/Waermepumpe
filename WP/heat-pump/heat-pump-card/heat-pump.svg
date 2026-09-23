@@ -62,16 +62,16 @@ text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{fon
    <stop offset="0" stop-color="#dfe5e8" /><stop offset=".5" stop-color="#aeb8bd" /><stop offset="1" stop-color="#eef2f4" />
   </linearGradient>
  </defs>
- <path d="M55 575L70 565H218L230 575V835H55Z" fill="var(--wp-button)" stroke="var(--wp-icon)" stroke-width="2" />
- <path d="M55 575L70 565H218L230 575H55Z" fill="var(--wp-icon)" opacity=".12" />
+ <path d="M55 575L70 565H218L230 575V835H55Z" fill="#d7dde0" stroke="var(--wp-border2)" stroke-width="2" />
+ <path d="M55 575L70 565H218L230 575H55Z" fill="#f2f4f5" opacity=".72" />
  <line x1="55" y1="775" x2="230" y2="775" stroke="var(--wp-border2)" />
  <line x1="172" y1="775" x2="172" y2="835" stroke="var(--wp-border2)" />
  <rect x="68" y="792" width="25" height="30" rx="2" fill="var(--wp-panel1)" stroke="var(--wp-border2)" />
- <g stroke="var(--wp-icon)" stroke-width="1.5">
+ <g stroke="#45545b" stroke-width="1.5">
   <line x1="73" y1="799" x2="88" y2="799" /><line x1="73" y1="805" x2="88" y2="805" />
   <line x1="73" y1="811" x2="88" y2="811" /><line x1="73" y1="817" x2="88" y2="817" />
  </g>
- <text x="190" y="810" font-size="16" font-weight="700" fill="var(--wp-icon)">WP</text>
+ <text x="190" y="810" font-size="16" font-weight="700" fill="#263238">WP</text>
 </g>
 <g id="gHPFan" transform="translate(145 690)"><circle r="83" fill="#090d10" stroke="#89959e" stroke-width="3" /><circle r="69" fill="#171e23" stroke="#56626b" /><g id="pathHPFan" fill="#aeb8bf">
    <circle cx="0" cy="0" r="12" />
