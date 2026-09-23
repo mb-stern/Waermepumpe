@@ -553,6 +553,10 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 
 ## Versionen
 
+### Version 2.0 (23.09.2026)
+
+- Neue grafische Oberfläche.
+
 ### Version 1.3 (03.09.2026)
 
 - Geänderte Farben in der Konfiguration werden nun nicht mehr ohne Rückfrage gespeichert.

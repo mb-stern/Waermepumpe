@@ -8987,8 +8987,10 @@ window.SymconHeatPump = {
                 [2, cfg.supplyTemperatureHeating2, cfg.refluxTemperatureHeating2, cfg.heatingCircuitPumpRunning2],
                 [3, cfg.supplyTemperatureHeating3, cfg.refluxTemperatureHeating3, cfg.heatingCircuitPumpRunning3]
             ].forEach(([n, supply, reflux, pump]) => {
-                setText('#textSupplyTemperatureHeating' + n, formatted(supply));
-                setText('#textRefluxTemperatureHeating' + n, formatted(reflux));
+                const supplySelector = n === 1 ? '#textSupplyTemperatureHeating' : '#textSupplyTemperatureHeating' + n;
+                const refluxSelector = n === 1 ? '#textRefluxTemperatureHeating' : '#textRefluxTemperatureHeating' + n;
+                setText(supplySelector, formatted(supply));
+                setText(refluxSelector, formatted(reflux));
                 const pumpValue = formatted(pump);
                 if (pumpValue) setText('#textHeatingPump' + n, pumpValue);
             });
