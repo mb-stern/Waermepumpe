@@ -1,125 +1,9 @@
 <?php
 
-/*
- * ## Third-Party Components
- *
- * Komponente | Lizenz | Verwendung |
- * ------------|---------|------------|
- * lovelace-heat-pump-card (Manfred Tremmel) | MIT | Basis; modernes V24-SVG über Symcon-Adapter |
- */
-
 declare(strict_types=1);
 
 class Waermepumpe extends IPSModuleStrict
 {
-
-    private const BINARY_PROPERTIES = [
-        'HeatingPumpStatusOnOff',
-        'HeatingPumpHotWaterMode',
-        'HeatingPumpHeatingMode',
-        'HeatingPumpCoolingMode',
-        'Error',
-        'DefrostMode',
-        'AdditionalHeating',
-        'HpRunning',
-        'CompressorRunning',
-        'CirculatingPumpRunning',
-        'StorageChargingPumpRunning',
-        'HeatingCircuitPumpRunning1',
-        'HeatingCircuitPumpRunning2',
-        'HeatingCircuitPumpRunning3',
-        'WWHeatingValve',
-        'HeaterRodWW',
-        'HeaterRodHP',
-        'HeaterRodLevel1',
-        'HeaterRodLevel2',
-        'ThermalSolarPump'
-    ];
-
-    private const VARIABLE_PROPERTIES = [
-        'HeatingPumpStatusOnOff',
-        'HeatingPumpHotWaterMode',
-        'HeatingPumpHeatingMode',
-        'HeatingPumpCoolingMode',
-        'Error',
-        'DefrostMode',
-        'AdditionalHeating',
-
-        'OutdoorTemperature',
-        'AmbientTemperatureNormal',
-        'AmbientTemperatureActual',
-        'SupplyTemperature',
-
-        'HpRunning',
-        'CompressorRunning',
-        'CirculatingPumpRunning',
-        'StorageChargingPumpRunning',
-
-        'TankTempHPUp',
-        'TankTempHPMiddle',
-        'TankTempHPDown',
-
-        'TankTempWWUp',
-        'TankTempWWMiddle',
-        'TankTempWWDown',
-
-        'HeatingCircuitPumpRunning1',
-        'SupplyTemperatureHeating1',
-        'RefluxTemperatureHeating1',
-
-        'HeatingCircuitPumpRunning2',
-        'SupplyTemperatureHeating2',
-        'RefluxTemperatureHeating2',
-
-        'HeatingCircuitPumpRunning3',
-        'SupplyTemperatureHeating3',
-        'RefluxTemperatureHeating3',
-
-
-
-        'EvaporatorPressure',
-        'EvaporatorTemperature',
-        'CondenserPressure',
-        'CondenserTemperature',
-        'ExpansionValveOpening',
-        'CompressorValue',
-        'HeatingPumpPower',
-
-        'WWHeatingValve',
-        'HeaterRodWW',
-        'HeaterRodHP',
-        'HeaterRodLevel1',
-        'HeaterRodLevel2',
-        'HeaterRod1',
-        'HeaterRod2',
-        'HeaterRod3',
-
-        'ThermalSolarPump',
-        'ThermalSolarPumpSpeed',
-        'ThermalSolarPanelTemp',
-        'ThermalSolarFluxTemp',
-        'ThermalSolarReturnTemp',
-
-        'AdditionalValue000',
-        'AdditionalValue001',
-        'AdditionalValue002',
-        'AdditionalValue003',
-        'AdditionalValue004',
-        'AdditionalValue005',
-        'AdditionalValue006',
-        'AdditionalValue007',
-        'AdditionalValue008',
-        'AdditionalValue009',
-
-        'OperatingStatusVariable',
-        'HeatingControlVariable',
-        'HotWaterControlVariable',
-        'CoolingControlVariable',
-        'WarmWaterSetpointVariable',
-        'HeatingTemperatureCorrectionVariable',
-        'FanSpeed'
-    ];
-
     public function Create(): void
     {
         parent::Create();
@@ -883,17 +767,33 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         $ids = [];
-
-        foreach (self::VARIABLE_PROPERTIES as $property) {
-            $variableId = $this->ReadPropertyInteger($property);
-
-            if ($variableId > 0 && IPS_VariableExists($variableId)) {
-                $this->RegisterMessage($variableId, VM_UPDATE);
-                $ids[] = $variableId;
+        $collectVariableIds = static function (mixed $value) use (&$collectVariableIds, &$ids): void {
+            if (!is_array($value)) {
+                return;
             }
-        }
+
+            if (isset($value['variableId'])) {
+                $variableId = (int) $value['variableId'];
+                if ($variableId > 0 && IPS_VariableExists($variableId)) {
+                    $ids[] = $variableId;
+                }
+            }
+
+            foreach ($value as $child) {
+                if (is_array($child)) {
+                    $collectVariableIds($child);
+                }
+            }
+        };
+
+        $collectVariableIds($this->BuildVisualizationData());
+        $collectVariableIds($this->BuildControlData());
 
         $ids = array_values(array_unique($ids));
+        foreach ($ids as $variableId) {
+            $this->RegisterMessage($variableId, VM_UPDATE);
+        }
+
         $this->SetBuffer('RegisteredVariables', json_encode($ids, JSON_THROW_ON_ERROR));
     }
 
@@ -1310,81 +1210,76 @@ HTML;
         $data = [];
 
         $map = [
-            'operatingStatus'             => 'OperatingStatusVariable',
-            'heatingPumpStatusOnOff'     => 'HeatingPumpStatusOnOff',
-            'heatingPumpHotWaterMode'    => 'HeatingPumpHotWaterMode',
-            'heatingPumpHeatingMode'     => 'HeatingPumpHeatingMode',
-            'heatingPumpCoolingMode'     => 'HeatingPumpCoolingMode',
-            'error'                      => 'Error',
-            'defrostMode'                => 'DefrostMode',
-            'additionalHeating'          => 'AdditionalHeating',
-            'outdoorTemperature'         => 'OutdoorTemperature',
-            'ambientTemperatureNormal'   => 'AmbientTemperatureNormal',
-            'supplyTemperature'          => 'SupplyTemperature',
-            'hpRunning'                  => 'HpRunning',
-            'fanSpeed'                   => 'FanSpeed',
-            'compressorRunning'          => 'CompressorRunning',
-            'heatingPumpPower'          => 'HeatingPumpPower',
-            'circulatingPumpRunning'     => 'CirculatingPumpRunning',
-            'storageChargingPumpRunning' => 'StorageChargingPumpRunning',
-            'tankTempHPUp'               => 'TankTempHPUp',
-            'tankTempHPMiddle'           => 'TankTempHPMiddle',
-            'tankTempHPDown'             => 'TankTempHPDown',
-            'tankTempWWUp'               => 'TankTempWWUp',
-            'tankTempWWMiddle'           => 'TankTempWWMiddle',
-            'tankTempWWDown'             => 'TankTempWWDown',
-            'heatingCircuitPumpRunning'  => 'HeatingCircuitPumpRunning1',
-            'heatingCircuitPumpValue'    => 'HeatingCircuitPumpValue1',
-            'supplyTemperatureHeating'   => 'SupplyTemperatureHeating1',
-            'refluxTemperatureHeating'   => 'RefluxTemperatureHeating1',
-            'heatingCircuitPumpRunning2' => 'HeatingCircuitPumpRunning2',
-            'heatingCircuitPumpValue2' => 'HeatingCircuitPumpValue2',
-            'supplyTemperatureHeating2'  => 'SupplyTemperatureHeating2',
-            'refluxTemperatureHeating2'  => 'RefluxTemperatureHeating2',
-            'heatingCircuitPumpRunning3' => 'HeatingCircuitPumpRunning3',
-            'heatingCircuitPumpValue3' => 'HeatingCircuitPumpValue3',
-            'supplyTemperatureHeating3'  => 'SupplyTemperatureHeating3',
-            'refluxTemperatureHeating3'  => 'RefluxTemperatureHeating3',
-            'evaporatorPressure'         => 'EvaporatorPressure',
-            'evaporatorTemperature'      => 'EvaporatorTemperature',
-            'condenserPressure'          => 'CondenserPressure',
-            'condenserTemperature'       => 'CondenserTemperature',
-            'expansionValveOpening'      => 'ExpansionValveOpening',
-            'compressorValue'            => 'CompressorValue',
-            'heatingPumpPower'           => 'HeatingPumpPower',
-            'wwHeatingValve'             => 'WWHeatingValve',
-            'heaterRodWW'                => 'HeaterRodWW',
-            'heaterRodHP'                => 'HeaterRodHP',
-            'heaterRodLevel1'            => 'HeaterRodLevel1',
-            'heaterRodLevel2'            => 'HeaterRodLevel2',
-            'heaterRod1'                 => 'HeaterRod1',
-            'heaterRod2'                 => 'HeaterRod2',
-            'heaterRod3'                 => 'HeaterRod3',
-            'thermalSolarPump'           => 'ThermalSolarPump',
-            'thermalSolarPumpSpeed'      => 'ThermalSolarPumpSpeed',
-            'thermalSolarPanelTemp'      => 'ThermalSolarPanelTemp',
-            'thermalSolarFluxTemp'       => 'ThermalSolarFluxTemp',
-            'thermalSolarReturnTemp'     => 'ThermalSolarReturnTemp',
+            'operatingStatus' => ['OperatingStatusVariable', false],
+            'heatingPumpStatusOnOff' => ['HeatingPumpStatusOnOff', true],
+            'heatingPumpHotWaterMode' => ['HeatingPumpHotWaterMode', true],
+            'heatingPumpHeatingMode' => ['HeatingPumpHeatingMode', true],
+            'heatingPumpCoolingMode' => ['HeatingPumpCoolingMode', true],
+            'error' => ['Error', true],
+            'defrostMode' => ['DefrostMode', true],
+            'additionalHeating' => ['AdditionalHeating', true],
+            'outdoorTemperature' => ['OutdoorTemperature', false],
+            'ambientTemperatureNormal' => ['AmbientTemperatureNormal', false],
+            'supplyTemperature' => ['SupplyTemperature', false],
+            'hpRunning' => ['HpRunning', true],
+            'fanSpeed' => ['FanSpeed', false],
+            'compressorRunning' => ['CompressorRunning', true],
+            'heatingPumpPower' => ['HeatingPumpPower', false],
+            'circulatingPumpRunning' => ['CirculatingPumpRunning', true],
+            'storageChargingPumpRunning' => ['StorageChargingPumpRunning', true],
+            'tankTempHPUp' => ['TankTempHPUp', false],
+            'tankTempHPMiddle' => ['TankTempHPMiddle', false],
+            'tankTempHPDown' => ['TankTempHPDown', false],
+            'tankTempWWUp' => ['TankTempWWUp', false],
+            'tankTempWWMiddle' => ['TankTempWWMiddle', false],
+            'tankTempWWDown' => ['TankTempWWDown', false],
+            'heatingCircuitPumpRunning' => ['HeatingCircuitPumpRunning1', true],
+            'heatingCircuitPumpValue' => ['HeatingCircuitPumpValue1', false],
+            'supplyTemperatureHeating' => ['SupplyTemperatureHeating1', false],
+            'refluxTemperatureHeating' => ['RefluxTemperatureHeating1', false],
+            'heatingCircuitPumpRunning2' => ['HeatingCircuitPumpRunning2', true],
+            'heatingCircuitPumpValue2' => ['HeatingCircuitPumpValue2', false],
+            'supplyTemperatureHeating2' => ['SupplyTemperatureHeating2', false],
+            'refluxTemperatureHeating2' => ['RefluxTemperatureHeating2', false],
+            'heatingCircuitPumpRunning3' => ['HeatingCircuitPumpRunning3', true],
+            'heatingCircuitPumpValue3' => ['HeatingCircuitPumpValue3', false],
+            'supplyTemperatureHeating3' => ['SupplyTemperatureHeating3', false],
+            'refluxTemperatureHeating3' => ['RefluxTemperatureHeating3', false],
+            'evaporatorPressure' => ['EvaporatorPressure', false],
+            'evaporatorTemperature' => ['EvaporatorTemperature', false],
+            'condenserPressure' => ['CondenserPressure', false],
+            'condenserTemperature' => ['CondenserTemperature', false],
+            'expansionValveOpening' => ['ExpansionValveOpening', false],
+            'compressorValue' => ['CompressorValue', false],
+            'heatingPumpPower' => ['HeatingPumpPower', false],
+            'wwHeatingValve' => ['WWHeatingValve', true],
+            'heaterRodWW' => ['HeaterRodWW', true],
+            'heaterRodHP' => ['HeaterRodHP', true],
+            'heaterRodLevel1' => ['HeaterRodLevel1', true],
+            'heaterRodLevel2' => ['HeaterRodLevel2', true],
+            'heaterRod1' => ['HeaterRod1', false],
+            'heaterRod2' => ['HeaterRod2', false],
+            'heaterRod3' => ['HeaterRod3', false],
+            'thermalSolarPump' => ['ThermalSolarPump', true],
+            'thermalSolarPumpSpeed' => ['ThermalSolarPumpSpeed', false],
+            'thermalSolarPanelTemp' => ['ThermalSolarPanelTemp', false],
+            'thermalSolarFluxTemp' => ['ThermalSolarFluxTemp', false],
+            'thermalSolarReturnTemp' => ['ThermalSolarReturnTemp', false],
 
-            'additionalValue000'          => 'AdditionalValue000',
-            'additionalValue001'          => 'AdditionalValue001',
-            'additionalValue002'          => 'AdditionalValue002',
-            'additionalValue003'          => 'AdditionalValue003',
-            'additionalValue004'          => 'AdditionalValue004',
-            'additionalValue005'          => 'AdditionalValue005',
-            'additionalValue006'          => 'AdditionalValue006',
-            'additionalValue007'          => 'AdditionalValue007',
-            'additionalValue008'          => 'AdditionalValue008',
-            'additionalValue009'          => 'AdditionalValue009',
+            'additionalValue000' => ['AdditionalValue000', false],
+            'additionalValue001' => ['AdditionalValue001', false],
+            'additionalValue002' => ['AdditionalValue002', false],
+            'additionalValue003' => ['AdditionalValue003', false],
+            'additionalValue004' => ['AdditionalValue004', false],
+            'additionalValue005' => ['AdditionalValue005', false],
+            'additionalValue006' => ['AdditionalValue006', false],
+            'additionalValue007' => ['AdditionalValue007', false],
+            'additionalValue008' => ['AdditionalValue008', false],
+            'additionalValue009' => ['AdditionalValue009', false],
         ];
 
-        foreach ($map as $key => $property) {
-            $this->AddVariableData(
-                $data,
-                $key,
-                $property,
-                in_array($property, self::BINARY_PROPERTIES, true)
-            );
+        foreach ($map as $key => [$property, $binary]) {
+            $this->AddVariableData($data, $key, $property, $binary);
         }
 
         if (!isset($data['ambientTemperatureNormal'])) {
@@ -1436,6 +1331,7 @@ HTML;
         $value = GetValue($variableId);
 
         $data[$key] = [
+            'variableId'=> $variableId,
             'value'     => $binary ? $this->NormalizeBinaryValue($value) : $value,
             'formatted' => $binary ? '' : GetValueFormatted($variableId),
             'unit'      => $binary ? '' : $this->GetVariableUnit($variableId),
