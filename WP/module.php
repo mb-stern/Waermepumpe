@@ -35,9 +35,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('HeatingPumpCoolingMode', 0);
         // Heizprogramm-Status, z. B. Luxtronik opStateHeating / Calculation 125.
         // Die Werte können wie beim zentralen Betriebsstatus frei definiert werden.
-        $this->RegisterPropertyInteger('Error', 0);
         $this->RegisterPropertyInteger('DefrostMode', 0);
-        $this->RegisterPropertyInteger('AdditionalHeating', 0);
 
         $this->RegisterPropertyInteger('OutdoorTemperature', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureNormal', 0);
@@ -319,12 +317,6 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Hochdruck', 'name' => 'CondenserPressure'],
                         ['caption' => 'Kondensationstemperatur', 'name' => 'CondenserTemperature'],
                         ['caption' => 'Expansionsventil Öffnung', 'name' => 'ExpansionValveOpening']
-                    ]),
-
-                    ['type' => 'Label', 'caption' => 'Weitere Zustände'],
-                    $this->VariableGrid([
-                        ['caption' => 'Zusatzheizung aktiv', 'name' => 'AdditionalHeating'],
-                        ['caption' => 'Fehler aktiv', 'name' => 'Error']
                     ])
                 ]
             ],
@@ -1105,9 +1097,7 @@ HTML;
             'heatingPumpHotWaterMode'    => $this->HasOperatingStatus() ? 'heatingPumpHotWaterMode' : $this->DataKey('HeatingPumpHotWaterMode', 'heatingPumpHotWaterMode'),
             'heatingPumpHeatingMode'     => $this->HasOperatingStatus() ? 'heatingPumpHeatingMode' : $this->DataKey('HeatingPumpHeatingMode', 'heatingPumpHeatingMode'),
             'heatingPumpCoolingMode'     => $this->HasOperatingStatus() ? 'heatingPumpCoolingMode' : $this->DataKey('HeatingPumpCoolingMode', 'heatingPumpCoolingMode'),
-            'error'                      => $this->DataKey('Error', 'error'),
             'defrostMode'                => $this->HasOperatingStatus() ? 'defrostMode' : $this->DataKey('DefrostMode', 'defrostMode'),
-            'additionalHeating'          => $this->DataKey('AdditionalHeating', 'additionalHeating'),
 
             'outdoorTemperature'         => $this->DataKey('OutdoorTemperature', 'outdoorTemperature'),
             'ambientTemperatureNormal'   => $this->DataKeyWithFallback('AmbientTemperatureNormal', 'AmbientTemperatureActual', 'ambientTemperatureNormal'),
@@ -1215,9 +1205,7 @@ HTML;
             'heatingPumpHotWaterMode' => ['HeatingPumpHotWaterMode', true],
             'heatingPumpHeatingMode' => ['HeatingPumpHeatingMode', true],
             'heatingPumpCoolingMode' => ['HeatingPumpCoolingMode', true],
-            'error' => ['Error', true],
             'defrostMode' => ['DefrostMode', true],
-            'additionalHeating' => ['AdditionalHeating', true],
             'outdoorTemperature' => ['OutdoorTemperature', false],
             'ambientTemperatureNormal' => ['AmbientTemperatureNormal', false],
             'supplyTemperature' => ['SupplyTemperature', false],
@@ -1805,7 +1793,7 @@ class HeatPumpCard extends HTMLElement {
     show('#gTimeSymbolNight', false);
     show('#gTimeSymbolDay', false);
     show('#gWarning', false);
-    show('#gError', this.binary(c.error));
+    show('#gError', false);
     show('#gDefrost', false);
     show('#gAdditionalHeating', false);
 
