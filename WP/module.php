@@ -9071,8 +9071,8 @@ window.SymconHeatPump = {
                     }
                 }
 
-                fanRotor.style.setProperty('transform-box', 'fill-box', 'important');
-                fanRotor.style.setProperty('transform-origin', 'center', 'important');
+                fanRotor.style.setProperty('transform-box', 'view-box', 'important');
+                fanRotor.style.setProperty('transform-origin', '0px 0px', 'important');
                 fanRotor.style.setProperty(
                     'animation',
                     duration > 0 ? 'symcon-modern-rotate ' + duration.toFixed(2) + 's linear infinite' : 'none',
@@ -9102,8 +9102,8 @@ window.SymconHeatPump = {
                 const duration = speed > 0
                     ? Math.max(0.55, Math.min(2.8, 3.0 - Math.min(speed, 100) * 0.0245))
                     : 0;
-                rotor.style.setProperty('transform-box', 'fill-box', 'important');
-                rotor.style.setProperty('transform-origin', 'center', 'important');
+                rotor.style.setProperty('transform-box', 'view-box', 'important');
+                rotor.style.setProperty('transform-origin', '0px 0px', 'important');
                 rotor.style.setProperty(
                     'animation',
                     duration > 0 ? 'symcon-modern-rotate ' + duration.toFixed(2) + 's linear infinite' : 'none',
