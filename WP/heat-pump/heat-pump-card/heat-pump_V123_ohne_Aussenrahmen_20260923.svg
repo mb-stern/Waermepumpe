@@ -41,7 +41,7 @@ text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{fon
 <stop offset="100%" stop-color="#245cff"/>
 </linearGradient>
 </defs>
-<rect id="symconThemeBackground" width="1600" height="1000" fill="transparent" /><rect x="5" y="5" width="1590" height="990" rx="13" fill="none" stroke="var(--wp-border)" stroke-width="2" />
+<rect id="symconThemeBackground" width="1600" height="1000" fill="transparent" />
 
 <g id="controls">
  <g transform="translate(28 25)" id="gHPStatusOnOff"><rect class="on" width="205" height="105" rx="10" /><text class="hd" x="18" y="49">Betrieb</text><text id="textControlPower" x="18" y="80" font-size="25" fill="#29ef67">Ein</text></g>

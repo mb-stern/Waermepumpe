@@ -254,7 +254,7 @@ class Waermepumpe extends IPSModuleStrict
     {
         if (!$this->ResourcesAvailable()) {
             return '<div style="padding:16px;font-family:sans-serif;color:#c62828;">'
-                . 'Wärmepumpen-Ressource fehlt. Erwartet wird: heat-pump/heat-pump-card/heat-pump.svg.'
+                . 'Wärmepumpen-Ressource fehlt. Erwartet wird eine lesbare .svg-Datei im Verzeichnis heat-pump/heat-pump-card/.'
                 . '</div>';
         }
 
@@ -737,14 +737,32 @@ class Waermepumpe extends IPSModuleStrict
 
     private function GetResourceFiles(): array
     {
+        $svgDirectory = __DIR__
+            . DIRECTORY_SEPARATOR
+            . 'heat-pump'
+            . DIRECTORY_SEPARATOR
+            . 'heat-pump-card';
+
+        $svgFiles = glob($svgDirectory . DIRECTORY_SEPARATOR . '*.svg') ?: [];
+        $svgFiles = array_values(array_filter(
+            $svgFiles,
+            static fn(string $fileName): bool => is_file($fileName) && is_readable($fileName)
+        ));
+
+        // Der Dateiname der SVG ist absichtlich egal.
+        // Liegen mehrere SVG-Dateien im Verzeichnis, wird die zuletzt
+        // geänderte Datei verwendet. Bei gleichem Änderungszeitpunkt
+        // entscheidet der Dateiname eindeutig.
+        usort(
+            $svgFiles,
+            static function (string $a, string $b): int {
+                $timeCompare = filemtime($b) <=> filemtime($a);
+                return $timeCompare !== 0 ? $timeCompare : strnatcasecmp(basename($b), basename($a));
+            }
+        );
+
         return [
-            'svg' => __DIR__
-                . DIRECTORY_SEPARATOR
-                . 'heat-pump'
-                . DIRECTORY_SEPARATOR
-                . 'heat-pump-card'
-                . DIRECTORY_SEPARATOR
-                . 'heat-pump.svg'
+            'svg' => $svgFiles[0] ?? ($svgDirectory . DIRECTORY_SEPARATOR . '__keine_svg_vorhanden__.svg')
         ];
     }
 
