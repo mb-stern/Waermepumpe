@@ -106,7 +106,7 @@ text{font-family:Arial,sans-serif;fill:var(--wp-text)}.sm{font-size:18px}.lb{fon
 <g id="main">
  <path class="hot" d="M675 665H775" />
  <path class="cold" d="M720 835H675" />
- <g id="switchValve" transform="translate(775 665)"><rect class="theme-surface" x="-25" y="-25" width="50" height="50" rx="4" fill="var(--wp-button)" stroke="var(--wp-border2)" stroke-width="2" /><path d="M-16 0H16M0 0V-16" stroke="#f22424" stroke-width="6" /><circle class="theme-dot" r="6" fill="var(--wp-icon)" /></g>
+ <g id="switchValve" transform="translate(775 665)"><rect class="theme-surface" x="-25" y="-25" width="50" height="50" rx="4" fill="var(--wp-button)" stroke="var(--wp-border2)" stroke-width="2" /><path id="switchValveFlow" d="M-16 0H0V-16" fill="none" stroke="var(--wp-icon)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" /><circle class="theme-dot" r="6" fill="var(--wp-icon)" /></g>
  <text class="sm" x="800" y="710" text-anchor="middle">Umschaltventil</text>
  <text id="textWWHeatingValveState" class="sm" x="800" y="730" text-anchor="middle">Heizung</text>
 </g>
