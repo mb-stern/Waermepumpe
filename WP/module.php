@@ -412,6 +412,7 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
                         ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
                         ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
+                        ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed'],
                         ['caption' => 'Raumtemperatur Soll', 'name' => 'AmbientTemperatureNormal'],
                         ['caption' => 'Raumtemperatur Ist (Fallback)', 'name' => 'AmbientTemperatureActual'],
                     ]),
@@ -425,11 +426,6 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'Hochdruck', 'name' => 'CondenserPressure'],
                         ['caption' => 'Kondensationstemperatur', 'name' => 'CondenserTemperature'],
                         ['caption' => 'Expansionsventil Öffnung', 'name' => 'ExpansionValveOpening']
-                    ]),
-
-                    ['type' => 'Label', 'caption' => 'Primärquelle'],
-                    $this->VariableGrid([
-                        ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed'],
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Weitere Zustände'],
@@ -1879,6 +1875,7 @@ class HeatPumpCard extends HTMLElement {
     this.setText('#textG2WWaterTempIn', this.format(c.temperatureGroundWaterIn));
     this.setText('#textG2WWaterTempOut', this.format(c.temperatureGroundWaterOut));
 
+    const party = this.binary(c.heatingPumpPartyMode);
     const night = this.binary(c.heatingPumpNightMode);
     const hasExplicitDayState = !!c.heatingPumpDayMode;
     const day = hasExplicitDayState
@@ -1890,21 +1887,25 @@ class HeatPumpCard extends HTMLElement {
       if (element) element.style.display = visible ? 'inline' : 'none';
     };
 
-    show('#gHPStatusOff', !this.binary(c.heatingPumpStatusOnOff));
+    show('#gHPStatusOff', false);
     show('#gHPStatusWW', this.binary(c.heatingPumpHotWaterMode));
     show('#gHPStatusHeating', this.binary(c.heatingPumpHeatingMode));
     show('#gHPStatusCooling', this.binary(c.heatingPumpCoolingMode));
     show('#gHPStatusParty', false);
     show('#gHPStatusSave', false);
-    show('#gTimeSymbolNight', night);
-    show('#gTimeSymbolDay', day);
+    show('#gTimeSymbolNight', false);
+    show('#gTimeSymbolDay', false);
     show('#gWarning', false);
     show('#gError', this.binary(c.error));
-    show('#gDefrost', this.binary(c.defrostMode));
-    show('#gAdditionalHeating', this.binary(c.additionalHeating));
+    show('#gDefrost', false);
+    show('#gAdditionalHeating', false);
 
     this.setText('#textOutdoorTemperatureValue', this.format(c.outdoorTemperature));
 
+    if (party && this.format(c.ambientTemperatureParty)) {
+      this.setText('#textIndoorTemperatureValue', this.format(c.ambientTemperatureParty));
+    } else if (night && this.format(c.ambientTemperatureReduced)) {
+      this.setText('#textIndoorTemperatureValue', this.format(c.ambientTemperatureReduced));
     } else {
       this.setText('#textIndoorTemperatureValue', this.format(c.ambientTemperatureNormal));
     }
@@ -5846,10 +5847,17 @@ window.SymconHeatPump = {
                 const entity = entities[i];
                 if (!entity || !currentData || !currentData[entity]) continue;
                 const value = currentData[entity].value;
-                const numeric = Number(value);
-                const on = Number.isFinite(numeric)
-                    ? numeric >= thresholds[i]
-                    : ['1','true','on','yes','ja','ein','active','aktiv'].includes(String(value ?? '').trim().toLowerCase());
+                let on = false;
+                if (typeof value === 'boolean') {
+                    on = value;
+                } else {
+                    const text = String(value ?? '').trim().toLowerCase();
+                    if (['true','on','yes','ja','ein','active','aktiv'].includes(text)) on = true;
+                    else if (!['false','off','no','nein','aus','inactive','inaktiv',''].includes(text)) {
+                        const numeric = Number(value);
+                        on = Number.isFinite(numeric) && numeric >= thresholds[i];
+                    }
+                }
                 if (on) active++;
             }
             const text = svg.querySelector('#textHeaterRodStatus');
@@ -6016,15 +6024,11 @@ window.SymconHeatPump = {
                 const value = String(raw ?? '').trim().toLowerCase();
                 const limit = Number.isFinite(Number(threshold)) ? Number(threshold) : 1;
 
-                // Bool: true entspricht 1, false entspricht 0.
-                if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) {
-                    return 1 >= limit;
+                if (typeof raw === 'boolean') {
+                    return raw;
                 }
-
-                if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) {
-                    return 0 >= limit;
-                }
-
+                if (['true', 'on', 'yes', 'ja', 'ein', 'active', 'aktiv'].includes(value)) return true;
+                if (['false', 'off', 'no', 'nein', 'aus', 'inactive', 'inaktiv', ''].includes(value)) return false;
                 const numeric = Number(raw);
                 return Number.isFinite(numeric) && numeric >= limit;
             };
@@ -6566,6 +6570,16 @@ window.SymconHeatPump = {
                     originalX: 346.000
                 },
                 {
+                    selector: '#gHPStatusParty',
+                    custom: false,
+                    originalX: 437.380
+                },
+                {
+                    selector: '#gHPStatusSave',
+                    custom: false,
+                    originalX: 485.077
+                },
+                {
                     selector: '#gSymconWarmWaterSetpoint',
                     custom: true
                 },
@@ -6880,29 +6894,23 @@ window.SymconHeatPump = {
                 return found ? String(found.name) : String(current ?? '');
             };
 
-            // Alte Party-/Eco-Felder der Original-SVG dauerhaft ausblenden.
+            // Kompakte obere Leiste: nur Warmwasser, Heizung, Kühlen,
+            // WW Soll und Heizkorrektur. Alte Roh-SVG-Statusfelder bleiben aus.
+            show('#gHPStatusOnOff', false);
+            show('#gHPStatusOff', false);
             show('#gHPStatusParty', false);
             show('#gHPStatusSave', false);
+            show('#gTimeSymbolNight', false);
+            show('#gTimeSymbolDay', false);
+            show('#gDefrost', false);
+            show('#gAdditionalHeating', false);
 
             // Real mode values from the configured Symcon profiles.
             setText('#textControlHeating', optionName(controls.heating));
             setText('#textControlHotWater', optionName(controls.hotwater));
             setText('#textControlCooling', optionName(controls.cooling));
 
-            // Binary buttons: real state, and completely hidden when no variable is configured.
-            const binaryDefs = [
-                ['power', '#gHPStatusOnOff', '#textControlPower', cfg.heatingPumpStatusOnOff],
-            ];
-            binaryDefs.forEach(([name, groupSel, textSel, dataKey]) => {
-                const control = controls[name];
-                const configured = !!(control && control.configured && dataKey);
-                show(groupSel, configured);
-                if (!configured) return;
-                const on = binary(dataKey);
-                setText(textSel, on ? 'Ein' : 'Aus');
-                const group = svg.querySelector(groupSel);
-                if (group) group.style.opacity = on ? '1' : '0.55';
-            });
+            // Betrieb/Party/Eco sind bewusst keine Elemente der oberen Bedienleiste.
 
             // Mode buttons are visible only if a real control exists.
             [
@@ -6942,7 +6950,6 @@ window.SymconHeatPump = {
 
             // Sichtbare Buttons lückenlos von links anordnen.
             const topButtons = [
-                '#gHPStatusOnOff',
                 '#gHPStatusWW',
                 '#gHPStatusHeating',
                 '#gHPStatusCooling',
@@ -7047,6 +7054,10 @@ window.SymconHeatPump = {
             // Live values.
             setText('#textOutdoorTemperatureValue', formatted(cfg.outdoorTemperature));
             let indoorKey = cfg.ambientTemperatureNormal;
+            if (binary(cfg.heatingPumpPartyMode) && formatted(cfg.ambientTemperatureParty)) {
+                indoorKey = cfg.ambientTemperatureParty;
+            } else if (binary(cfg.heatingPumpNightMode) && formatted(cfg.ambientTemperatureReduced)) {
+                indoorKey = cfg.ambientTemperatureReduced;
             }
             setText('#textIndoorTemperatureValue', formatted(indoorKey));
             setText('#textSupplyTemperatureValue', formatted(cfg.supplyTemperature));
