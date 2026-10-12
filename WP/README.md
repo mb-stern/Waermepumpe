@@ -574,11 +574,23 @@ oder erneute Zuordnung ist dafür nicht erforderlich.
 
 Im Formular sind die Messwerte nach Wärmepumpe, Speicher, Heizkreisen,
 Solarthermie und Zusatzwerten geordnet. Nicht benötigte Variablen bleiben auf
-„Keine“. Unter **Einzelne Statusvariablen / Fallbacks** können die bisherigen
-Zuordnungen für Heizen, Warmwasser, Kühlen, Abtauen und Lüfterstatus weiterhin
-bearbeitet werden. Ein konfigurierter zentraler Betriebsstatus hat für die ersten
-vier Funktionen Vorrang. Eine vorhandene Lüfterdrehzahlvariable bestimmt den
-Lüfterzustand; ohne diese wird der bisherige Lüfterstatus verwendet.
+„Keine“. Es werden nur Einstellungen angeboten, welche die aktuelle
+Visualisierung verwendet. Die alten Einzelstatusfelder (Ein/Aus, Heizen,
+Warmwasser, Kühlen, Abtauen), deren Statuswertlisten, die alten Heizstabstatus,
+Solarpumpenstatus und Solar-Vor-/Rücklauftemperaturen sowie die bisherige
+Warmwasser-Umschaltoption für einen Heizkreis werden nicht mehr abgefragt.
+Die zugehörigen gespeicherten Einstellungen bleiben aus Kompatibilitätsgründen
+registriert und werden nicht gelöscht. Die Lüfterstatusvariable bleibt als
+Fallback für eine fehlende Drehzahlvariable auswählbar. Die drei einzeln
+konfigurierbaren Heizstäbe mit Anzahl und Einschaltschwelle bleiben verfügbar.
+
+Unter **Wärmepumpe → Messwerte → Rücklauf Soll** kann eine zusätzliche
+Solltemperaturvariable ausgewählt werden. Die Rücklaufzeile in der Infobox
+zeigt dann beispielsweise `28.9 °C / Soll 30.0 °C`. Der Istwert verwendet weiter
+die bestehende Variable `RefluxTemperatureHeating1` aus `main`. Ohne Sollwert
+wird weiterhin nur der Istwert angezeigt. Die Box behält ihre Größe; die Werte
+stehen näher an der Beschriftung und passen sich bei langen Profiltexten an
+den vorhandenen Platz an. Der Sollwert dient der Anzeige, nicht der Bedienung.
 
 Die in `development` entfallenen Funktionen werden nicht wieder eingeführt:
 Wasser-/Sole-Wärmepumpentypen mit Quellentemperaturen, Party-/Energiesparmodus,
@@ -604,3 +616,7 @@ Mit `WP_TEST_ARTIFACT_DIR=/tmp/wp-review php tests/regression.php` können HTML 
 JavaScript zur zusätzlichen Browser-/Syntaxprüfung ausgegeben werden.
 
 Offizielle SDK-Dokumentation: <https://www.symcon.de/de/llms.txt>.
+
+Die optionale Browserprüfung `python3 tests/browser.py` benötigt Playwright und
+Chromium. Sie prüft die Rücklaufzeile bei Desktop- und Mobilbreite, die
+unveränderte Boxbreite sowie Aktualisierungen und fehlende Messwerte.

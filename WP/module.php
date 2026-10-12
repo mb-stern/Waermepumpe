@@ -37,6 +37,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('AmbientTemperatureNormal', 0);
         $this->RegisterPropertyInteger('AmbientTemperatureActual', 0);
         $this->RegisterPropertyInteger('SupplyTemperature', 0);
+        $this->RegisterPropertyInteger('ReturnTemperatureSetpointVariable', 0);
 
         $this->RegisterPropertyInteger('HpRunning', 0);
         $this->RegisterPropertyInteger('CompressorRunning', 0);
@@ -273,35 +274,13 @@ class Waermepumpe extends IPSModuleStrict
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Wärmepumpe',
                 'items'   => [
-                    ['type' => 'Label', 'caption' => 'Betriebsstatus – mehrere Werte durch Kommas trennen'],
+                    ['type' => 'Label', 'caption' => 'Betriebsstatus und Lüfter'],
                     $this->VariableGrid([
-                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable'],
-                        ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff']
+                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable']
                     ]),
-                    [
-                        'type'  => 'RowLayout',
-                        'items' => [
-                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHeatingValues', 'caption' => 'Heizen – Statuswerte'],
-                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHotWaterValues', 'caption' => 'Warmwasser – Statuswerte'],
-                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusCoolingValues', 'caption' => 'Kühlen – Statuswerte'],
-                            ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusDefrostValues', 'caption' => 'Abtauen – Statuswerte']
-                        ]
-                    ],
-
-                    [
-                        'type' => 'ExpansionPanel',
-                        'caption' => 'Einzelne Statusvariablen / Fallbacks',
-                        'items' => [
-                            ['type' => 'Label', 'caption' => 'Heizen, Warmwasser, Kühlen und Abtauen werden aus dem Betriebsstatus ermittelt. Ohne Betriebsstatus werden die folgenden Variablen verwendet.'],
-                            $this->VariableGrid([
-                                ['caption' => 'Heizen aktiv', 'name' => 'HeatingPumpHeatingMode'],
-                                ['caption' => 'Warmwasser aktiv', 'name' => 'HeatingPumpHotWaterMode'],
-                                ['caption' => 'Kühlen aktiv', 'name' => 'HeatingPumpCoolingMode'],
-                                ['caption' => 'Abtauen aktiv', 'name' => 'DefrostMode'],
-                                ['caption' => 'Lüfter aktiv (ohne Drehzahlvariable)', 'name' => 'HpRunning']
-                            ])
-                        ]
-                    ],
+                    $this->VariableGrid([
+                        ['caption' => 'Lüfter aktiv (ohne Drehzahlvariable)', 'name' => 'HpRunning']
+                    ]),
 
                     ['type' => 'Label', 'caption' => 'Bedienung'],
                     $this->VariableGrid([
@@ -316,6 +295,7 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableGrid([
                         ['caption' => 'Außentemperatur', 'name' => 'OutdoorTemperature'],
                         ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
+                        ['caption' => 'Rücklauf Soll', 'name' => 'ReturnTemperatureSetpointVariable'],
                         ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
                         ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed'],
                         ['caption' => 'Raumtemperatur Soll', 'name' => 'AmbientTemperatureNormal'],
@@ -416,18 +396,6 @@ class Waermepumpe extends IPSModuleStrict
                             ]
                         ]
                     ],
-                    [
-                        'type' => 'ExpansionPanel',
-                        'caption' => 'Weitere Heizstabstatus aus Version 1.x',
-                        'items' => [
-                            $this->VariableGrid([
-                                ['caption' => 'Warmwasser-Heizstab aktiv', 'name' => 'HeaterRodWW'],
-                                ['caption' => 'Heizstab Stufe 1 aktiv', 'name' => 'HeaterRodLevel1'],
-                                ['caption' => 'Heizstab Stufe 2 aktiv', 'name' => 'HeaterRodLevel2']
-                            ]),
-                            ['type' => 'Label', 'caption' => 'Diese Statuswerte ergänzen die bestehende Darstellung. Die drei Heizstäbe im Speicher werden über Anzahl, Variable und Einschaltschwelle oben konfiguriert.']
-                        ]
-                    ]
                 ]
             ],
 
@@ -440,9 +408,7 @@ class Waermepumpe extends IPSModuleStrict
                 'caption' => 'Solarthermie',
                 'items'   => [
                     ['type' => 'CheckBox', 'name' => 'ThermalSolarAvailable', 'caption' => 'Solarthermie'],
-                    $this->VariableRow('Solarpumpe aktiv', 'ThermalSolarPump', 'Solarpumpendrehzahl', 'ThermalSolarPumpSpeed'),
-                    $this->VariableRow('Kollektortemperatur', 'ThermalSolarPanelTemp', 'Solar Vorlauf', 'ThermalSolarFluxTemp'),
-                    $this->VariableRow('Solar Rücklauf', 'ThermalSolarReturnTemp', '', '')
+                    $this->VariableRow('Kollektortemperatur', 'ThermalSolarPanelTemp', 'Solarpumpendrehzahl', 'ThermalSolarPumpSpeed')
                 ]
             ],
 
@@ -509,15 +475,6 @@ class Waermepumpe extends IPSModuleStrict
                         'caption' => 'Name'
                     ]
                 ],
-                $number === 1
-                    ? [
-                        [
-                            'type' => 'CheckBox',
-                            'name' => 'SingleCircuitHotWaterTemperatureSwitch',
-                            'caption' => 'Heizen des Warmwasserspeichers integrieren'
-                        ]
-                    ]
-                    : [],
                 [
                 [
                     'type'    => 'Select',
@@ -1007,6 +964,7 @@ HTML;
             'outdoorTemperature'         => $this->DataKey('OutdoorTemperature', 'outdoorTemperature'),
             'ambientTemperatureNormal'   => $this->DataKeyWithFallback('AmbientTemperatureNormal', 'AmbientTemperatureActual', 'ambientTemperatureNormal'),
             'supplyTemperature'          => $this->DataKey('SupplyTemperature', 'supplyTemperature'),
+            'returnTemperatureSetpoint'  => $this->DataKey('ReturnTemperatureSetpointVariable', 'returnTemperatureSetpoint'),
 
             'hpRunning'                  => $this->DataKeyWithFallback('FanSpeed', 'HpRunning', 'hpRunning'),
             'fanSpeed'                   => $this->DataKey('FanSpeed', 'fanSpeed'),
@@ -1112,6 +1070,7 @@ HTML;
             'outdoorTemperature' => ['OutdoorTemperature', false],
             'ambientTemperatureNormal' => ['AmbientTemperatureNormal', false],
             'supplyTemperature' => ['SupplyTemperature', false],
+            'returnTemperatureSetpoint' => ['ReturnTemperatureSetpointVariable', false],
             'hpRunning' => ['HpRunning', true],
             'fanSpeed' => ['FanSpeed', false],
             'compressorRunning' => ['CompressorRunning', true],
@@ -6185,8 +6144,8 @@ window.SymconHeatPump = {
 
             const setText = (selector, value) => {
                 const el = svg.querySelector(selector);
-                if (el && value !== null && value !== undefined && String(value) !== '') {
-                    el.textContent = String(value);
+                if (el) {
+                    el.textContent = value === null || value === undefined ? '' : String(value);
                 }
             };
 
@@ -6446,7 +6405,32 @@ window.SymconHeatPump = {
             }
             setText('#textIndoorTemperatureValue', formatted(indoorKey));
             setText('#textSupplyTemperatureValue', formatted(cfg.supplyTemperature));
-            setText('#textReturnTemperatureValue', formatted(cfg.refluxTemperatureHeating));
+            const returnValue = svg.querySelector('#textReturnTemperatureValue');
+            if (returnValue) {
+                const actual = formatted(cfg.refluxTemperatureHeating);
+                const target = formatted(cfg.returnTemperatureSetpoint);
+                // Keep the existing info box; move the values towards their label.
+                returnValue.setAttribute('x', '462');
+                returnValue.style.fontSize = target ? '21px' : '25px';
+                returnValue.removeAttribute('textLength');
+                returnValue.removeAttribute('lengthAdjust');
+                returnValue.replaceChildren();
+                const actualSpan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                actualSpan.setAttribute('id', 'textReturnTemperatureActualValue');
+                actualSpan.textContent = actual;
+                returnValue.appendChild(actualSpan);
+                const targetSpan = document.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+                targetSpan.setAttribute('id', 'textReturnTemperatureSetpointValue');
+                targetSpan.style.fontSize = '17px';
+                targetSpan.textContent = target ? (actual ? ' / Soll ' : 'Soll ') + target : '';
+                returnValue.appendChild(targetSpan);
+                // Long profile suffixes must also stay inside the unchanged frame.
+                const availableWidth = 650 - 462 - 2;
+                if (returnValue.getComputedTextLength() > availableWidth) {
+                    returnValue.setAttribute('textLength', String(availableWidth));
+                    returnValue.setAttribute('lengthAdjust', 'spacingAndGlyphs');
+                }
+            }
 
             setText('#textTankTempHPUp', formatted(cfg.tankTempHPUp));
             setText('#textTankTempHPMiddle', formatted(cfg.tankTempHPMiddle));
@@ -6705,8 +6689,8 @@ window.SymconHeatPump = {
                 );
             }
 
-            // Fußzeile: exakt die 12 in der Konfiguration vorhandenen
-            // Zusatzwerte 000...011 verwenden. Unkonfigurierte Plätze verschwinden.
+            // Fußzeile: die 10 in der Konfiguration vorhandenen
+            // Zusatzwerte 000...009 verwenden. Unkonfigurierte Plätze verschwinden.
             const footerValues = [];
             for (let index = 0; index < 10; index++) {
                 const suffix = String(index).padStart(3, '0');
