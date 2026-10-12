@@ -63,6 +63,17 @@ function createModule(array $properties = []): Waermepumpe {
     $module->Create();
     return $module;
 }
+$svgFiles = glob(__DIR__ . '/../WP/heat-pump/heat-pump-card/*.svg');
+foreach ($svgFiles as $svgFile) {
+    $document = new DOMDocument();
+    check($document->load($svgFile, LIBXML_NONET), 'Invalid SVG XML');
+    $ids = [];
+    foreach ((new DOMXPath($document))->query('//*[@id]') as $element) {
+        $id = $element->getAttribute('id');
+        check(!isset($ids[$id]), 'Duplicate SVG ID: ' . $id);
+        $ids[$id] = true;
+    }
+}
 $module = createModule();
 $legacy = json_decode(file_get_contents(__DIR__ . '/fixtures/main-properties.json'), true, 512, JSON_THROW_ON_ERROR);
 $retained = array_intersect_key($legacy, $module->registered);

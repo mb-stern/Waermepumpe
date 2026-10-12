@@ -2612,6 +2612,10 @@ window.SymconHeatPump = {
             svg.style.setProperty('--wp-border2', borderColor);
             svg.style.setProperty('--wp-text', textColor);
             svg.style.setProperty('--wp-icon', textColor);
+            svg.style.setProperty('--wp-equipment-face',
+                'color-mix(in srgb, ' + textColor + ' 4%, ' + panelBackground + ')');
+            svg.style.setProperty('--wp-equipment-edge',
+                'color-mix(in srgb, ' + textColor + ' 12%, ' + panelBackground + ')');
 
             const bg = svg.querySelector('#symconThemeBackground');
             if (bg) {
@@ -6730,6 +6734,40 @@ window.SymconHeatPump = {
                 const y = count <= 6 ? 962 : (row === 0 ? 950 : 970);
                 el.setAttribute('x', String(x));
                 el.setAttribute('y', String(y));
+            });
+
+            // Live flow overlays use actual running variables; no idle animation.
+            const compressorActive = binary(cfg.compressorRunning);
+            const heatingActive = [cfg.heatingCircuitPumpRunning,
+                cfg.heatingCircuitPumpRunning2, cfg.heatingCircuitPumpRunning3].some(binary);
+            const chargingActive = binary(cfg.storageChargingPumpRunning);
+            const solarActive = Number(raw(cfg.thermalSolarPumpSpeed)) > 0;
+            const flows = [
+                ['#gRefrigerantCircuit path.hot, #gRefrigerantCircuit path.cold', compressorActive],
+                ['#main path.hot, #main path.cold', compressorActive],
+                ['#gBuffer > path.hot, #gBuffer > path.cold', chargingActive || heatingActive],
+                ['#gNoBuffer path.hot, #gNoBuffer path.cold', heatingActive],
+                ['#gHK1 > path.hot, #gHK1 > path.cold', binary(cfg.heatingCircuitPumpRunning)],
+                ['#gHK2 > path.hot, #gHK2 > path.cold', binary(cfg.heatingCircuitPumpRunning2)],
+                ['#gHK3 > path.hot, #gHK3 > path.cold', binary(cfg.heatingCircuitPumpRunning3)],
+                ['#gDHW > path.hot, #gDHW > path.cold', chargingActive && binary(cfg.wwHeatingValve)],
+                ['#gSolar path.sol', solarActive]
+            ];
+            flows.forEach(([selector, active]) => {
+                svg.querySelectorAll(selector).forEach((path) => {
+                    if (!active) {
+                        if (path.__wpLiveFlow) path.__wpLiveFlow.remove();
+                        path.__wpLiveFlow = null;
+                        return;
+                    }
+                    const overlay = path.__wpLiveFlow
+                        || document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    overlay.setAttribute('d', path.getAttribute('d') || '');
+                    overlay.setAttribute('class', 'wp-live-flow');
+                    if (path.hasAttribute('transform')) overlay.setAttribute('transform', path.getAttribute('transform'));
+                    if (!overlay.isConnected) path.after(overlay);
+                    path.__wpLiveFlow = overlay;
+                });
             });
 
             // Heizstab-Anzeige im modernen Renderer ebenfalls aktualisieren.

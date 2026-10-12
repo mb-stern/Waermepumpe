@@ -620,3 +620,15 @@ Offizielle SDK-Dokumentation: <https://www.symcon.de/de/llms.txt>.
 Die optionale Browserprüfung `python3 tests/browser.py` benötigt Playwright und
 Chromium. Sie prüft die Rücklaufzeile bei Desktop- und Mobilbreite, die
 unveränderte Boxbreite sowie Aktualisierungen und fehlende Messwerte.
+
+### Technisch moderne Grafik
+
+Die SVG verwendet klare Gerätekonturen, neutrale Speicherflächen mit schmalen
+Temperaturakzenten und dezente Schatten. Beschriftungen und Geräteflächen folgen
+dem Symcon-Theme. Alle bisherigen Element-IDs, Variablenzuordnungen und die
+Breite der Infobox bleiben erhalten.
+
+Flusspunkte erscheinen nur bei passenden aktiven Betriebsvariablen, etwa
+Verdichter- und Pumpenstatus. Ohne solche Daten wird keine Aktivität dargestellt.
+Die Animation bleibt bei Datenaktualisierungen stabil. Die Betriebssystemoption
+für reduzierte Bewegung unterdrückt die animierten Flusspunkte und Rotoren.

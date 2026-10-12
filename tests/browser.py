@@ -57,6 +57,37 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 }''')
                 target_key=payload['config']['returnTemperatureSetpoint']
                 actual_key=payload['config']['refluxTemperatureHeating']
+                # Actual running variables drive overlays; updates keep their identity.
+                assert page.locator('.wp-live-flow').count() > 0
+                page.evaluate("document.querySelector('.wp-live-flow').dataset.testIdentity='retained'")
+                page.evaluate('(p) => window.handleMessage({type:"update",data:p.data,controls:p.controls})',payload)
+                assert page.locator('.wp-live-flow[data-test-identity="retained"]').count() == 1
+                for theme in ['light', 'dark']:
+                    page.evaluate("""(theme) => {
+                        const dark=theme==='dark';
+                        document.documentElement.style.setProperty('--content-color',dark?'#e6edf4':'#1f2937');
+                        document.documentElement.style.setProperty('--card-background-color',dark?'#18222f':'#f8fafc');
+                        document.documentElement.style.setProperty('--divider-color',dark?'#354255':'#d8e1ea');
+                        document.documentElement.style.setProperty('background',dark?'#111923':'#f0f4f8','important');
+                        document.body.style.setProperty('background',dark?'#111923':'#f0f4f8','important');
+                    }""",theme)
+                    page.evaluate('(p) => window.handleMessage({type:"update",data:p.data,controls:p.controls})',payload)
+                    page.wait_for_timeout(250)  # Allow the theme transition to finish.
+                    screenshot_dir=os.environ.get('WP_BROWSER_SCREENSHOT_DIR')
+                    if screenshot_dir:
+                        Path(screenshot_dir).mkdir(parents=True,exist_ok=True)
+                        page.screenshot(path=str(Path(screenshot_dir)/f'{theme}-{width}.png'))
+                    assert page.locator('#wp-error').text_content()==''
+                page.emulate_media(reduced_motion='reduce')
+                assert page.locator('.wp-live-flow').first.evaluate("e=>getComputedStyle(e).animationName")=='none'
+                idle=json.loads(json.dumps(payload))
+                for key in ['compressorRunning','storageChargingPumpRunning',
+                            'heatingCircuitPumpRunning','heatingCircuitPumpRunning2',
+                            'heatingCircuitPumpRunning3','thermalSolarPumpSpeed']:
+                    entity=idle['config'].get(key)
+                    if entity in idle['data']: idle['data'][entity]['value']=0
+                page.evaluate('(p) => window.handleMessage({type:"update",data:p.data,controls:p.controls})',idle)
+                assert page.locator('.wp-live-flow').count()==0
                 payload['data'][target_key]['formatted']='-123.45 °C langer Profiltext'
                 page.evaluate('(p) => window.handleMessage({type:"update",data:p.data,controls:p.controls})',payload)
                 assert page.evaluate('document.querySelector("#textReturnTemperatureValue").getBBox().x+document.querySelector("#textReturnTemperatureValue").getBBox().width')<=650.1
