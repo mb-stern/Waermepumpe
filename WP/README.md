@@ -564,3 +564,43 @@ Die Visualisierung dient der Darstellung und Überwachung der vorhandenen Betrie
 ### Version 1.0 (23.08.2026)
 
 - Initiale Version.
+## Update von Version 1.x auf Version 2.0
+
+Bestehende Instanzen können weiterverwendet werden. Bibliotheks-ID und Modul-ID
+bleiben gegenüber `main` unverändert. Die 88 weiterverwendeten Eigenschaften
+behalten ihre bisherigen Namen, Typen und Standardwerte. Bereits gespeicherte
+Variablen-IDs und Einstellungen werden nicht zurückgesetzt; eine neue Instanz
+oder erneute Zuordnung ist dafür nicht erforderlich.
+
+Im Formular sind die Messwerte nach Wärmepumpe, Speicher, Heizkreisen,
+Solarthermie und Zusatzwerten geordnet. Nicht benötigte Variablen bleiben auf
+„Keine“. Unter **Einzelne Statusvariablen / Fallbacks** können die bisherigen
+Zuordnungen für Heizen, Warmwasser, Kühlen, Abtauen und Lüfterstatus weiterhin
+bearbeitet werden. Ein konfigurierter zentraler Betriebsstatus hat für die ersten
+vier Funktionen Vorrang. Eine vorhandene Lüfterdrehzahlvariable bestimmt den
+Lüfterzustand; ohne diese wird der bisherige Lüfterstatus verwendet.
+
+Die in `development` entfallenen Funktionen werden nicht wieder eingeführt:
+Wasser-/Sole-Wärmepumpentypen mit Quellentemperaturen, Party-/Energiesparmodus,
+Tag-/Nachtstatus, Warnung/Fehler/Zusatzheizung, reduzierte/Party-Raumtemperatur,
+Puffer-Heizstab, Schichtladung und eigene Temperaturfarbskala. Von den früheren
+13 Zusatzwerten werden die Plätze 000–009 weiterverwendet; 010–012 entfallen.
+Die neue Oberfläche bleibt auf Luft/Wasser ausgelegt. Neue Felder wie Leistung,
+Heizkreisname und Pumpendrehzahl/Durchfluss müssen bei Bedarf zugeordnet werden.
+
+### Lokale Prüfung
+
+Mit PHP 8.4 oder einer passenden PHP-Version des Zielsystems:
+
+```sh
+php -l WP/module.php
+php tests/regression.php
+```
+
+Die Tests prüfen die Kompatibilität zu den in `main` registrierten Eigenschaften,
+das Formular, Variablenabonnements und Datenaufbereitung mit einem minimalen
+Symcon-Ersatz. Sie ersetzen keine Prüfung in einer echten IP-Symcon-Installation.
+Mit `WP_TEST_ARTIFACT_DIR=/tmp/wp-review php tests/regression.php` können HTML und
+JavaScript zur zusätzlichen Browser-/Syntaxprüfung ausgegeben werden.
+
+Offizielle SDK-Dokumentation: <https://www.symcon.de/de/llms.txt>.

@@ -1,0 +1,526 @@
+{
+  "HeatingPumpType": {
+    "type": "String",
+    "default": "A2W"
+  },
+  "OperatingStatusVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "OperatingStatusHeatingValues": {
+    "type": "String",
+    "default": "0,6"
+  },
+  "OperatingStatusHotWaterValues": {
+    "type": "String",
+    "default": "1"
+  },
+  "OperatingStatusCoolingValues": {
+    "type": "String",
+    "default": "7"
+  },
+  "OperatingStatusDefrostValues": {
+    "type": "String",
+    "default": "4"
+  },
+  "HeatingControlVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HotWaterControlVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "CoolingControlVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "WarmWaterSetpointVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingTemperatureCorrectionVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "FanSpeed": {
+    "type": "Integer",
+    "default": 0
+  },
+  "FanActiveStatusValues": {
+    "type": "String",
+    "default": "0,1,2,4,7"
+  },
+  "TemperatureGroundWaterIn": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TemperatureGroundWaterOut": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingPumpStatusOnOff": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingPumpHotWaterMode": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingPumpHeatingMode": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingPumpCoolingMode": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingPumpPartyMode": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingPumpEnergySaveMode": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingProgramStatusVariable": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingProgramDayValues": {
+    "type": "String",
+    "default": "1"
+  },
+  "HeatingProgramNightValues": {
+    "type": "String",
+    "default": "2"
+  },
+  "Warning": {
+    "type": "Integer",
+    "default": 0
+  },
+  "Error": {
+    "type": "Integer",
+    "default": 0
+  },
+  "DefrostMode": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalHeating": {
+    "type": "Integer",
+    "default": 0
+  },
+  "OutdoorTemperature": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AmbientTemperatureNormal": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AmbientTemperatureActual": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AmbientTemperatureReduced": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AmbientTemperatureParty": {
+    "type": "Integer",
+    "default": 0
+  },
+  "SupplyTemperature": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HpRunning": {
+    "type": "Integer",
+    "default": 0
+  },
+  "CompressorRunning": {
+    "type": "Integer",
+    "default": 0
+  },
+  "CirculatingPumpRunning": {
+    "type": "Integer",
+    "default": 0
+  },
+  "StorageChargingPumpRunning": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TankHP": {
+    "type": "Boolean",
+    "default": true
+  },
+  "TankTempHPUp": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TankTempHPMiddle": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TankTempHPDown": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TankWW": {
+    "type": "Boolean",
+    "default": true
+  },
+  "LayeredChargeStorage": {
+    "type": "Boolean",
+    "default": false
+  },
+  "TankTempWWUp": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TankTempWWMiddle": {
+    "type": "Integer",
+    "default": 0
+  },
+  "TankTempWWDown": {
+    "type": "Integer",
+    "default": 0
+  },
+  "UseCustomTemperatureColors": {
+    "type": "Boolean",
+    "default": false
+  },
+  "TemperaturePoint1": {
+    "type": "Integer",
+    "default": 15
+  },
+  "TemperatureColor1": {
+    "type": "Integer",
+    "default": 26316
+  },
+  "TemperaturePoint2": {
+    "type": "Integer",
+    "default": 20
+  },
+  "TemperatureColor2": {
+    "type": "Integer",
+    "default": 2730472
+  },
+  "TemperaturePoint3": {
+    "type": "Integer",
+    "default": 25
+  },
+  "TemperatureColor3": {
+    "type": "Integer",
+    "default": 3790293
+  },
+  "TemperaturePoint4": {
+    "type": "Integer",
+    "default": 30
+  },
+  "TemperatureColor4": {
+    "type": "Integer",
+    "default": 16765286
+  },
+  "TemperaturePoint5": {
+    "type": "Integer",
+    "default": 35
+  },
+  "TemperatureColor5": {
+    "type": "Integer",
+    "default": 16769126
+  },
+  "TemperaturePoint6": {
+    "type": "Integer",
+    "default": 40
+  },
+  "TemperatureColor6": {
+    "type": "Integer",
+    "default": 16761395
+  },
+  "TemperaturePoint7": {
+    "type": "Integer",
+    "default": 45
+  },
+  "TemperatureColor7": {
+    "type": "Integer",
+    "default": 16750616
+  },
+  "TemperaturePoint8": {
+    "type": "Integer",
+    "default": 50
+  },
+  "TemperatureColor8": {
+    "type": "Integer",
+    "default": 16734744
+  },
+  "TemperaturePoint9": {
+    "type": "Integer",
+    "default": 55
+  },
+  "TemperatureColor9": {
+    "type": "Integer",
+    "default": 15018795
+  },
+  "TemperaturePoint10": {
+    "type": "Integer",
+    "default": 60
+  },
+  "TemperatureColor10": {
+    "type": "Integer",
+    "default": 16711680
+  },
+  "SingleCircuitHotWaterTemperatureSwitch": {
+    "type": "Boolean",
+    "default": true
+  },
+  "HeatingCircuitType1": {
+    "type": "String",
+    "default": "underfloor"
+  },
+  "HeatingCircuitPumpRunning1": {
+    "type": "Integer",
+    "default": 0
+  },
+  "SupplyTemperatureHeating1": {
+    "type": "Integer",
+    "default": 0
+  },
+  "RefluxTemperatureHeating1": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingCircuitType2": {
+    "type": "String",
+    "default": "off"
+  },
+  "HeatingCircuitPumpRunning2": {
+    "type": "Integer",
+    "default": 0
+  },
+  "SupplyTemperatureHeating2": {
+    "type": "Integer",
+    "default": 0
+  },
+  "RefluxTemperatureHeating2": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeatingCircuitType3": {
+    "type": "String",
+    "default": "off"
+  },
+  "HeatingCircuitPumpRunning3": {
+    "type": "Integer",
+    "default": 0
+  },
+  "SupplyTemperatureHeating3": {
+    "type": "Integer",
+    "default": 0
+  },
+  "RefluxTemperatureHeating3": {
+    "type": "Integer",
+    "default": 0
+  },
+  "EvaporatorPressure": {
+    "type": "Integer",
+    "default": 0
+  },
+  "EvaporatorTemperature": {
+    "type": "Integer",
+    "default": 0
+  },
+  "CondenserPressure": {
+    "type": "Integer",
+    "default": 0
+  },
+  "CondenserTemperature": {
+    "type": "Integer",
+    "default": 0
+  },
+  "ExpansionValveOpening": {
+    "type": "Integer",
+    "default": 0
+  },
+  "CompressorValue": {
+    "type": "Integer",
+    "default": 0
+  },
+  "WWHeatingValve": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRodWW": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRodHP": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRodLevel1": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRodLevel2": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRodCount": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRod1": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRod1Threshold": {
+    "type": "Integer",
+    "default": 1
+  },
+  "HeaterRod2": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRod2Threshold": {
+    "type": "Integer",
+    "default": 1
+  },
+  "HeaterRod3": {
+    "type": "Integer",
+    "default": 0
+  },
+  "HeaterRod3Threshold": {
+    "type": "Integer",
+    "default": 1
+  },
+  "ThermalSolarAvailable": {
+    "type": "Boolean",
+    "default": false
+  },
+  "ThermalSolarPump": {
+    "type": "Integer",
+    "default": 0
+  },
+  "ThermalSolarPumpSpeed": {
+    "type": "Integer",
+    "default": 0
+  },
+  "ThermalSolarPanelTemp": {
+    "type": "Integer",
+    "default": 0
+  },
+  "ThermalSolarFluxTemp": {
+    "type": "Integer",
+    "default": 0
+  },
+  "ThermalSolarReturnTemp": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel000": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue000": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel001": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue001": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel002": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue002": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel003": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue003": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel004": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue004": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel005": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue005": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel006": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue006": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel007": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue007": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel008": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue008": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel009": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue009": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel010": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue010": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel011": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue011": {
+    "type": "Integer",
+    "default": 0
+  },
+  "AdditionalLabel012": {
+    "type": "String",
+    "default": ""
+  },
+  "AdditionalValue012": {
+    "type": "Integer",
+    "default": 0
+  }
+}

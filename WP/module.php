@@ -8,8 +8,6 @@ class Waermepumpe extends IPSModuleStrict
     {
         parent::Create();
 
-        // Allgemein
-
         // Zentrale Status- und Steuerungszuordnung
         $this->RegisterPropertyInteger('OperatingStatusVariable', 0);
         $this->RegisterPropertyString('OperatingStatusHeatingValues', '0,6');
@@ -33,8 +31,6 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('HeatingPumpHotWaterMode', 0);
         $this->RegisterPropertyInteger('HeatingPumpHeatingMode', 0);
         $this->RegisterPropertyInteger('HeatingPumpCoolingMode', 0);
-        // Heizprogramm-Status, z. B. Luxtronik opStateHeating / Calculation 125.
-        // Die Werte können wie beim zentralen Betriebsstatus frei definiert werden.
         $this->RegisterPropertyInteger('DefrostMode', 0);
 
         $this->RegisterPropertyInteger('OutdoorTemperature', 0);
@@ -120,7 +116,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->RegisterPropertyInteger('ThermalSolarFluxTemp', 0);
         $this->RegisterPropertyInteger('ThermalSolarReturnTemp', 0);
 
-        // Frei belegbare Zusatzwerte der SVG (000 ... 012)
+        // Frei belegbare Zusatzwerte der SVG (000 ... 009)
         $this->RegisterPropertyString('AdditionalLabel000', '');
         $this->RegisterPropertyInteger('AdditionalValue000', 0);
         $this->RegisterPropertyString('AdditionalLabel001', '');
@@ -265,15 +261,19 @@ class Waermepumpe extends IPSModuleStrict
     {
         $elements = [
             [
+                'type' => 'Label',
+                'caption' => 'Vorhandene Variablen zuordnen. Nicht benötigte Werte bleiben auf „Keine“. Bestehende Zuordnungen aus Version 1.x bleiben erhalten.'
+            ],
+            [
                 'type' => 'CheckBox',
                 'name' => 'FullConfigurationPreview',
-                'caption' => 'Vollansicht / Vorschau – alle vorhandenen Komponenten einblenden'
+                'caption' => 'Konfigurationsvorschau – alle Komponenten einblenden'
             ],
             [
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Wärmepumpe',
                 'items'   => [
-                    ['type' => 'Label', 'caption' => 'Betriebsstatus'],
+                    ['type' => 'Label', 'caption' => 'Betriebsstatus – mehrere Werte durch Kommas trennen'],
                     $this->VariableGrid([
                         ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable'],
                         ['caption' => 'Wärmepumpe Ein/Aus', 'name' => 'HeatingPumpStatusOnOff']
@@ -285,6 +285,21 @@ class Waermepumpe extends IPSModuleStrict
                             ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusHotWaterValues', 'caption' => 'Warmwasser – Statuswerte'],
                             ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusCoolingValues', 'caption' => 'Kühlen – Statuswerte'],
                             ['type' => 'ValidationTextBox', 'name' => 'OperatingStatusDefrostValues', 'caption' => 'Abtauen – Statuswerte']
+                        ]
+                    ],
+
+                    [
+                        'type' => 'ExpansionPanel',
+                        'caption' => 'Einzelne Statusvariablen / Fallbacks',
+                        'items' => [
+                            ['type' => 'Label', 'caption' => 'Heizen, Warmwasser, Kühlen und Abtauen werden aus dem Betriebsstatus ermittelt. Ohne Betriebsstatus werden die folgenden Variablen verwendet.'],
+                            $this->VariableGrid([
+                                ['caption' => 'Heizen aktiv', 'name' => 'HeatingPumpHeatingMode'],
+                                ['caption' => 'Warmwasser aktiv', 'name' => 'HeatingPumpHotWaterMode'],
+                                ['caption' => 'Kühlen aktiv', 'name' => 'HeatingPumpCoolingMode'],
+                                ['caption' => 'Abtauen aktiv', 'name' => 'DefrostMode'],
+                                ['caption' => 'Lüfter aktiv (ohne Drehzahlvariable)', 'name' => 'HpRunning']
+                            ])
                         ]
                     ],
 
@@ -331,9 +346,19 @@ class Waermepumpe extends IPSModuleStrict
                             ['type' => 'CheckBox', 'name' => 'TankWW', 'caption' => 'Warmwasserspeicher']
                         ]
                     ],
-                    $this->VariableRow('Puffer oben', 'TankTempHPUp', 'Warmwasser oben', 'TankTempWWUp'),
-                    $this->VariableRow('Puffer Mitte', 'TankTempHPMiddle', 'Warmwasser Mitte', 'TankTempWWMiddle'),
-                    $this->VariableRow('Puffer unten', 'TankTempHPDown', 'Warmwasser unten', 'TankTempWWDown'),
+                    ['type' => 'Label', 'caption' => 'Pufferspeicher'],
+                    $this->VariableGrid([
+                        ['caption' => 'Temperatur oben', 'name' => 'TankTempHPUp'],
+                        ['caption' => 'Temperatur Mitte', 'name' => 'TankTempHPMiddle'],
+                        ['caption' => 'Temperatur unten', 'name' => 'TankTempHPDown']
+                    ]),
+                    ['type' => 'Label', 'caption' => 'Warmwasserspeicher'],
+                    $this->VariableGrid([
+                        ['caption' => 'Temperatur oben', 'name' => 'TankTempWWUp'],
+                        ['caption' => 'Temperatur Mitte', 'name' => 'TankTempWWMiddle'],
+                        ['caption' => 'Temperatur unten', 'name' => 'TankTempWWDown']
+                    ]),
+                    ['type' => 'Label', 'caption' => 'Pumpen und Umschaltventil'],
                     $this->VariableRow('Speicherladepumpe aktiv', 'StorageChargingPumpRunning', 'Zirkulationspumpe aktiv', 'CirculatingPumpRunning'),
                     $this->VariableGrid([
                         ['caption' => 'Umschaltventil Warmwasser/Heizung', 'name' => 'WWHeatingValve']
@@ -390,7 +415,20 @@ class Waermepumpe extends IPSModuleStrict
                                 'digits' => 0
                             ]
                         ]
-                    ]                ]
+                    ],
+                    [
+                        'type' => 'ExpansionPanel',
+                        'caption' => 'Weitere Heizstabstatus aus Version 1.x',
+                        'items' => [
+                            $this->VariableGrid([
+                                ['caption' => 'Warmwasser-Heizstab aktiv', 'name' => 'HeaterRodWW'],
+                                ['caption' => 'Heizstab Stufe 1 aktiv', 'name' => 'HeaterRodLevel1'],
+                                ['caption' => 'Heizstab Stufe 2 aktiv', 'name' => 'HeaterRodLevel2']
+                            ]),
+                            ['type' => 'Label', 'caption' => 'Diese Statuswerte ergänzen die bestehende Darstellung. Die drei Heizstäbe im Speicher werden über Anzahl, Variable und Einschaltschwelle oben konfiguriert.']
+                        ]
+                    ]
+                ]
             ],
 
             $this->HeatingCircuitPanel(1),
@@ -406,8 +444,7 @@ class Waermepumpe extends IPSModuleStrict
                     $this->VariableRow('Kollektortemperatur', 'ThermalSolarPanelTemp', 'Solar Vorlauf', 'ThermalSolarFluxTemp'),
                     $this->VariableRow('Solar Rücklauf', 'ThermalSolarReturnTemp', '', '')
                 ]
-            ]
-,
+            ],
 
             [
                 'type'    => 'ExpansionPanel',
@@ -417,157 +454,8 @@ class Waermepumpe extends IPSModuleStrict
                         'type' => 'Label',
                         'caption' => 'Bis zu 10 zusätzliche Werte an den vorgesehenen Positionen der Grafik anzeigen.'
                     ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel000',
-                                'caption' => 'Bezeichnung 1'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue000',
-                                'caption' => 'Variable 1'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel001',
-                                'caption' => 'Bezeichnung 2'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue001',
-                                'caption' => 'Variable 2'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel002',
-                                'caption' => 'Bezeichnung 3'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue002',
-                                'caption' => 'Variable 3'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel003',
-                                'caption' => 'Bezeichnung 4'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue003',
-                                'caption' => 'Variable 4'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel004',
-                                'caption' => 'Bezeichnung 5'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue004',
-                                'caption' => 'Variable 5'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel005',
-                                'caption' => 'Bezeichnung 6'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue005',
-                                'caption' => 'Variable 6'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel006',
-                                'caption' => 'Bezeichnung 7'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue006',
-                                'caption' => 'Variable 7'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel007',
-                                'caption' => 'Bezeichnung 8'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue007',
-                                'caption' => 'Variable 8'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel008',
-                                'caption' => 'Bezeichnung 9'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue008',
-                                'caption' => 'Variable 9'
-                            ]
-                        ]
-                    ],
-                    [
-                        'type' => 'RowLayout',
-                        'items' => [
-                            [
-                                'type' => 'ValidationTextBox',
-                                'name' => 'AdditionalLabel009',
-                                'caption' => 'Bezeichnung 10'
-                            ],
-                            [
-                                'type' => 'SelectVariable',
-                                'name' => 'AdditionalValue009',
-                                'caption' => 'Variable 10'
-                            ]
-                        ]
-                    ],
-                                                        ]
+                    ...$this->AdditionalValueRows()
+                ]
             ],
             [
                 "type" => "RowLayout",
@@ -688,40 +576,38 @@ class Waermepumpe extends IPSModuleStrict
     private function VariableGrid(array $entries): array
     {
         $rows = [];
-
-        foreach (array_chunk($entries, 3) as $chunk) {
-            $columns = [];
-
-            foreach ($chunk as $entry) {
-                $columns[] = [
-                    'type'  => 'ColumnLayout',
-                    'items' => [
-                        [
-                            'type'    => 'SelectVariable',
-                            'name'    => $entry['name'],
-                            'caption' => $entry['caption']
-                        ]
-                    ]
-                ];
-            }
-
-            while (count($columns) < 3) {
-                $columns[] = [
-                    'type'  => 'ColumnLayout',
-                    'items' => []
-                ];
-            }
-
+        foreach (array_chunk($entries, 2) as $chunk) {
             $rows[] = [
-                'type'  => 'RowLayout',
-                'items' => $columns
+                'type' => 'RowLayout',
+                'items' => array_map(
+                    fn(array $entry): array => $this->VariableSelect($entry['caption'], $entry['name']),
+                    $chunk
+                )
             ];
         }
 
-        return [
-            'type'  => 'ColumnLayout',
-            'items' => $rows
-        ];
+        return ['type' => 'ColumnLayout', 'items' => $rows];
+    }
+
+    private function AdditionalValueRows(): array
+    {
+        $rows = [];
+        for ($index = 0; $index < 10; $index++) {
+            $suffix = sprintf('%03d', $index);
+            $rows[] = [
+                'type' => 'RowLayout',
+                'items' => [
+                    [
+                        'type' => 'ValidationTextBox',
+                        'name' => 'AdditionalLabel' . $suffix,
+                        'caption' => 'Bezeichnung ' . ($index + 1)
+                    ],
+                    $this->VariableSelect('Variable ' . ($index + 1), 'AdditionalValue' . $suffix)
+                ]
+            ];
+        }
+
+        return $rows;
     }
 
     private function ResourcesAvailable(): bool
@@ -1122,10 +1008,9 @@ HTML;
             'ambientTemperatureNormal'   => $this->DataKeyWithFallback('AmbientTemperatureNormal', 'AmbientTemperatureActual', 'ambientTemperatureNormal'),
             'supplyTemperature'          => $this->DataKey('SupplyTemperature', 'supplyTemperature'),
 
-            'hpRunning'                  => ($this->ReadPropertyInteger('FanSpeed') > 0 || $this->HasOperatingStatus()) ? 'hpRunning' : $this->DataKey('HpRunning', 'hpRunning'),
+            'hpRunning'                  => $this->DataKeyWithFallback('FanSpeed', 'HpRunning', 'hpRunning'),
             'fanSpeed'                   => $this->DataKey('FanSpeed', 'fanSpeed'),
             'compressorRunning'          => $this->DataKey('CompressorRunning', 'compressorRunning'),
-            'heatingPumpPower'          => $this->DataKey('HeatingPumpPower', 'heatingPumpPower'),
             'circulatingPumpRunning'     => $this->DataKey('CirculatingPumpRunning', 'circulatingPumpRunning'),
             'storageChargingPumpRunning' => $this->DataKey('StorageChargingPumpRunning', 'storageChargingPumpRunning'),
 
@@ -1315,7 +1200,12 @@ HTML;
 
         $fanSpeedId = $this->ReadPropertyInteger('FanSpeed');
         if ($fanSpeedId > 0 && IPS_VariableExists($fanSpeedId)) {
-            $data['hpRunning'] = $this->BinaryData((float) GetValue($fanSpeedId) > 0.0);
+            $fanValue = GetValue($fanSpeedId);
+            $data['hpRunning'] = $this->BinaryData(
+                is_numeric($fanValue)
+                    ? (float) $fanValue > 0.0
+                    : $this->NormalizeBinaryValue($fanValue)
+            );
         }
 
         return $data;
