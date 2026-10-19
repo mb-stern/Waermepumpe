@@ -392,10 +392,6 @@ class Waermepumpe extends IPSModuleStrict
                 ]
             ],
             [
-                'type' => 'Label',
-                'caption' => 'Vorhandene Variablen zuordnen. Nicht benötigte Werte bleiben auf „Keine“. Bestehende Zuordnungen aus Version 1.x bleiben erhalten.'
-            ],
-            [
                 'type' => 'CheckBox',
                 'name' => 'FullConfigurationPreview',
                 'caption' => 'Konfigurationsvorschau – alle Komponenten einblenden'
@@ -404,13 +400,13 @@ class Waermepumpe extends IPSModuleStrict
                 'type'    => 'ExpansionPanel',
                 'caption' => 'Wärmepumpe',
                 'items'   => [
-                    ['type' => 'Label', 'caption' => 'Betriebsstatus und Lüfter'],
+                    ['type' => 'Label', 'caption' => 'Betriebsstatus'],
                     $this->VariableGrid([
                         ['caption' => 'Betriebsstatus', 'name' => 'OperatingStatusVariable']
                     ]),
-                    $this->VariableGrid([
-                        ['caption' => 'Lüfter aktiv (ohne Drehzahlvariable)', 'name' => 'HpRunning']
-                    ]),
+                    ['type' => 'Label', 'caption' => 'Lüfter'],
+                    $this->VariableRow('Drehzahl', 'FanSpeed', 'Aktivsignal (Alternative)', 'HpRunning'),
+                    ['type' => 'Label', 'caption' => 'Eine Drehzahlvariable reicht aus. Das Aktivsignal wird nur verwendet, wenn keine gültige Drehzahlvariable verknüpft ist.'],
 
                     ['type' => 'Label', 'caption' => 'Bedienung'],
                     [
@@ -435,7 +431,6 @@ class Waermepumpe extends IPSModuleStrict
                         ['caption' => 'WP Vorlauf', 'name' => 'SupplyTemperature'],
                         ['caption' => 'Rücklauf Soll', 'name' => 'ReturnTemperatureSetpointVariable'],
                         ['caption' => 'Leistung', 'name' => 'HeatingPumpPower'],
-                        ['caption' => 'Lüfterdrehzahl', 'name' => 'FanSpeed'],
                         ['caption' => 'Raumtemperatur Soll', 'name' => 'AmbientTemperatureNormal'],
                         ['caption' => 'Raumtemperatur Ist (Fallback)', 'name' => 'AmbientTemperatureActual'],
                     ]),
@@ -6556,10 +6551,13 @@ window.SymconHeatPump = {
             const formatted = (key) => {
                 if (!key || !data[key]) return '';
                 const item = data[key];
+                // A cached profile string is not a reading without a raw value.
+                if (item.value === undefined || item.value === null
+                    || (typeof item.value === 'string' && item.value.trim() === '')
+                    || (typeof item.value === 'number' && !Number.isFinite(item.value))) return '';
                 if (item.formatted !== undefined && item.formatted !== null && String(item.formatted) !== '') {
                     return String(item.formatted);
                 }
-                if (item.value === undefined || item.value === null) return '';
                 return String(item.value) + (item.unit ? ' ' + item.unit : '');
             };
 
@@ -6836,51 +6834,30 @@ window.SymconHeatPump = {
                 }
             }
 
-            setText('#textTankTempHPUp', formatted(cfg.tankTempHPUp));
-            setText('#textTankTempHPMiddle', formatted(cfg.tankTempHPMiddle));
-            setText('#textTankTempHPDown', formatted(cfg.tankTempHPDown));
-            // Speicherwerte nur anzeigen, wenn die jeweilige Variable konfiguriert ist.
-            // Bei nur einem Wert steht dieser mittig; bei zwei werden sie verteilt.
-            const placeTankValues = (definitions, positions) => {
-                const active = definitions
-                    .map(([selector, key]) => ({
-                        el: svg.querySelector(selector),
-                        value: formatted(key)
-                    }))
-                    .filter((item) => !!item.value);
-
-                definitions.forEach(([selector]) => {
+            // Each sensor keeps its physical level, even if the other sensors
+            // are absent. Removing a link also removes the old text completely.
+            const placeTankValues = (definitions) => {
+                definitions.forEach(([selector, key, y]) => {
                     const el = svg.querySelector(selector);
-                    if (el) el.style.display = 'none';
-                });
-
-                const ys = positions[active.length] || [];
-                active.forEach((item, index) => {
-                    item.el.style.display = 'inline';
-                    item.el.textContent = item.value;
-                    item.el.setAttribute('y', String(ys[index]));
+                    if (!el) return;
+                    const value = formatted(key);
+                    el.textContent = value;
+                    el.style.setProperty('display', value !== '' ? 'inline' : 'none', 'important');
+                    el.setAttribute('y', String(y));
                 });
             };
 
             placeTankValues([
-                ['#textTankTempWWUp', cfg.tankTempWWUp],
-                ['#textTankTempWWMiddle', cfg.tankTempWWMiddle],
-                ['#textTankTempWWDown', cfg.tankTempWWDown]
-            ], {
-                1: [162],
-                2: [105, 220],
-                3: [85, 162, 240]
-            });
+                ['#textTankTempWWUp', cfg.tankTempWWUp, 85],
+                ['#textTankTempWWMiddle', cfg.tankTempWWMiddle, 162],
+                ['#textTankTempWWDown', cfg.tankTempWWDown, 240]
+            ]);
 
             placeTankValues([
-                ['#textTankTempHPUp', cfg.tankTempHPUp],
-                ['#textTankTempHPMiddle', cfg.tankTempHPMiddle],
-                ['#textTankTempHPDown', cfg.tankTempHPDown]
-            ], {
-                1: [158],
-                2: [105, 215],
-                3: [82, 158, 232]
-            });
+                ['#textTankTempHPUp', cfg.tankTempHPUp, 82],
+                ['#textTankTempHPMiddle', cfg.tankTempHPMiddle, 158],
+                ['#textTankTempHPDown', cfg.tankTempHPDown, 232]
+            ]);
 
             setText('#textHeatingCircuitName1', cfg.heatingCircuitName1 || 'HK1');
             setText('#textHeatingCircuitName2', cfg.heatingCircuitName2 || 'HK2');

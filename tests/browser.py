@@ -57,6 +57,65 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 }''')
                 target_key=payload['config']['returnTemperatureSetpoint']
                 actual_key=payload['config']['refluxTemperatureHeating']
+                # Missing tank sensors must leave no stale or synthetic readings.
+                tanks=[
+                    ('tankTempWW', 'textTankTempWW', {'Up':85,'Middle':162,'Down':240}),
+                    ('tankTempHP', 'textTankTempHP', {'Up':82,'Middle':158,'Down':232}),
+                ]
+                def tank_readings():
+                    return page.evaluate('''() => Object.fromEntries(
+                        [...document.querySelectorAll('text[id^="textTankTemp"]')].map(e=>[
+                            e.id,{text:e.textContent,display:getComputedStyle(e).display,y:Number(e.getAttribute('y'))}
+                        ])
+                    )''')
+                def update_tanks(p):
+                    page.evaluate('(p)=>window.handleMessage({type:"update",config:p.config,data:p.data,controls:p.controls})',p)
+                for active in [[],['Up'],['Up','Down'],['Up','Middle','Down']]:
+                    changed=json.loads(json.dumps(payload))
+                    for key_prefix, text_prefix, positions in tanks:
+                        for suffix in ['Up','Middle','Down']:
+                            if suffix not in active:
+                                # Retain old data deliberately: an unlinked config must win.
+                                changed['config'][key_prefix+suffix]=''
+                    update_tanks(changed)
+                    readings=tank_readings()
+                    for key_prefix, text_prefix, positions in tanks:
+                        for suffix in ['Up','Middle','Down']:
+                            reading=readings[text_prefix+suffix]
+                            if suffix in active:
+                                assert reading['text']=='25.5' and reading['display']!='none',reading
+                                assert reading['y']==positions[suffix],reading
+                            else:
+                                assert reading['text']=='' and reading['display']=='none',reading
+                # A selected sensor may subsequently lose its data or yield no value.
+                for missing_value in ['missing',None,'','   ']:
+                    changed=json.loads(json.dumps(payload))
+                    for key_prefix, _, _ in tanks:
+                        for suffix in ['Up','Middle','Down']:
+                            key=changed['config'][key_prefix+suffix]
+                            if missing_value=='missing':
+                                changed['data'].pop(key,None)
+                            else:
+                                changed['data'][key].update(value=missing_value,formatted='57.2 °C')
+                    update_tanks(changed)
+                    for reading in tank_readings().values():
+                        assert reading['text']=='' and reading['display']=='none',reading
+                # Zero is a legitimate measurement; the component preview adds no data.
+                zero=json.loads(json.dumps(payload))
+                for key_prefix, _, _ in tanks:
+                    for suffix in ['Up','Middle','Down']:
+                        zero['data'][zero['config'][key_prefix+suffix]].update(value=0,formatted='0.0 °C')
+                update_tanks(zero)
+                for reading in tank_readings().values():
+                    assert reading['text']=='0.0 °C' and reading['display']!='none',reading
+                zero['config']['fullConfigurationPreview']=True
+                for key_prefix, _, _ in tanks:
+                    for suffix in ['Up','Middle','Down']:
+                        zero['config'][key_prefix+suffix]=''
+                update_tanks(zero)
+                for reading in tank_readings().values():
+                    assert reading['text']=='' and reading['display']=='none',reading
+                update_tanks(payload)
                 # Drive real numeric popups and capture only simulated SDK actions.
                 page.evaluate('''() => {
                     window.testActions=[];

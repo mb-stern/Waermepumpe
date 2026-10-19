@@ -177,6 +177,8 @@ Andere Elemente des Kältekreises werden dabei nicht verschoben.
 
 Bei einer Luft/Wasser-Wärmepumpe kann der Lüfter animiert werden.
 
+Unter **Wärmepumpe → Lüfter** stehen **Drehzahl** und **Aktivsignal (Alternative)** gemeinsam nebeneinander. Eine gültige Drehzahlvariable reicht aus: Bei einer Drehzahl größer null ist der Lüfter aktiv, bei null steht er. Das separate Aktivsignal wird nur verwendet, wenn keine gültige Drehzahlvariable verknüpft ist. Bestehende Zuordnungen bleiben erhalten.
+
 Als Datenquelle können sowohl:
 
 - Boolean
@@ -281,7 +283,7 @@ Unterstützt werden:
 - Temperatur Mitte
 - Temperatur unten
 
-Fehlende Mittel- oder Untertemperaturen können durch die Logik der Card aus den vorhandenen Temperaturen abgeleitet werden.
+Es werden ausschließlich verknüpfte Sensoren mit einem vorhandenen Messwert angezeigt. Jeder Sensor behält seine Position: **oben bleibt oben, Mitte bleibt Mitte und unten bleibt unten**, auch wenn nur ein einzelner Sensor konfiguriert ist. Fehlende Temperaturen werden weder ergänzt noch aus anderen Sensoren übernommen. Beim Entfernen einer Zuordnung oder Ausbleiben eines Messwerts wird der alte Text vollständig gelöscht. Eine echte Temperatur von **0 °C** bleibt sichtbar. Auch die Konfigurationsvorschau erzeugt keine Temperaturwerte.
 
 ---
 
