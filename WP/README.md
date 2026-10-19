@@ -13,7 +13,26 @@ Die Visualisierung unterstützt die Instanzen des Moduls [mb-stern/Luxtronik](ht
 1. Im Formular **Luxtronik automatisch zuordnen (optional)** öffnen. Bei genau einer vorhandenen Luxtronik-Instanz wird deren Name und ID als Vorschlag angezeigt.
 2. Bei mehreren Instanzen die gewünschte Quelle im **Instanz-Picker** auswählen. „Keine“ bedeutet automatische Erkennung einer einzelnen Instanz; bei mehreren wird keine willkürlich ausgewählt.
 3. **Luxtronik-Variablen zuordnen** klicken. Leere Felder werden befüllt; bestehende Zuordnungen zu einer Luxtronik-Instanz werden anhand der passenden Idents auf die gewählte Quelle aktualisiert. Variablen aus anderen Modulen sowie freie manuelle Variablen bleiben erhalten. Entscheidend ist die übergeordnete Instanz der Variable. Auch noch nicht gespeicherte externe Zuordnungen im geöffneten Formular werden berücksichtigt.
-4. Vorschläge prüfen, bei Bedarf einzelne Felder manuell ändern und anschließend **Übernehmen**. Der Button selbst speichert keine Eigenschaften und löst keine Geräteaktion aus. Alle Variablenfelder bleiben dauerhaft manuell bedienbar; es gibt keinen Automatikmodus, der manuelle Änderungen im Hintergrund zurücksetzt.
+4. Vorschläge in der **Zuordnungsübersicht** prüfen und anschließend **Übernehmen**. Der Button selbst speichert keine Eigenschaften und löst keine Geräteaktion aus. Passende Ident-Zuordnungen sind im Formular grau und gesperrt. Externe Quellen und offene Felder bleiben bearbeitbar. Für freie Änderungen **Manuelle Konfiguration – alle Variablenfelder freigeben** aktivieren; in diesem Modus ist der automatische Zuordnungsbutton deaktiviert.
+
+### Zuordnungsübersicht und graue Felder
+
+Die Übersicht zeigt alle 57 Variablenfelder mit Bereich, Zuordnungsstatus, tatsächlichem bzw. gesuchtem Ident sowie Quelle, Variablenname und ID. Sie wird beim Öffnen aus den gespeicherten Zuordnungen erzeugt. Nach einer automatischen Zuordnung, einer manuellen Variablenauswahl oder einem Wechsel der Luxtronik-Quelle werden die noch nicht gespeicherten Formularwerte angezeigt.
+
+| Anzeige | Bedeutung |
+| --- | --- |
+| Per Ident zugeordnet | Die Variable entspricht der passenden Zuordnung der gewählten Luxtronik-Instanz. Die Tabellenzeile ist hellgrau, der Variablen-Picker grau und gesperrt. |
+| Externe / manuelle Quelle | Die Variable stammt aus einem anderen Modul oder ist eine freie manuelle Variable. Sie bleibt erhalten und bearbeitbar. |
+| Luxtronik, manuell | Eine Luxtronik-Variable ist gewählt, entspricht aber nicht der automatischen Zuordnung dieses Feldes. |
+| Andere Luxtronik-Instanz | Die Variable gehört zu einer anderen Luxtronik-Quelle als der aktuell ausgewählten. |
+| Nicht zugeordnet | Das Feld ist leer; eine passende Variable ist verfügbar oder es ist noch keine eindeutige Luxtronik-Quelle gewählt. |
+| Datenpunkt fehlt | Für die gewählte Quelle ist keine passende, nutzbare Variable verfügbar. Bei Bedienvariablen sind ein numerischer Typ und eine Aktion erforderlich. |
+| Manuell zuordnen | Für dieses leere Feld ist keine automatische Luxtronik-Zuordnung hinterlegt. |
+| Ungültige Variablen-ID | Die eingetragene Variable existiert nicht mehr und muss geprüft werden. |
+
+„Per Ident zugeordnet“ beschreibt die aktuell passende Verknüpfung, unabhängig davon, ob sie ursprünglich per Button oder von Hand gewählt wurde. Das Formular speichert die Übersicht und ihre Farben nicht als Konfiguration. Die Sperre verhindert versehentliche Änderungen an erkannten Zuordnungen; sie lässt sich mit **Manuelle Konfiguration** jederzeit aufheben. Im manuellen Modus wird weiterhin angezeigt, welche Idents passen, die Picker sind jedoch frei bedienbar. Im Hintergrund werden keine manuellen Variablenzuordnungen überschrieben.
+
+Der **Betriebsstatus** bleibt eine eigene Zustandsvariable. Die drei getrennten Bedienvariablen stehen gemeinsam im aufklappbaren Bereich **Betriebsarten bedienen**. Technische Zusätze wie „Integer“ entfallen in den Feldbeschriftungen; gespeicherte Eigenschaften und ihre Auswertung bleiben gleich.
 
 Beim Wechsel der Luxtronik-Quelle werden alte Luxtronik-Zuordnungen in den unterstützten Feldern auf „Keine“ gesetzt, wenn die neue Quelle keinen passenden Datenpunkt bereitstellt. Dadurch bleiben dort keine Messwerte einer anderen Anlage verknüpft. Nicht mehr auflösbare Variablen-IDs werden vorsichtshalber erhalten und müssen manuell geprüft werden.
 

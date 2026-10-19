@@ -55,6 +55,13 @@ function IPS_GetObjectIDByIdent(string $ident, int $parent): int|false {
     return $GLOBALS['objectIdents'][$parent][$ident] ?? false;
 }
 function IPS_GetName(int $id): string { return 'Test instance ' . $id; }
+function IPS_GetObject(int $id): array {
+    foreach ($GLOBALS['objectIdents'] as $children) {
+        $ident = array_search($id, $children, true);
+        if ($ident !== false) return ['ObjectIdent' => $ident];
+    }
+    return ['ObjectIdent' => ''];
+}
 function IPS_GetParent(int $id): int {
     foreach ($GLOBALS['objectIdents'] as $parent => $children) {
         if (in_array($id, $children, true)) return $parent;
@@ -114,13 +121,17 @@ check($library['id'] === '{DB43F0BF-5550-99C6-0548-F3C87E9BBE2D}', 'Changed libr
 check($metadata['id'] === '{DB43F0BF-5550-99C6-0548-F3C87E9BBE2D}', 'Changed module identity');
 $form = json_decode($module->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
 $fields = [];
+$allFormNames = [];
 $selectors = [];
-$walk = function (array $item) use (&$walk, &$fields, &$selectors, $module): void {
+$walk = function (array $item) use (&$walk, &$fields, &$allFormNames, &$selectors, $module): void {
     if (isset($item['name'])) {
-        check(!isset($fields[$item['name']]), 'Duplicate field: ' . $item['name']);
-        check(isset($module->registered[$item['name']]), 'Unregistered field: ' . $item['name']);
-        $fields[$item['name']] = true;
-        if ($item['type'] === 'SelectVariable') $selectors[] = $item['name'];
+        check(!isset($allFormNames[$item['name']]), 'Duplicate field: ' . $item['name']);
+        $allFormNames[$item['name']] = $item;
+        if (!in_array($item['type'], ['Label', 'List', 'Button'], true)) {
+            check(isset($module->registered[$item['name']]), 'Unregistered field: ' . $item['name']);
+            $fields[$item['name']] = true;
+            if ($item['type'] === 'SelectVariable') $selectors[] = $item['name'];
+        }
     }
     foreach ($item['items'] ?? [] as $child) $walk($child);
 };
@@ -286,7 +297,7 @@ $variables[62050] = -2.0;
 $explicit = createModule();
 $explicit->AssignLuxtronik(61001, '{}');
 check($explicit->formUpdates['OutdoorTemperature']['value'] === 62050, 'Explicit instance ignored');
-check(!isset($explicit->formUpdates['OperatingStatusVariable']), 'Variables leaked from another instance');
+check(!isset($explicit->formUpdates['OperatingStatusVariable']['value']), 'Variables leaked from another instance');
 
 // Refresh incorrect Luxtronik links and switch units while retaining external modules.
 $objectIdents[61002] = ['ExternalRoomSensor' => 62060];
@@ -300,11 +311,11 @@ $before = [$writes, $actions, $refresh->properties];
 $refresh->AssignLuxtronik(61000, '{}');
 check($refresh->formUpdates['SupplyTemperature']['value'] === 62001, 'Incorrect Luxtronik mapping not refreshed');
 check($refresh->formUpdates['OutdoorTemperature']['value'] === 62004, 'Old Luxtronik source not replaced');
-check(!isset($refresh->formUpdates['WarmWaterSetpointVariable']), 'External module assignment overwritten');
+check(!isset($refresh->formUpdates['WarmWaterSetpointVariable']['value']), 'External module assignment overwritten');
 check([$writes, $actions, $refresh->properties] === $before, 'Refresh persisted settings or triggered actions');
 $unsavedExternal = createModule(['OutdoorTemperature' => 62004]);
 $unsavedExternal->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62060], JSON_THROW_ON_ERROR));
-check(!isset($unsavedExternal->formUpdates['OutdoorTemperature']), 'Unsaved external assignment overwritten');
+check(!isset($unsavedExternal->formUpdates['OutdoorTemperature']['value']), 'Unsaved external assignment overwritten');
 $unsavedLuxtronik = createModule(['OutdoorTemperature' => 62060]);
 $unsavedLuxtronik->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62050], JSON_THROW_ON_ERROR));
 check($unsavedLuxtronik->formUpdates['OutdoorTemperature']['value'] === 62004, 'Current form source not used for refresh');
@@ -318,7 +329,7 @@ $module = createModule(['OutdoorTemperature' => 63000]);
 $before = [$writes, $actions, $module->properties];
 // Include a manual edit that has not yet been saved in the instance.
 $message = $module->AssignLuxtronik(0, json_encode(['SupplyTemperature' => 63001], JSON_THROW_ON_ERROR));
-check(!isset($module->formUpdates['OutdoorTemperature']) && !isset($module->formUpdates['SupplyTemperature']), 'Manual assignment overwritten');
+check(!isset($module->formUpdates['OutdoorTemperature']['value']) && !isset($module->formUpdates['SupplyTemperature']['value']), 'Manual assignment overwritten');
 check($module->formUpdates['LuxtronikInstanceID']['value'] === 61000, 'Single Luxtronik instance not detected');
 foreach (['OperatingStatusVariable' => 62000, 'RefluxTemperatureHeating1' => 62002,
           'ReturnTemperatureSetpointVariable' => 62003, 'TankTempWWUp' => 62005,
@@ -326,7 +337,7 @@ foreach (['OperatingStatusVariable' => 62000, 'RefluxTemperatureHeating1' => 620
           'WarmWaterSetpointVariable' => 62009, 'HeatingTemperatureCorrectionVariable' => 62010] as $property => $expected) {
     check($module->formUpdates[$property]['value'] === $expected, 'Wrong Luxtronik Ident mapping: ' . $property);
 }
-check(!isset($module->formUpdates['ExpansionValveOpening']) && !isset($module->formUpdates['HeaterRod1']), 'Uncertain physical mapping guessed');
+check(!isset($module->formUpdates['ExpansionValveOpening']['value']) && !isset($module->formUpdates['HeaterRod1']['value']), 'Uncertain physical mapping guessed');
 check([$writes, $actions, $module->properties] === $before, 'Assignment persisted configuration or operated a device');
 check(str_contains($message, 'Übernehmen'), 'Saving instructions missing');
 
@@ -336,7 +347,9 @@ $module = createModule();
 $module->AssignLuxtronik(0, '{}');
 check($module->formUpdates['TankTempWWUp']['value'] === 62006, 'Specific tank sensor not preferred');
 // Simulate pressing Apply: normal data, actions and subscriptions use the saved IDs.
-foreach ($module->formUpdates as $property => $parameters) $module->properties[$property] = $parameters['value'];
+foreach ($module->formUpdates as $property => $parameters) {
+    if (array_key_exists('value', $parameters)) $module->properties[$property] = $parameters['value'];
+}
 $module->ApplyChanges();
 $data = callPrivate($module, 'BuildVisualizationData');
 check($data['returnTemperatureSetpoint']['value'] === 30.0 && $data['refluxTemperatureHeating']['value'] === 28.9, 'Imported return temperatures not used');
@@ -347,7 +360,9 @@ check(end($actions) === [62009, 51.0], 'Imported control did not use its normal 
 $module->formUpdates = [];
 $module->AssignLuxtronik(61000, '{}');
 foreach ($module->formUpdates as $property => $parameters) {
-    check($module->properties[$property] === $parameters['value'], 'Repeated import changed an already correct assignment');
+    if (array_key_exists('value', $parameters)) {
+        check($module->properties[$property] === $parameters['value'], 'Repeated import changed an already correct assignment');
+    }
 }
 
 // Read-only or legacy string values must not be imported as device controls.
@@ -355,11 +370,11 @@ $variableMetadata[62009] = [];
 $variableMetadata[62010] = ['VariableType' => 3, 'VariableAction' => 61000];
 $module = createModule();
 $module->AssignLuxtronik(0, '{}');
-check(!isset($module->formUpdates['WarmWaterSetpointVariable']) && !isset($module->formUpdates['HeatingTemperatureCorrectionVariable']), 'Unsupported control imported');
+check(!isset($module->formUpdates['WarmWaterSetpointVariable']['value']) && !isset($module->formUpdates['HeatingTemperatureCorrectionVariable']['value']), 'Unsupported control imported');
 $objectIdents[61000]['Ruecklauf_Soll_Heizkreis'] = 62999;
 $module = createModule();
 $module->AssignLuxtronik(0, '{}');
-check(!isset($module->formUpdates['ReturnTemperatureSetpointVariable']), 'Deleted variable imported');
+check(!isset($module->formUpdates['ReturnTemperatureSetpointVariable']['value']), 'Deleted variable imported');
 
 $singleForm = json_decode(createModule()->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
 check(str_contains(json_encode($singleForm, JSON_THROW_ON_ERROR), 'Automatischer Vorschlag: Test instance 61000'), 'Single-instance proposal missing');
@@ -373,9 +388,9 @@ $missingForm = createModule(['LuxtronikInstanceID' => 61999])->GetConfigurationF
 check(str_contains(json_encode(json_decode($missingForm, true, 512, JSON_THROW_ON_ERROR), JSON_UNESCAPED_UNICODE), 'nicht verfügbar'), 'Deleted saved source not explained');
 
 // Exercise the actual generated button script with unsaved form values.
-function WP_AssignLuxtronik(int $id, int $source, string $formValues): string {
+function WP_AssignLuxtronik(int $id, int $source, string $formValues, bool $manual = false): string {
     check($id === $GLOBALS['assignmentModule']->InstanceID, 'Wrong target instance in button script');
-    return $GLOBALS['assignmentModule']->AssignLuxtronik($source, $formValues);
+    return $GLOBALS['assignmentModule']->AssignLuxtronik($source, $formValues, $manual);
 }
 $assignmentModule = createModule();
 foreach ($assignmentModule->properties as $property => $value) $$property = $value;
@@ -384,9 +399,89 @@ $OutdoorTemperature = 63100; // Unsaved user choice must survive the button.
 $buttonScript = $singleForm['elements'][0]['items'][3]['onClick'];
 ob_start();
 try { eval($buttonScript); } finally { $buttonMessage = ob_get_clean(); }
-check(!isset($assignmentModule->formUpdates['OutdoorTemperature']), 'Button overwrote unsaved manual input');
+check(!isset($assignmentModule->formUpdates['OutdoorTemperature']['value']), 'Button overwrote unsaved manual input');
 check(isset($assignmentModule->formUpdates['RefluxTemperatureHeating1']), 'Button did not populate matching Idents');
 check(str_contains($buttonMessage, 'Übernehmen'), 'Button did not explain how to save');
+
+// Live assignment report: correct Idents are locked; external and missing values stay editable.
+function namedFormItems(array $elements): array {
+    $items = [];
+    foreach ($elements as $element) {
+        if (isset($element['name'])) $items[$element['name']] = $element;
+        if (isset($element['items'])) $items += namedFormItems($element['items']);
+    }
+    return $items;
+}
+function reportRow(array $rows, string $fieldCaption): array {
+    foreach ($rows as $row) {
+        if (str_ends_with($row['field'], ' · ' . $fieldCaption)) return $row;
+    }
+    throw new RuntimeException('Missing assignment report row: ' . $fieldCaption);
+}
+$objectIdents[61000]['Ruecklauf_Soll_Heizkreis'] = 62003;
+$variableMetadata[62009] = ['VariableAction' => 61000];
+$instances[61001] = $luxtronikID;
+$statusProperties = [
+    'LuxtronikInstanceID' => 61000,
+    'OperatingStatusVariable' => 62000,
+    'HeatingControlVariable' => 62008,
+    'SupplyTemperature' => 62002, // A different Luxtronik Ident.
+    'OutdoorTemperature' => 62060, // External module.
+    'CompressorRunning' => 62050, // Other Luxtronik instance.
+    'ReturnTemperatureSetpointVariable' => 62998, // Deleted variable.
+    'AdditionalValue000' => 62060, // Manual field without an automatic mapping.
+];
+$assignmentModule = createModule($statusProperties);
+$statusForm = json_decode($assignmentModule->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+$statusItems = namedFormItems($statusForm['elements']);
+$overview = $statusItems['AssignmentOverview'];
+check(count($overview['values']) === count($selectors), 'Assignment report does not cover every variable field');
+check($overview['add'] === false && $overview['delete'] === false && $overview['loadValuesFromConfiguration'] === false, 'Report may edit or load persisted configuration');
+foreach ($overview['columns'] as $column) check($column['save'] === false, 'Report column persists derived status');
+check(!isset($assignmentModule->registered['AssignmentOverview']), 'Derived report registered as configuration');
+$statusRow = reportRow($overview['values'], 'Betriebsstatus');
+check($statusRow['status'] === 'Per Ident zugeordnet' && $statusRow['ident'] === 'Betriebszustand' && $statusRow['rowColor'] === '#eeeeee', 'Correct Ident not highlighted');
+check(str_contains($statusRow['variable'], '#62000'), 'Variable ID missing from report');
+check(reportRow($overview['values'], 'Außentemperatur')['status'] === 'Externe / manuelle Quelle', 'External source not distinguished');
+check(reportRow($overview['values'], 'WP Vorlauf')['status'] === 'Luxtronik, manuell', 'Wrong Luxtronik Ident reported as automatic');
+check(reportRow($overview['values'], 'Verdichter aktiv')['status'] === 'Andere Luxtronik-Instanz', 'Other source reported as automatic');
+check(reportRow($overview['values'], 'Rücklauf Soll')['status'] === 'Ungültige Variablen-ID', 'Deleted assignment not distinguished');
+$missingRow = reportRow($overview['values'], 'Niederdruck');
+check($missingRow['status'] === 'Datenpunkt fehlt' && $missingRow['ident'] === 'Niederdruck', 'Missing Ident not named');
+check($statusItems['OperatingStatusVariable']['enabled'] === false && $statusItems['HeatingControlVariable']['enabled'] === false, 'Correct Ident picker not locked');
+foreach (['OutdoorTemperature', 'SupplyTemperature', 'CompressorRunning', 'ReturnTemperatureSetpointVariable', 'HeaterRod1'] as $property) {
+    check($statusItems[$property]['enabled'] === true, 'Non-automatic picker locked: ' . $property);
+}
+check($statusItems['OperatingStatusVariable']['caption'] === 'Betriebsstatus', 'Technical integer wording retained');
+check($statusItems['HeatingControlVariable']['caption'] === 'Heizen', 'Control label not simplified');
+check($statusItems['OperatingStatusVariable']['name'] !== $statusItems['HeatingControlVariable']['name'], 'Operating state and controls conflated');
+
+function WP_RefreshAssignmentStatus(int $id, int $source, string $formValues, bool $manual = false): void {
+    check($id === $GLOBALS['assignmentModule']->InstanceID, 'Wrong target instance in status script');
+    $GLOBALS['assignmentModule']->RefreshAssignmentStatus($source, $formValues, $manual);
+}
+foreach ($assignmentModule->properties as $property => $value) $$property = $value;
+$before = [$writes, $actions, $assignmentModule->properties];
+$OperatingStatusVariable = 62060; // A current, unsaved change to an external source.
+ob_start();
+try { eval($statusItems['OperatingStatusVariable']['onChange']); }
+finally { $statusOutput = ob_get_clean(); }
+check($statusOutput === '', 'Status change opened a popup');
+$liveRows = json_decode($assignmentModule->formUpdates['AssignmentOverview']['values'], true, 512, JSON_THROW_ON_ERROR);
+check(reportRow($liveRows, 'Betriebsstatus')['status'] === 'Externe / manuelle Quelle', 'Report ignored unsaved selection');
+check($assignmentModule->formUpdates['OperatingStatusVariable']['enabled'] === true, 'Changed external source remained locked');
+check([$writes, $actions, $assignmentModule->properties] === $before, 'Status refresh persisted values or triggered actions');
+foreach ($assignmentModule->formUpdates as $parameters) check(!array_key_exists('value', $parameters), 'Status refresh changed a selection');
+$ManualConfiguration = true;
+eval($statusItems['ManualConfiguration']['onChange']);
+foreach ($selectors as $property) check($assignmentModule->formUpdates[$property]['enabled'] === true, 'Manual mode did not unlock picker: ' . $property);
+check($assignmentModule->formUpdates['LuxtronikAssignButton']['enabled'] === false, 'Import button available in manual mode');
+$beforeUpdates = $assignmentModule->formUpdates;
+check(str_contains($assignmentModule->AssignLuxtronik(61000, '{}', true), 'Manuelle Konfiguration'), 'Manual import not explained');
+check($assignmentModule->formUpdates === $beforeUpdates, 'Import changed form in manual mode');
+$manualForm = namedFormItems(json_decode(createModule($statusProperties + ['ManualConfiguration' => true])->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR)['elements']);
+check($manualForm['OperatingStatusVariable']['enabled'] === true && $manualForm['LuxtronikAssignButton']['enabled'] === false, 'Saved manual mode not respected');
+
 $instances = $objectIdents = [];
 $module = createModule();
 $html = $module->GetVisualizationTile();

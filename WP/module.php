@@ -45,6 +45,7 @@ class Waermepumpe extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterPropertyInteger('LuxtronikInstanceID', 0);
+        $this->RegisterPropertyBoolean('ManualConfiguration', false);
 
         // Zentrale Status- und Steuerungszuordnung
         $this->RegisterPropertyInteger('OperatingStatusVariable', 0);
@@ -316,6 +317,47 @@ class Waermepumpe extends IPSModuleStrict
 
     public function GetConfigurationForm(): string
     {
+        $elements = $this->BuildConfigurationElements();
+        $fields = $this->CollectAssignmentFields($elements);
+        $values = $this->ReadAssignmentValues('{}', $fields);
+        $report = $this->BuildAssignmentReport($this->ReadPropertyInteger('LuxtronikInstanceID'), $values, $fields);
+        $manual = $this->ReadPropertyBoolean('ManualConfiguration');
+        $script = 'WP_RefreshAssignmentStatus($id, $LuxtronikInstanceID, '
+            . $this->GetAssignmentValuesScript(array_keys($fields)) . ', $ManualConfiguration);';
+        $elements[0]['items'][3]['onClick'] = $this->GetLuxtronikAssignmentScript(array_keys($fields));
+        $this->DecorateAssignmentFields($elements, $report['fields'], $script, $manual);
+        $elements[0]['items'][3]['enabled'] = !$manual;
+        $elements[0]['items'][] = [
+            'type' => 'Label',
+            'name' => 'AssignmentSummary',
+            'caption' => $report['summary']
+        ];
+        $elements[0]['items'][] = [
+            'type' => 'Label',
+            'caption' => 'Grau und gesperrt: passende Luxtronik-Ident-Zuordnung. Externe Quellen und offene Felder bleiben bearbeitbar. Für freie Änderungen „Manuelle Konfiguration“ aktivieren.'
+        ];
+        $elements[0]['items'][] = [
+            'type' => 'List',
+            'name' => 'AssignmentOverview',
+            'caption' => 'Zuordnungsübersicht',
+            'rowCount' => 10,
+            'add' => false,
+            'delete' => false,
+            'loadValuesFromConfiguration' => false,
+            'columns' => [
+                ['name' => 'field', 'caption' => 'Feld', 'width' => '260px', 'save' => false],
+                ['name' => 'status', 'caption' => 'Zuordnung', 'width' => '190px', 'save' => false],
+                ['name' => 'ident', 'caption' => 'Ident / gesuchter Ident', 'width' => '280px', 'save' => false],
+                ['name' => 'variable', 'caption' => 'Quelle und Variable', 'width' => '320px', 'save' => false]
+            ],
+            'values' => $report['rows']
+        ];
+
+        return json_encode(['elements' => $elements], JSON_THROW_ON_ERROR);
+    }
+
+    private function BuildConfigurationElements(): array
+    {
         $elements = [
             [
                 'type' => 'ExpansionPanel',
@@ -323,10 +365,11 @@ class Waermepumpe extends IPSModuleStrict
                 'items' => [
                     [
                         'type' => 'Label',
-                        'caption' => 'Eine einzelne Luxtronik-Instanz wird automatisch erkannt. Bei mehreren Instanzen bitte die gewünschte auswählen. Die Zuordnung befüllt leere Felder und aktualisiert bestehende Luxtronik-Zuordnungen. Variablen aus anderen Quellen bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern; alle Felder bleiben manuell änderbar.'
+                        'caption' => 'Luxtronik auswählen und Variablen zuordnen. Eine einzelne Instanz wird automatisch vorgeschlagen. Externe Quellen bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern.'
                     ],
                     [
                         'type' => 'Label',
+                        'name' => 'LuxtronikAssignmentHint',
                         'caption' => $this->GetLuxtronikAssignmentHint()
                     ],
                     [
@@ -337,8 +380,14 @@ class Waermepumpe extends IPSModuleStrict
                     ],
                     [
                         'type' => 'Button',
+                        'name' => 'LuxtronikAssignButton',
                         'caption' => 'Luxtronik-Variablen zuordnen',
                         'onClick' => $this->GetLuxtronikAssignmentScript()
+                    ],
+                    [
+                        'type' => 'CheckBox',
+                        'name' => 'ManualConfiguration',
+                        'caption' => 'Manuelle Konfiguration – alle Variablenfelder freigeben'
                     ]
                 ]
             ],
@@ -357,17 +406,25 @@ class Waermepumpe extends IPSModuleStrict
                 'items'   => [
                     ['type' => 'Label', 'caption' => 'Betriebsstatus und Lüfter'],
                     $this->VariableGrid([
-                        ['caption' => 'Betriebsstatus (Integer)', 'name' => 'OperatingStatusVariable']
+                        ['caption' => 'Betriebsstatus', 'name' => 'OperatingStatusVariable']
                     ]),
                     $this->VariableGrid([
                         ['caption' => 'Lüfter aktiv (ohne Drehzahlvariable)', 'name' => 'HpRunning']
                     ]),
 
                     ['type' => 'Label', 'caption' => 'Bedienung'],
+                    [
+                        'type' => 'ExpansionPanel',
+                        'caption' => 'Betriebsarten bedienen',
+                        'items' => [
+                            $this->VariableGrid([
+                                ['caption' => 'Heizen', 'name' => 'HeatingControlVariable'],
+                                ['caption' => 'Warmwasser', 'name' => 'HotWaterControlVariable'],
+                                ['caption' => 'Kühlen', 'name' => 'CoolingControlVariable']
+                            ])
+                        ]
+                    ],
                     $this->VariableGrid([
-                        ['caption' => 'Betriebsart Heizen (Integer)', 'name' => 'HeatingControlVariable'],
-                        ['caption' => 'Betriebsart Warmwasser (Integer)', 'name' => 'HotWaterControlVariable'],
-                        ['caption' => 'Betriebsart Kühlen (Integer)', 'name' => 'CoolingControlVariable'],
                         ['caption' => 'Warmwasser-Solltemperatur', 'name' => 'WarmWaterSetpointVariable'],
                         ['caption' => 'Heiztemperaturkorrektur', 'name' => 'HeatingTemperatureCorrectionVariable'],
                     ]),
@@ -520,15 +577,12 @@ class Waermepumpe extends IPSModuleStrict
             ]
         ];
 
-        return json_encode(
-            ['elements' => $elements],
-            JSON_THROW_ON_ERROR
-        );
+        return $elements;
     }
 
-    private function GetLuxtronikAssignmentHint(): string
+    private function GetLuxtronikAssignmentHint(?int $selected = null): string
     {
-        $selected = $this->ReadPropertyInteger('LuxtronikInstanceID');
+        $selected ??= $this->ReadPropertyInteger('LuxtronikInstanceID');
         $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
         if ($selected !== 0 && !in_array($selected, $instances, true)) {
             return 'Die gespeicherte Luxtronik-Instanz ist nicht verfügbar. Bitte eine andere auswählen oder manuell konfigurieren.';
@@ -540,27 +594,180 @@ class Waermepumpe extends IPSModuleStrict
         }
         $instanceID = $selected ?: $instances[0];
         return ($selected === 0 ? 'Automatischer Vorschlag: ' : 'Gespeicherte Quelle: ')
-            . IPS_GetName($instanceID) . ' (#' . $instanceID . '). Alle Variablenfelder bleiben manuell änderbar.';
+            . IPS_GetName($instanceID) . ' (#' . $instanceID . ').';
     }
 
-    private function GetLuxtronikAssignmentScript(): string
+    private function GetAssignmentValuesScript(array $properties): string
     {
         $fields = [];
-        foreach (array_keys(self::LUXTRONIK_IDENT_MAP) as $property) {
+        foreach ($properties as $property) {
             $fields[] = var_export($property, true) . ' => $' . $property;
         }
 
-        return 'echo WP_AssignLuxtronik($id, $LuxtronikInstanceID, json_encode(['
-            . implode(', ', $fields)
-            . '], JSON_THROW_ON_ERROR));';
+        return 'json_encode([' . implode(', ', $fields) . '], JSON_THROW_ON_ERROR)';
     }
 
-    public function AssignLuxtronik(int $instanceID, string $formValues): string
+    private function GetLuxtronikAssignmentScript(?array $properties = null): string
+    {
+        return 'echo WP_AssignLuxtronik($id, $LuxtronikInstanceID, '
+            . $this->GetAssignmentValuesScript($properties ?? array_keys(self::LUXTRONIK_IDENT_MAP)) . ', $ManualConfiguration);';
+    }
+
+    private function CollectAssignmentFields(array $elements, string $group = ''): array
+    {
+        $fields = [];
+        $section = '';
+        foreach ($elements as $element) {
+            if ($element['type'] === 'Label' && strlen($element['caption'] ?? '') < 100) {
+                $section = $element['caption'] ?? '';
+            }
+            $context = implode(' / ', array_filter([$group, $section]));
+            if ($element['type'] === 'SelectVariable') {
+                $fields[$element['name']] = ($context === '' ? '' : $context . ' · ') . $element['caption'];
+            }
+            if (isset($element['items'])) {
+                $fields += $this->CollectAssignmentFields(
+                    $element['items'],
+                    $element['type'] === 'ExpansionPanel' ? $element['caption'] : $context
+                );
+            }
+        }
+        return $fields;
+    }
+
+    private function ReadAssignmentValues(string $formValues, array $fields): array
     {
         $values = json_decode($formValues, true, 512, JSON_THROW_ON_ERROR);
         if (!is_array($values)) {
             throw new InvalidArgumentException('Ungültige Formularwerte.');
         }
+        $current = [];
+        foreach ($fields as $property => $caption) {
+            $value = $values[$property] ?? $this->ReadPropertyInteger($property);
+            if (!is_int($value) || $value < 0) {
+                throw new InvalidArgumentException('Ungültige Variablenzuordnung: ' . $property);
+            }
+            $current[$property] = $value;
+        }
+        return $current;
+    }
+
+    private function FindLuxtronikVariable(string $property, int $instanceID): int
+    {
+        foreach (self::LUXTRONIK_IDENT_MAP[$property] ?? [] as $ident) {
+            $variableID = @IPS_GetObjectIDByIdent($ident, $instanceID);
+            if ($variableID === false || !IPS_VariableExists($variableID)) {
+                continue;
+            }
+            if (in_array($property, [
+                'HeatingControlVariable', 'HotWaterControlVariable', 'CoolingControlVariable',
+                'WarmWaterSetpointVariable', 'HeatingTemperatureCorrectionVariable'
+            ], true)) {
+                $variable = IPS_GetVariable($variableID);
+                if (!in_array((int) $variable['VariableType'], [1, 2], true)
+                    || (int) ($variable['VariableCustomAction'] ?: $variable['VariableAction']) <= 0) {
+                    continue;
+                }
+            }
+            return $variableID;
+        }
+        return 0;
+    }
+
+    private function BuildAssignmentReport(int $instanceID, array $values, array $fields): array
+    {
+        $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
+        $source = in_array($instanceID, $instances, true) ? $instanceID : 0;
+        if ($instanceID === 0 && count($instances) === 1) {
+            $source = $instances[0];
+        }
+        $rows = [];
+        $statuses = [];
+        $counts = ['ident' => 0, 'external' => 0, 'manual' => 0, 'missing' => 0, 'invalid' => 0];
+        foreach ($fields as $property => $caption) {
+            $variableID = $values[$property];
+            $expected = $source === 0 ? 0 : $this->FindLuxtronikVariable($property, $source);
+            $ident = implode(' / ', self::LUXTRONIK_IDENT_MAP[$property] ?? []);
+            $variable = '—';
+            $kind = 'missing';
+            $status = !isset(self::LUXTRONIK_IDENT_MAP[$property]) ? 'Manuell zuordnen'
+                : ($source !== 0 && $expected === 0 ? 'Datenpunkt fehlt' : 'Nicht zugeordnet');
+            if ($variableID !== 0 && !IPS_VariableExists($variableID)) {
+                $kind = 'invalid';
+                $status = 'Ungültige Variablen-ID';
+                $variable = '#' . $variableID;
+            } elseif ($variableID !== 0) {
+                $parent = IPS_GetParent($variableID);
+                $ident = (string) (IPS_GetObject($variableID)['ObjectIdent'] ?? '');
+                $variable = ($parent > 0 ? IPS_GetName($parent) . ' / ' : '')
+                    . IPS_GetName($variableID) . ' (#' . $variableID . ')';
+                if ($variableID === $expected) {
+                    $kind = 'ident';
+                    $status = 'Per Ident zugeordnet';
+                } elseif (in_array($parent, $instances, true)) {
+                    $kind = 'manual';
+                    $status = $source !== 0 && $parent !== $source
+                        ? 'Andere Luxtronik-Instanz' : 'Luxtronik, manuell';
+                } else {
+                    $kind = 'external';
+                    $status = 'Externe / manuelle Quelle';
+                }
+            }
+            $counts[$kind]++;
+            $statuses[$property] = ['ident' => $kind === 'ident'];
+            $rows[] = [
+                'field' => $caption,
+                'status' => $status,
+                'ident' => $ident === '' ? '—' : $ident,
+                'variable' => $variable,
+                'rowColor' => $kind === 'ident' ? '#eeeeee' : ''
+            ];
+        }
+        return [
+            'fields' => $statuses,
+            'rows' => $rows,
+            'summary' => $counts['ident'] . ' per Ident zugeordnet; '
+                . $counts['external'] . ' externe Quellen; ' . $counts['manual'] . ' manuelle Luxtronik-Zuordnungen; '
+                . $counts['missing'] . ' nicht zugeordnet; ' . $counts['invalid'] . ' ungültige IDs.'
+        ];
+    }
+
+    private function DecorateAssignmentFields(array &$elements, array $statuses, string $script, bool $manual): void
+    {
+        foreach ($elements as &$element) {
+            if ($element['type'] === 'SelectVariable') {
+                $property = $element['name'];
+                $element['onChange'] = $script;
+                $element['enabled'] = $manual || !$statuses[$property]['ident'];
+            } elseif (in_array($element['name'] ?? '', ['LuxtronikInstanceID', 'ManualConfiguration'], true)) {
+                $element['onChange'] = $script;
+            } elseif (isset($element['items'])) {
+                $this->DecorateAssignmentFields($element['items'], $statuses, $script, $manual);
+            }
+        }
+    }
+
+    public function RefreshAssignmentStatus(int $instanceID, string $formValues, bool $manual = false): void
+    {
+        $fields = $this->CollectAssignmentFields($this->BuildConfigurationElements());
+        $values = $this->ReadAssignmentValues($formValues, $fields);
+        $report = $this->BuildAssignmentReport($instanceID, $values, $fields);
+        $this->UpdateFormField('AssignmentOverview', 'values', json_encode($report['rows'], JSON_THROW_ON_ERROR));
+        $this->UpdateFormField('AssignmentSummary', 'caption', $report['summary']);
+        $this->UpdateFormField('LuxtronikAssignmentHint', 'caption', $this->GetLuxtronikAssignmentHint($instanceID));
+        $this->UpdateFormField('LuxtronikAssignButton', 'enabled', !$manual);
+        foreach ($report['fields'] as $property => $status) {
+            $this->UpdateFormField($property, 'enabled', $manual || !$status['ident']);
+        }
+    }
+
+    public function AssignLuxtronik(int $instanceID, string $formValues, bool $manual = false): string
+    {
+        if ($manual) {
+            return 'Manuelle Konfiguration ist aktiv. Für automatische Zuordnungen zuerst deaktivieren.';
+        }
+        $fields = $this->CollectAssignmentFields($this->BuildConfigurationElements());
+        $values = $this->ReadAssignmentValues($formValues, $fields);
 
         $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
         if ($instanceID === 0) {
@@ -578,7 +785,7 @@ class Waermepumpe extends IPSModuleStrict
         $assignments = [];
         $missing = 0;
         $cleared = 0;
-        foreach (self::LUXTRONIK_IDENT_MAP as $property => $idents) {
+        foreach (array_keys(self::LUXTRONIK_IDENT_MAP) as $property) {
             // Read the current form values, including unsaved manual edits.
             $current = $values[$property] ?? $this->ReadPropertyInteger($property);
             if (!is_int($current) || $current < 0) {
@@ -590,24 +797,9 @@ class Waermepumpe extends IPSModuleStrict
                 || !in_array(IPS_GetParent($current), $instances, true))) {
                 continue;
             }
-            foreach ($idents as $ident) {
-                $variableID = @IPS_GetObjectIDByIdent($ident, $instanceID);
-                if ($variableID === false || !IPS_VariableExists($variableID)) {
-                    continue;
-                }
-                // Never turn read-only measurements into automatically linked controls.
-                if (in_array($property, [
-                    'HeatingControlVariable', 'HotWaterControlVariable', 'CoolingControlVariable',
-                    'WarmWaterSetpointVariable', 'HeatingTemperatureCorrectionVariable'
-                ], true)) {
-                    $variable = IPS_GetVariable($variableID);
-                    if (!in_array((int) $variable['VariableType'], [1, 2], true)
-                        || (int) ($variable['VariableCustomAction'] ?: $variable['VariableAction']) <= 0) {
-                        continue;
-                    }
-                }
+            $variableID = $this->FindLuxtronikVariable($property, $instanceID);
+            if ($variableID !== 0) {
                 $assignments[$property] = $variableID;
-                break;
             }
             if (!isset($assignments[$property])) {
                 $missing++;
@@ -624,10 +816,12 @@ class Waermepumpe extends IPSModuleStrict
             $this->UpdateFormField($property, 'value', $variableID);
         }
         $this->UpdateFormField('LuxtronikInstanceID', 'value', $instanceID);
+        $this->RefreshAssignmentStatus($instanceID, json_encode(array_replace($values, $assignments), JSON_THROW_ON_ERROR));
 
         return (count($assignments) - $cleared) . ' Zuordnungen im Formular gesetzt; '
             . $cleared . ' alte Luxtronik-Zuordnungen auf „Keine“ gesetzt; '
             . $missing . ' Felder ohne passende Luxtronik-Variable. '
+            . 'Einzelheiten stehen in der Zuordnungsübersicht. '
             . 'Bitte prüfen und mit „Übernehmen“ speichern. '
             . 'Fehlende Datenpunkte bzw. Bedienvariablen im Luxtronik-Modul aktivieren oder manuell zuordnen.';
     }
