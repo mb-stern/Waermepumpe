@@ -6,6 +6,52 @@ Das Modul stellt den kompletten Wärmepumpenprozess grafisch dar und verbindet d
 
 Die Konfiguration erfolgt vollständig über das IP-Symcon-Konfigurationsformular.
 
+## Luxtronik automatisch zuordnen oder manuell konfigurieren
+
+Die Visualisierung unterstützt die Instanzen des Moduls [mb-stern/Luxtronik](https://github.com/mb-stern/Luxtronik/tree/development) mit der Modul-ID `{3884C1C3-F4FF-9A56-B982-B986E934A5E7}`. Die Zuordnung verwendet die echten Variablen-Idents dieses Moduls; ein Umbenennen der Variablen in der Konsole ändert diese Erkennung nicht. Das Luxtronik-Modul ist optional.
+
+1. Im Formular **Luxtronik automatisch zuordnen (optional)** öffnen. Bei genau einer vorhandenen Luxtronik-Instanz wird deren Name und ID als Vorschlag angezeigt.
+2. Bei mehreren Instanzen die gewünschte Quelle im **Instanz-Picker** auswählen. „Keine“ bedeutet automatische Erkennung einer einzelnen Instanz; bei mehreren wird keine willkürlich ausgewählt.
+3. **Luxtronik-Variablen zuordnen** klicken. Leere Felder werden befüllt; bestehende Zuordnungen zu einer Luxtronik-Instanz werden anhand der passenden Idents auf die gewählte Quelle aktualisiert. Variablen aus anderen Modulen sowie freie manuelle Variablen bleiben erhalten. Entscheidend ist die übergeordnete Instanz der Variable. Auch noch nicht gespeicherte externe Zuordnungen im geöffneten Formular werden berücksichtigt.
+4. Vorschläge prüfen, bei Bedarf einzelne Felder manuell ändern und anschließend **Übernehmen**. Der Button selbst speichert keine Eigenschaften und löst keine Geräteaktion aus. Alle Variablenfelder bleiben dauerhaft manuell bedienbar; es gibt keinen Automatikmodus, der manuelle Änderungen im Hintergrund zurücksetzt.
+
+Beim Wechsel der Luxtronik-Quelle werden alte Luxtronik-Zuordnungen in den unterstützten Feldern auf „Keine“ gesetzt, wenn die neue Quelle keinen passenden Datenpunkt bereitstellt. Dadurch bleiben dort keine Messwerte einer anderen Anlage verknüpft. Nicht mehr auflösbare Variablen-IDs werden vorsichtshalber erhalten und müssen manuell geprüft werden.
+
+Ohne Luxtronik wird wie bisher manuell konfiguriert. Auch mit Luxtronik lassen sich externe Sensoren, Zähler oder andere Datenquellen verwenden: Solche Zuordnungen werden beim erneuten Klick auf den Button nicht überschrieben. Zum Ersetzen einer externen Quelle durch Luxtronik das betreffende Feld zunächst auf „Keine“ setzen und die Zuordnung erneut ausführen.
+
+### Automatisch zuordenbare Felder
+
+Die folgende Zuordnung wurde gegen `mb-stern/Luxtronik`, Branch `development`, Commit `1fa55a2fd6bca7e02566e01fa975d1cdad7383c3` geprüft. Bei mehreren angegebenen Idents wird der erste vorhandene verwendet. Die Werte sind im Luxtronik-Modul bereits umgerechnet; hier erfolgt keine zusätzliche Skalierung.
+
+| Feld in der Visualisierung | Luxtronik-Ident |
+| --- | --- |
+| Betriebsstatus | `Betriebszustand` (Java-ID 80, nicht SEC-Board-Zustand 191) |
+| Betriebsart Heizen / Warmwasser / Kühlen | `Mode_Heizung` / `Mode_WW` / `Mode_Kuehlung` |
+| Warmwasser-Solltemperatur, bedienbar | `Anpassung_WW` |
+| Heiztemperaturkorrektur, bedienbar | `Anpassung_Temp` |
+| Außentemperatur | `Aussentemperatur` |
+| Raumtemperatur Soll | `Raumtemperatur_Sollwert`, alternativ `Desired_Room_Temperature` |
+| Raumtemperatur Ist | `Raumtemperatur_Istwert`, alternativ `Raumtemperatur_Raumstation_1` |
+| WP Vorlauf und Heizkreis 1 Vorlauf | `Vorlauftemperatur_Heizkreis` |
+| Heizkreis 1 Rücklauf Ist | `Ruecklauftemperatur_Heizkreis` |
+| Rücklauf Soll, nur Anzeige | `Ruecklauf_Soll_Heizkreis` |
+| Lüfterdrehzahl / Lüfter aktiv | `Ventilator_Drehzahl` / `Ausgang_Solepumpe_Ventilator` |
+| Verdichter aktiv / Drehzahl | `Ausgang_Verdichter_1` / `Verdichterdrehzahl` |
+| Leistung | `Waermeleistung` (thermisch, kW) |
+| Niederdruck / Verdampfungstemperatur | `Niederdruck` / `Vapourisation_Temperature` |
+| Hochdruck / Kondensationstemperatur | `Hochdruck` / `Kondensationstemperatur` |
+| Heizkreis 1 Pumpe / Pumpenwert | `Ausgang_Heizungsumwaelzpumpe` / `Steuersignal_Umwaelzpumpe` |
+| Warmwasserspeicher oben | `Temperatur_Brauchwasser_Oben`, alternativ `Warmwasser_Ist_Temperatur` |
+| Warmwasser-Umschaltventil und Speicherladepumpe | `Ausgang_Brauchwasserpumpe_Umstellventil` |
+| Zirkulationspumpe | `Ausgang_Zirkulationspumpe` |
+| Solar-Kollektortemperatur | `Fuehler_Solarkollektor` |
+
+Luxtronik legt nur aktivierte Datenpunkte und Bedienvariablen an. Fehlende Idents werden nicht anhand ähnlich klingender Namen oder beliebiger Nummern geraten. Benötigte Datenpunkte bzw. Bedienvariablen müssen zuerst im Luxtronik-Modul aktiviert werden. Steuerfelder werden nur automatisch zugeordnet, wenn die gefundene Variable numerisch ist und eine Standard- oder benutzerdefinierte Aktion besitzt; reine Ist- oder Sollwertmessungen werden dadurch nicht zu Stellbefehlen.
+
+Die physische Zuordnung zusätzlicher Mischkreise, einzelner Heizstäbe und weiterer Speicherfühler ist anlagenabhängig. Für diese Felder sowie für die Expansionsventil-Öffnung und freie Zusatzwerte gibt es hier keine automatische Zuordnung. Sie bleiben manuell konfigurierbar. Anlagenkomponenten wie Speicher, Heizkreistypen und Anzahl der Heizstäbe werden ebenfalls nicht automatisch geändert. Die gemeinsame Luxtronik-Ausgabe „Brauchwasserpumpe/Umstellventil“ und die Zuordnung des ungemischten Hauptkreises zu Heizkreis 1 müssen zur tatsächlichen Hydraulik passen.
+
+Die lokalen Regressionstests prüfen Erkennung, Auswahl mehrerer Instanzen, Idents, externe Quellen, ungespeicherte manuelle Änderungen, Quellenwechsel, Formularvorschläge und die anschließenden Daten-/Aktionswege mit einem Symcon-Ersatz. Die Bedienung des Konfigurationsformulars auf einem echten IP-Symcon-System muss zusätzlich geprüft werden.
+
 ---
 
 ## Funktionen

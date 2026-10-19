@@ -14,6 +14,7 @@ class IPSModuleStrict
     public array $buffers = [];
     public array $messages = [];
     public array $updates = [];
+    public array $formUpdates = [];
     public function Create(): void {}
     public function ApplyChanges(): void {}
     public function __call(string $name, array $args): mixed
@@ -33,6 +34,7 @@ class IPSModuleStrict
             'RegisterMessage' => $this->messages[$args[0]] = $args[1],
             'UnregisterMessage' => $this->removeMessage($args[0]),
             'UpdateVisualizationValue' => $this->updates[] = json_decode($args[0], true, 512, JSON_THROW_ON_ERROR),
+            'UpdateFormField' => $this->formUpdates[$args[0]][$args[1]] = $args[2],
             default => throw new RuntimeException('Unexpected Symcon API: ' . $name)
         };
     }
@@ -44,6 +46,21 @@ $variableMetadata = [];
 $profiles = [];
 $writes = [];
 $actions = [];
+$instances = [];
+$objectIdents = [];
+function IPS_GetInstanceListByModuleID(string $moduleID): array {
+    return array_keys(array_filter($GLOBALS['instances'], static fn(string $id): bool => $id === $moduleID));
+}
+function IPS_GetObjectIDByIdent(string $ident, int $parent): int|false {
+    return $GLOBALS['objectIdents'][$parent][$ident] ?? false;
+}
+function IPS_GetName(int $id): string { return 'Test instance ' . $id; }
+function IPS_GetParent(int $id): int {
+    foreach ($GLOBALS['objectIdents'] as $parent => $children) {
+        if (in_array($id, $children, true)) return $parent;
+    }
+    return 0;
+}
 function IPS_GetKernelRunlevel(): int { return KR_READY; }
 function IPS_VariableExists(int $id): bool { return isset($GLOBALS['variables'][$id]); }
 function IPS_GetVariable(int $id): array {
@@ -227,6 +244,150 @@ foreach ([0, 1, 3] as $type) {
 $variableMetadata[50001] = ['VariableType' => 1];
 $module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => 25]);
 check(end($writes) === [50001, 25], 'Integer setpoint type lost');
+
+// Optional Luxtronik assignment is a form suggestion, never a device action.
+// Exact Idents checked against mb-stern/Luxtronik development 1fa55a2.
+$luxtronikID = '{3884C1C3-F4FF-9A56-B982-B986E934A5E7}';
+$module = createModule();
+$before = [$writes, $actions, $module->properties];
+check(str_contains($module->AssignLuxtronik(0, '{}'), 'Keine Luxtronik'), 'Missing Luxtronik not explained');
+check($module->formUpdates === [] && [$writes, $actions, $module->properties] === $before, 'Missing Luxtronik changed manual setup');
+$instances = [61000 => $luxtronikID, 61001 => $luxtronikID, 61002 => '{OTHER-MODULE}'];
+check(str_contains($module->AssignLuxtronik(0, '{}'), 'Mehrere'), 'Ambiguous Luxtronik selection accepted');
+check($module->formUpdates === [], 'Ambiguous selection changed form');
+foreach ([61002, 61999] as $invalidInstance) {
+    $rejected = false;
+    try { $module->AssignLuxtronik($invalidInstance, '{}'); }
+    catch (InvalidArgumentException) { $rejected = true; }
+    check($rejected && $module->formUpdates === [], 'Wrong or deleted Luxtronik instance accepted');
+}
+$objectIdents[61000] = [
+    'Betriebszustand' => 62000,
+    'Vorlauftemperatur_Heizkreis' => 62001,
+    'Ruecklauftemperatur_Heizkreis' => 62002,
+    'Ruecklauf_Soll_Heizkreis' => 62003,
+    'Aussentemperatur' => 62004,
+    'Warmwasser_Ist_Temperatur' => 62005,
+    'Ventilator_Drehzahl' => 62007,
+    'Mode_Heizung' => 62008,
+    'Anpassung_WW' => 62009,
+    'Anpassung_Temp' => 62010,
+    'Ausgang_Verdichter_1' => 62011,
+];
+foreach ([62000 => 7, 62001 => 37.5, 62002 => 28.9, 62003 => 30.0, 62004 => 10.0,
+          62005 => 48.0, 62007 => 250, 62008 => 0, 62009 => 50.0, 62010 => -1.0, 62011 => true] as $variableID => $value) {
+    $variables[$variableID] = $value;
+}
+$variableMetadata[62008] = ['VariableType' => 1, 'VariableAction' => 61000];
+$variableMetadata[62009] = ['VariableAction' => 61000];
+$variableMetadata[62010] = ['VariableCustomAction' => 61000];
+$objectIdents[61001] = ['Aussentemperatur' => 62050];
+$variables[62050] = -2.0;
+$explicit = createModule();
+$explicit->AssignLuxtronik(61001, '{}');
+check($explicit->formUpdates['OutdoorTemperature']['value'] === 62050, 'Explicit instance ignored');
+check(!isset($explicit->formUpdates['OperatingStatusVariable']), 'Variables leaked from another instance');
+
+// Refresh incorrect Luxtronik links and switch units while retaining external modules.
+$objectIdents[61002] = ['ExternalRoomSensor' => 62060];
+$variables[62060] = 22.0;
+$refresh = createModule([
+    'SupplyTemperature' => 62002, // Wrong Ident, but from a Luxtronik instance.
+    'OutdoorTemperature' => 62050, // Previously linked to the other Luxtronik unit.
+    'WarmWaterSetpointVariable' => 62060, // Variable supplied by another module.
+]);
+$before = [$writes, $actions, $refresh->properties];
+$refresh->AssignLuxtronik(61000, '{}');
+check($refresh->formUpdates['SupplyTemperature']['value'] === 62001, 'Incorrect Luxtronik mapping not refreshed');
+check($refresh->formUpdates['OutdoorTemperature']['value'] === 62004, 'Old Luxtronik source not replaced');
+check(!isset($refresh->formUpdates['WarmWaterSetpointVariable']), 'External module assignment overwritten');
+check([$writes, $actions, $refresh->properties] === $before, 'Refresh persisted settings or triggered actions');
+$unsavedExternal = createModule(['OutdoorTemperature' => 62004]);
+$unsavedExternal->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62060], JSON_THROW_ON_ERROR));
+check(!isset($unsavedExternal->formUpdates['OutdoorTemperature']), 'Unsaved external assignment overwritten');
+$unsavedLuxtronik = createModule(['OutdoorTemperature' => 62060]);
+$unsavedLuxtronik->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62050], JSON_THROW_ON_ERROR));
+check($unsavedLuxtronik->formUpdates['OutdoorTemperature']['value'] === 62004, 'Current form source not used for refresh');
+$sourceChange = createModule(['OutdoorTemperature' => 62004, 'OperatingStatusVariable' => 62000]);
+$sourceChange->AssignLuxtronik(61001, '{}');
+check($sourceChange->formUpdates['OutdoorTemperature']['value'] === 62050, 'Selected source not used when changing units');
+check($sourceChange->formUpdates['OperatingStatusVariable']['value'] === 0, 'Missing data point retained from the old unit');
+
+unset($instances[61001]);
+$module = createModule(['OutdoorTemperature' => 63000]);
+$before = [$writes, $actions, $module->properties];
+// Include a manual edit that has not yet been saved in the instance.
+$message = $module->AssignLuxtronik(0, json_encode(['SupplyTemperature' => 63001], JSON_THROW_ON_ERROR));
+check(!isset($module->formUpdates['OutdoorTemperature']) && !isset($module->formUpdates['SupplyTemperature']), 'Manual assignment overwritten');
+check($module->formUpdates['LuxtronikInstanceID']['value'] === 61000, 'Single Luxtronik instance not detected');
+foreach (['OperatingStatusVariable' => 62000, 'RefluxTemperatureHeating1' => 62002,
+          'ReturnTemperatureSetpointVariable' => 62003, 'TankTempWWUp' => 62005,
+          'FanSpeed' => 62007, 'HeatingControlVariable' => 62008,
+          'WarmWaterSetpointVariable' => 62009, 'HeatingTemperatureCorrectionVariable' => 62010] as $property => $expected) {
+    check($module->formUpdates[$property]['value'] === $expected, 'Wrong Luxtronik Ident mapping: ' . $property);
+}
+check(!isset($module->formUpdates['ExpansionValveOpening']) && !isset($module->formUpdates['HeaterRod1']), 'Uncertain physical mapping guessed');
+check([$writes, $actions, $module->properties] === $before, 'Assignment persisted configuration or operated a device');
+check(str_contains($message, 'Übernehmen'), 'Saving instructions missing');
+
+$objectIdents[61000]['Temperatur_Brauchwasser_Oben'] = 62006;
+$variables[62006] = 49.0;
+$module = createModule();
+$module->AssignLuxtronik(0, '{}');
+check($module->formUpdates['TankTempWWUp']['value'] === 62006, 'Specific tank sensor not preferred');
+// Simulate pressing Apply: normal data, actions and subscriptions use the saved IDs.
+foreach ($module->formUpdates as $property => $parameters) $module->properties[$property] = $parameters['value'];
+$module->ApplyChanges();
+$data = callPrivate($module, 'BuildVisualizationData');
+check($data['returnTemperatureSetpoint']['value'] === 30.0 && $data['refluxTemperatureHeating']['value'] === 28.9, 'Imported return temperatures not used');
+check($data['heatingPumpCoolingMode']['value'], 'Wrong operating-status Ident or decoding');
+check(isset($module->messages[62000], $module->messages[62002], $module->messages[62003], $module->messages[62009]), 'Imported variables not subscribed');
+$module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => 51.0]);
+check(end($actions) === [62009, 51.0], 'Imported control did not use its normal action');
+$module->formUpdates = [];
+$module->AssignLuxtronik(61000, '{}');
+foreach ($module->formUpdates as $property => $parameters) {
+    check($module->properties[$property] === $parameters['value'], 'Repeated import changed an already correct assignment');
+}
+
+// Read-only or legacy string values must not be imported as device controls.
+$variableMetadata[62009] = [];
+$variableMetadata[62010] = ['VariableType' => 3, 'VariableAction' => 61000];
+$module = createModule();
+$module->AssignLuxtronik(0, '{}');
+check(!isset($module->formUpdates['WarmWaterSetpointVariable']) && !isset($module->formUpdates['HeatingTemperatureCorrectionVariable']), 'Unsupported control imported');
+$objectIdents[61000]['Ruecklauf_Soll_Heizkreis'] = 62999;
+$module = createModule();
+$module->AssignLuxtronik(0, '{}');
+check(!isset($module->formUpdates['ReturnTemperatureSetpointVariable']), 'Deleted variable imported');
+
+$singleForm = json_decode(createModule()->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+check(str_contains(json_encode($singleForm, JSON_THROW_ON_ERROR), 'Automatischer Vorschlag: Test instance 61000'), 'Single-instance proposal missing');
+$sourcePicker = $singleForm['elements'][0]['items'][2];
+check($sourcePicker['type'] === 'SelectInstance' && $sourcePicker['validModules'] === [$luxtronikID], 'Picker not limited to supported Luxtronik module');
+$instances[61001] = $luxtronikID;
+$multipleForm = json_decode(createModule()->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR);
+check(str_contains(json_encode($multipleForm, JSON_THROW_ON_ERROR), 'Mehrere Luxtronik'), 'Ambiguous source not shown in form');
+unset($instances[61001]);
+$missingForm = createModule(['LuxtronikInstanceID' => 61999])->GetConfigurationForm();
+check(str_contains(json_encode(json_decode($missingForm, true, 512, JSON_THROW_ON_ERROR), JSON_UNESCAPED_UNICODE), 'nicht verfügbar'), 'Deleted saved source not explained');
+
+// Exercise the actual generated button script with unsaved form values.
+function WP_AssignLuxtronik(int $id, int $source, string $formValues): string {
+    check($id === $GLOBALS['assignmentModule']->InstanceID, 'Wrong target instance in button script');
+    return $GLOBALS['assignmentModule']->AssignLuxtronik($source, $formValues);
+}
+$assignmentModule = createModule();
+foreach ($assignmentModule->properties as $property => $value) $$property = $value;
+$id = $assignmentModule->InstanceID;
+$OutdoorTemperature = 63100; // Unsaved user choice must survive the button.
+$buttonScript = $singleForm['elements'][0]['items'][3]['onClick'];
+ob_start();
+try { eval($buttonScript); } finally { $buttonMessage = ob_get_clean(); }
+check(!isset($assignmentModule->formUpdates['OutdoorTemperature']), 'Button overwrote unsaved manual input');
+check(isset($assignmentModule->formUpdates['RefluxTemperatureHeating1']), 'Button did not populate matching Idents');
+check(str_contains($buttonMessage, 'Übernehmen'), 'Button did not explain how to save');
+$instances = $objectIdents = [];
 $module = createModule();
 $html = $module->GetVisualizationTile();
 check(str_contains($html, 'SymconHeatPump.init('), 'Visualization not generated');

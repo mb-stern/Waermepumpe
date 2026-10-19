@@ -4,9 +4,47 @@ declare(strict_types=1);
 
 class Waermepumpe extends IPSModuleStrict
 {
+    private const LUXTRONIK_MODULE_ID = '{3884C1C3-F4FF-9A56-B982-B986E934A5E7}';
+
+    // mb-stern/Luxtronik: WPLUX/DATA_POINT_CONFIG and controllable variables.
+    // Entries are exact Idents, not editable object names or Java array offsets.
+    private const LUXTRONIK_IDENT_MAP = [
+        'OperatingStatusVariable' => ['Betriebszustand'],
+        'HeatingControlVariable' => ['Mode_Heizung'],
+        'HotWaterControlVariable' => ['Mode_WW'],
+        'CoolingControlVariable' => ['Mode_Kuehlung'],
+        'WarmWaterSetpointVariable' => ['Anpassung_WW'],
+        'HeatingTemperatureCorrectionVariable' => ['Anpassung_Temp'],
+        'OutdoorTemperature' => ['Aussentemperatur'],
+        'AmbientTemperatureNormal' => ['Raumtemperatur_Sollwert', 'Desired_Room_Temperature'],
+        'AmbientTemperatureActual' => ['Raumtemperatur_Istwert', 'Raumtemperatur_Raumstation_1'],
+        'SupplyTemperature' => ['Vorlauftemperatur_Heizkreis'],
+        'ReturnTemperatureSetpointVariable' => ['Ruecklauf_Soll_Heizkreis'],
+        'FanSpeed' => ['Ventilator_Drehzahl'],
+        'HpRunning' => ['Ausgang_Solepumpe_Ventilator'],
+        'CompressorRunning' => ['Ausgang_Verdichter_1'],
+        'CompressorValue' => ['Verdichterdrehzahl'],
+        'HeatingPumpPower' => ['Waermeleistung'],
+        'EvaporatorPressure' => ['Niederdruck'],
+        'EvaporatorTemperature' => ['Vapourisation_Temperature'],
+        'CondenserPressure' => ['Hochdruck'],
+        'CondenserTemperature' => ['Kondensationstemperatur'],
+        'SupplyTemperatureHeating1' => ['Vorlauftemperatur_Heizkreis'],
+        'RefluxTemperatureHeating1' => ['Ruecklauftemperatur_Heizkreis'],
+        'HeatingCircuitPumpRunning1' => ['Ausgang_Heizungsumwaelzpumpe'],
+        'HeatingCircuitPumpValue1' => ['Steuersignal_Umwaelzpumpe'],
+        'TankTempWWUp' => ['Temperatur_Brauchwasser_Oben', 'Warmwasser_Ist_Temperatur'],
+        'WWHeatingValve' => ['Ausgang_Brauchwasserpumpe_Umstellventil'],
+        'StorageChargingPumpRunning' => ['Ausgang_Brauchwasserpumpe_Umstellventil'],
+        'CirculatingPumpRunning' => ['Ausgang_Zirkulationspumpe'],
+        'ThermalSolarPanelTemp' => ['Fuehler_Solarkollektor']
+    ];
+
     public function Create(): void
     {
         parent::Create();
+
+        $this->RegisterPropertyInteger('LuxtronikInstanceID', 0);
 
         // Zentrale Status- und Steuerungszuordnung
         $this->RegisterPropertyInteger('OperatingStatusVariable', 0);
@@ -280,6 +318,31 @@ class Waermepumpe extends IPSModuleStrict
     {
         $elements = [
             [
+                'type' => 'ExpansionPanel',
+                'caption' => 'Luxtronik automatisch zuordnen (optional)',
+                'items' => [
+                    [
+                        'type' => 'Label',
+                        'caption' => 'Eine einzelne Luxtronik-Instanz wird automatisch erkannt. Bei mehreren Instanzen bitte die gewünschte auswählen. Die Zuordnung befüllt leere Felder und aktualisiert bestehende Luxtronik-Zuordnungen. Variablen aus anderen Quellen bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern; alle Felder bleiben manuell änderbar.'
+                    ],
+                    [
+                        'type' => 'Label',
+                        'caption' => $this->GetLuxtronikAssignmentHint()
+                    ],
+                    [
+                        'type' => 'SelectInstance',
+                        'name' => 'LuxtronikInstanceID',
+                        'caption' => 'Luxtronik-Instanz (Keine = automatisch erkennen)',
+                        'validModules' => [self::LUXTRONIK_MODULE_ID]
+                    ],
+                    [
+                        'type' => 'Button',
+                        'caption' => 'Luxtronik-Variablen zuordnen',
+                        'onClick' => $this->GetLuxtronikAssignmentScript()
+                    ]
+                ]
+            ],
+            [
                 'type' => 'Label',
                 'caption' => 'Vorhandene Variablen zuordnen. Nicht benötigte Werte bleiben auf „Keine“. Bestehende Zuordnungen aus Version 1.x bleiben erhalten.'
             ],
@@ -461,6 +524,112 @@ class Waermepumpe extends IPSModuleStrict
             ['elements' => $elements],
             JSON_THROW_ON_ERROR
         );
+    }
+
+    private function GetLuxtronikAssignmentHint(): string
+    {
+        $selected = $this->ReadPropertyInteger('LuxtronikInstanceID');
+        $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
+        if ($selected !== 0 && !in_array($selected, $instances, true)) {
+            return 'Die gespeicherte Luxtronik-Instanz ist nicht verfügbar. Bitte eine andere auswählen oder manuell konfigurieren.';
+        }
+        if ($selected === 0 && count($instances) !== 1) {
+            return $instances === []
+                ? 'Keine Luxtronik-Instanz gefunden. Die manuelle Variablenzuordnung kann wie bisher verwendet werden.'
+                : 'Mehrere Luxtronik-Instanzen gefunden. Bitte die gewünschte Quelle im Picker auswählen.';
+        }
+        $instanceID = $selected ?: $instances[0];
+        return ($selected === 0 ? 'Automatischer Vorschlag: ' : 'Gespeicherte Quelle: ')
+            . IPS_GetName($instanceID) . ' (#' . $instanceID . '). Alle Variablenfelder bleiben manuell änderbar.';
+    }
+
+    private function GetLuxtronikAssignmentScript(): string
+    {
+        $fields = [];
+        foreach (array_keys(self::LUXTRONIK_IDENT_MAP) as $property) {
+            $fields[] = var_export($property, true) . ' => $' . $property;
+        }
+
+        return 'echo WP_AssignLuxtronik($id, $LuxtronikInstanceID, json_encode(['
+            . implode(', ', $fields)
+            . '], JSON_THROW_ON_ERROR));';
+    }
+
+    public function AssignLuxtronik(int $instanceID, string $formValues): string
+    {
+        $values = json_decode($formValues, true, 512, JSON_THROW_ON_ERROR);
+        if (!is_array($values)) {
+            throw new InvalidArgumentException('Ungültige Formularwerte.');
+        }
+
+        $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
+        if ($instanceID === 0) {
+            if (count($instances) !== 1) {
+                return $instances === []
+                    ? 'Keine Luxtronik-Instanz gefunden. Bitte wie bisher manuell konfigurieren.'
+                    : 'Mehrere Luxtronik-Instanzen gefunden. Bitte zuerst die gewünschte Instanz auswählen.';
+            }
+            $instanceID = $instances[0];
+        }
+        if (!in_array($instanceID, $instances, true)) {
+            throw new InvalidArgumentException('Die gewählte Instanz gehört nicht zum unterstützten Luxtronik-Modul.');
+        }
+
+        $assignments = [];
+        $missing = 0;
+        $cleared = 0;
+        foreach (self::LUXTRONIK_IDENT_MAP as $property => $idents) {
+            // Read the current form values, including unsaved manual edits.
+            $current = $values[$property] ?? $this->ReadPropertyInteger($property);
+            if (!is_int($current) || $current < 0) {
+                throw new InvalidArgumentException('Ungültige Variablenzuordnung: ' . $property);
+            }
+            // Keep external sources and unresolved IDs. Existing links to any
+            // Luxtronik instance can be refreshed or moved to the selected unit.
+            if ($current !== 0 && (!IPS_VariableExists($current)
+                || !in_array(IPS_GetParent($current), $instances, true))) {
+                continue;
+            }
+            foreach ($idents as $ident) {
+                $variableID = @IPS_GetObjectIDByIdent($ident, $instanceID);
+                if ($variableID === false || !IPS_VariableExists($variableID)) {
+                    continue;
+                }
+                // Never turn read-only measurements into automatically linked controls.
+                if (in_array($property, [
+                    'HeatingControlVariable', 'HotWaterControlVariable', 'CoolingControlVariable',
+                    'WarmWaterSetpointVariable', 'HeatingTemperatureCorrectionVariable'
+                ], true)) {
+                    $variable = IPS_GetVariable($variableID);
+                    if (!in_array((int) $variable['VariableType'], [1, 2], true)
+                        || (int) ($variable['VariableCustomAction'] ?: $variable['VariableAction']) <= 0) {
+                        continue;
+                    }
+                }
+                $assignments[$property] = $variableID;
+                break;
+            }
+            if (!isset($assignments[$property])) {
+                $missing++;
+                if ($current !== 0) {
+                    // A source change must not leave values from the old unit
+                    // behind when the selected unit lacks this data point.
+                    $assignments[$property] = 0;
+                    $cleared++;
+                }
+            }
+        }
+
+        foreach ($assignments as $property => $variableID) {
+            $this->UpdateFormField($property, 'value', $variableID);
+        }
+        $this->UpdateFormField('LuxtronikInstanceID', 'value', $instanceID);
+
+        return (count($assignments) - $cleared) . ' Zuordnungen im Formular gesetzt; '
+            . $cleared . ' alte Luxtronik-Zuordnungen auf „Keine“ gesetzt; '
+            . $missing . ' Felder ohne passende Luxtronik-Variable. '
+            . 'Bitte prüfen und mit „Übernehmen“ speichern. '
+            . 'Fehlende Datenpunkte bzw. Bedienvariablen im Luxtronik-Modul aktivieren oder manuell zuordnen.';
     }
 
     public function UpdateVisualization(): void
