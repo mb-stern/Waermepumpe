@@ -3,10 +3,12 @@
 Run from the repository: python3 tests/browser.py
 Only local fixtures are served; no real Symcon or device actions are used.
 """
+import base64
 import functools
 import http.server
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -24,10 +26,55 @@ class QuietHandler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
 
+
+class LuxtronikFixture:
+    """Independent local peer for the protocol seen in the user's Lux.js."""
+
+    def __init__(self):
+        self.connections = []
+        self.commands = []
+        self.empty_updates = False
+        self.silent = False
+        # Packed bytes cover vertical bits, row boundaries and the last pixel.
+        self.image = base64.b64encode(bytes([1] + [0] * 1278 + [128])).decode()
+
+    def connect(self, route):
+        index = len(self.connections) + 1
+        connection = {'route': route, 'closed': False, 'navigation': False,
+                      'display': False, 'menu': f'remote-{index}', 'lcd': f'lcd-{index}'}
+        self.connections.append(connection)
+
+        def receive(message):
+            self.commands.append(message)
+            if message == 'REFRESH':
+                if self.silent:
+                    return
+                if not connection['navigation']:
+                    connection['navigation'] = True
+                    route.send('<Navigation><item><item id="info"><name>Informationen</name></item>'
+                               f'<item id="{connection["menu"]}"><name>Fernsteuerung</name></item>'
+                               '</item></Navigation>')
+                elif connection['display']:
+                    route.send('<Values/>' if self.empty_updates else
+                               f'<Values><item id="{connection["lcd"]}"><value>{self.image}</value></item></Values>')
+            elif message.startswith('GET;'):
+                assert message == 'GET;' + connection['menu'], message
+                connection['display'] = True
+                route.send('<Content><name>Fernsteuerung</name><item><name>Gerät</name>'
+                           f'<item id="{connection["lcd"]}"><name>LCD</name><img>{self.image}</img>'
+                           '</item></item></Content>')
+
+        route.on_message(receive)
+        route.on_close(lambda code, reason: connection.update(closed=True))
+
+
 with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
     subprocess.run(["php", str(repository / "tests/regression.php")],
                    cwd=repository, check=True,
                    env={**os.environ, "WP_TEST_ARTIFACT_DIR": artifacts})
+    Path(artifacts, 'luxtronik-test.html').write_text(
+        '<meta charset="utf-8"><h1>Lokale Webinterface-Testseite</h1>',
+        encoding='utf-8')
     handler = functools.partial(QuietHandler, directory=artifacts)
     server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -37,6 +84,18 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
             browser=p.chromium.launch(executable_path=chromium,headless=True,args=['--no-sandbox'])
             for width in [1200,390]:
                 page=browser.new_page(viewport={'width':width,'height':850})
+                luxtronik=LuxtronikFixture()
+                page.route_web_socket(re.compile(r'^ws://127\.0\.0\.1:8214/$'),luxtronik.connect)
+                page.add_init_script('''(() => {
+                    const NativeWebSocket=window.WebSocket;
+                    window.testSocketRequests=[];
+                    window.WebSocket=class extends NativeWebSocket {
+                        constructor(url, protocols) {
+                            super(url,protocols);
+                            window.testSocketRequests.push({url,protocols});
+                        }
+                    };
+                })();''')
                 errors=[]
                 page.on('pageerror',lambda e: errors.append(str(e)))
                 page.goto(f'http://127.0.0.1:{server.server_port}/configured.html')
@@ -55,6 +114,120 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                     const script=[...document.scripts].find(s=>s.textContent.trim().startsWith('SymconHeatPump.init('));
                     return JSON.parse(script.textContent.trim().slice('SymconHeatPump.init('.length,-2));
                 }''')
+                # Only an intercepted local WebSocket and a local fallback page are used.
+                assert not page.locator('#gSettings').is_visible()
+                assert not luxtronik.connections
+                web_payload=json.loads(json.dumps(payload))
+                web_url=f'http://127.0.0.1:{server.server_port}/luxtronik-test.html'
+                web_payload['config']['luxtronikWebInterfaceURL']=web_url
+                page.evaluate('(p)=>window.handleMessage({type:"update",config:p.config})',web_payload)
+                assert page.locator('#gSettings').is_visible()
+                assert page.locator('#gSettings text').first.text_content()=='LUX Bedienfeld'
+                assert not luxtronik.connections
+                page.locator('#gSettings').dispatch_event('click')
+                assert page.locator('#wp-luxtronik-dialog').is_visible()
+                page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                assert page.evaluate('document.activeElement.id')=='wp-luxtronik-display'
+                assert luxtronik.commands[:3]==['LOGIN;999999','REFRESH','GET;remote-1'],luxtronik.commands
+                assert page.evaluate('window.testSocketRequests[0]')=={'url':'ws://127.0.0.1:8214/','protocols':'Lux_WS'}
+                pixels=page.locator('#wp-luxtronik-display').evaluate('''e=>{
+                    const ctx=e.getContext('2d');
+                    return [[0,0],[0,1],[159,63]].map(([x,y])=>Array.from(ctx.getImageData(x,y,1,1).data));
+                }''')
+                assert pixels==[[255,255,255,255],[0,0,255,255],[255,255,255,255]],pixels
+                assert not any(command.startswith('MOVE;') for command in luxtronik.commands)
+                before=len(luxtronik.commands)
+                page.get_by_role('button',name='Pfeil links',exact=True).click()
+                page.get_by_role('button',name='Pfeil rechts',exact=True).click()
+                page.locator('#wp-luxtronik-press').click()
+                page.locator('#wp-luxtronik-display').focus()
+                for key in ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space']:
+                    page.keyboard.press(key)
+                page.locator('#wp-luxtronik-display').click()
+                page.locator('#wp-luxtronik-display').dispatch_event('wheel',{'deltaY':-100})
+                page.locator('#wp-luxtronik-display').dispatch_event('wheel',{'deltaY':100})
+                expected_moves=[1,0,2,6,1,6,0,6,1,6,0,6,2,6,2,6,2,6,1,0]
+                page.wait_for_timeout(50)
+                moves=[command for command in luxtronik.commands[before:] if command.startswith('MOVE;')]
+                assert moves==['MOVE;'+str(value) for value in expected_moves],moves
+                bounds=page.locator('#wp-luxtronik-dialog').bounding_box()
+                assert bounds['x']>=0 and bounds['x']+bounds['width']<=width,bounds
+                external=page.locator('#wp-luxtronik-external')
+                assert external.get_attribute('href')==web_url
+                assert external.get_attribute('target')=='_blank'
+                with page.expect_popup() as popup:
+                    external.click()
+                popup.value.wait_for_load_state()
+                assert popup.value.get_by_role('heading').text_content()=='Lokale Webinterface-Testseite'
+                assert popup.value.evaluate('window.opener===null')
+                popup.value.close()
+                page.locator('#wp-luxtronik-close').click()
+                assert not page.locator('#wp-luxtronik-dialog').is_visible()
+                page.wait_for_timeout(50)
+                assert luxtronik.connections[-1]['closed']
+                assert page.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
+                for key in ['Enter','Space']:
+                    page.locator('#gSettings').focus()
+                    page.keyboard.press(key)
+                    assert page.locator('#wp-luxtronik-dialog').is_visible()
+                    page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                    page.keyboard.press('Escape')
+                    assert not page.locator('#wp-luxtronik-dialog').is_visible()
+                    assert page.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
+                # Dynamic menu IDs are resolved again on every new connection.
+                assert [command for command in luxtronik.commands if command.startswith('GET;')]==[
+                    'GET;remote-1','GET;remote-2','GET;remote-3']
+                page.locator('#gSettings').dispatch_event('click')
+                page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                # Closing during a held Enter must release it before disconnecting.
+                page.locator('#wp-luxtronik-press').hover()
+                page.mouse.down()
+                page.keyboard.press('Escape')
+                page.mouse.up()
+                page.wait_for_timeout(50)
+                assert [command for command in luxtronik.commands if command.startswith('MOVE;')][-2:]==['MOVE;2','MOVE;6']
+                page.locator('#gSettings').dispatch_event('click')
+                page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                # Corrupt LCD data disables controls and clears the previous screen.
+                luxtronik.connections[-1]['route'].send('<Values><item id="lcd-5"><value>bad!</value></item></Values>')
+                page.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+                assert 'nicht gelesen' in page.locator('#wp-luxtronik-help').text_content()
+                assert page.locator('#wp-luxtronik-display').evaluate('e=>e.getContext("2d").getImageData(0,0,1,1).data[3]')==0
+                # A reconnect uses the current input, while protocol separators are rejected.
+                page.locator('#wp-luxtronik-password').fill('bad;password')
+                page.get_by_role('button',name='Erneut verbinden',exact=True).click()
+                page.wait_for_function('document.querySelector("#wp-luxtronik-help").textContent.includes("Semikolons")')
+                assert 'LOGIN;bad;password' not in luxtronik.commands
+                page.locator('#wp-luxtronik-password').fill('999999')
+                page.get_by_role('button',name='Erneut verbinden',exact=True).click()
+                page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                luxtronik.connections[-1]['route'].send('<Navigation><item id="info"><name>Informationen</name></item></Navigation>')
+                page.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+                assert 'nicht angeboten' in page.locator('#wp-luxtronik-help').text_content()
+                page.locator('#wp-luxtronik-close').click()
+                # A server disconnect reconnects, resolves the new ID and replays no keys.
+                page.locator('#gSettings').dispatch_event('click')
+                page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                connections_before=len(luxtronik.connections)
+                commands_before=len(luxtronik.commands)
+                luxtronik.connections[-1]['route'].close(code=1001,reason='Simulated idle disconnect')
+                page.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+                assert 'Wiederverbindung' in page.locator('#wp-luxtronik-help').text_content()
+                page.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+                assert len(luxtronik.connections)==connections_before+1
+                assert 'GET;remote-'+str(connections_before+1) in luxtronik.commands[commands_before:]
+                assert not any(command.startswith('MOVE;') for command in luxtronik.commands[commands_before:])
+                # Closing while a retry is pending must cancel that retry and all polling.
+                luxtronik.connections[-1]['route'].close(code=1001,reason='Simulated second disconnect')
+                page.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+                page.locator('#wp-luxtronik-close').click()
+                connections_before=len(luxtronik.connections)
+                commands_before=len(luxtronik.commands)
+                page.wait_for_timeout(1200)
+                assert len(luxtronik.connections)==connections_before
+                assert len(luxtronik.commands)==commands_before
+                page.evaluate('(p)=>window.handleMessage({type:"update",config:p.config})',payload)
+                assert not page.locator('#gSettings').is_visible()
                 target_key=payload['config']['returnTemperatureSetpoint']
                 actual_key=payload['config']['refluxTemperatureHeating']
                 # Missing tank sensors must leave no stale or synthetic readings.
@@ -195,6 +368,78 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 assert not errors,errors
                 print(json.dumps({'viewport':width,**result,'updates':'PASS'}))
                 page.close()
+            # Exercise inactivity and retry limits without waiting for real timeouts.
+            liveness=browser.new_page()
+            liveness.clock.install()
+            peer=LuxtronikFixture()
+            liveness.route_web_socket(re.compile(r'^ws://127\.0\.0\.1:8214/$'),peer.connect)
+            liveness.goto(f'http://127.0.0.1:{server.server_port}/configured.html')
+            liveness.evaluate('(url)=>window.handleMessage({type:"update",config:{luxtronikWebInterfaceURL:url}})',web_url)
+            liveness.locator('#gSettings').dispatch_event('click')
+            liveness.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+            peer.empty_updates=True
+            for _ in range(4):
+                liveness.clock.fast_forward(5000)
+                liveness.wait_for_timeout(50)
+                assert not liveness.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
+                assert len(peer.connections)==1
+            peer.silent=True
+            liveness.clock.fast_forward(16000)
+            liveness.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+            assert 'Wiederverbindung' in liveness.locator('#wp-luxtronik-help').text_content()
+            peer.silent=False
+            liveness.clock.fast_forward(1000)
+            liveness.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+            assert len(peer.connections)==2
+            for delay in [3000,10000]:
+                peer.connections[-1]['route'].close(code=1001,reason='Simulated repeated disconnect')
+                liveness.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+                liveness.clock.fast_forward(delay+1)
+                liveness.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+            assert len(peer.connections)==4
+            peer.connections[-1]['route'].close(code=1001,reason='Retry limit check')
+            liveness.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+            assert 'Bitte erneut verbinden' in liveness.locator('#wp-luxtronik-help').text_content()
+            liveness.clock.fast_forward(60000)
+            assert len(peer.connections)==4
+            assert not any(command.startswith('MOVE;') for command in peer.commands)
+            liveness.get_by_role('button',name='Erneut verbinden',exact=True).click()
+            liveness.wait_for_function('!document.querySelector("#wp-luxtronik-controls").disabled')
+            assert len(peer.connections)==5
+            peer.connections[-1]['route'].send('<Navigation><item id="locked"><name>Fernsteuerung</name><readOnly>1</readOnly></item></Navigation>')
+            liveness.wait_for_function('document.querySelector("#wp-luxtronik-controls").disabled')
+            assert 'nicht zur Bedienung freigegeben' in liveness.locator('#wp-luxtronik-help').text_content()
+            assert 'GET;locked' not in peer.commands
+            liveness.locator('#wp-luxtronik-close').click()
+            liveness.close()
+            print(json.dumps({'luxtronik':'PASS','idle_heartbeat':'PASS','reconnect_limit':'PASS'}))
+            # HTTPS Symcon must offer a separate tab instead of a blocked ws connection.
+            secure=browser.new_page()
+            secure.route('https://symcon.test/**', lambda route: route.fulfill(
+                content_type='text/html', body=Path(artifacts,'configured.html').read_text()))
+            secure.goto('https://symcon.test/configured.html')
+            secure.evaluate('(url)=>window.handleMessage({type:"update",config:{luxtronikWebInterfaceURL:url}})',web_url)
+            secure.locator('#gSettings').dispatch_event('click')
+            assert secure.locator('#wp-luxtronik-dialog').is_visible()
+            assert secure.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
+            assert 'HTTP' in secure.locator('#wp-luxtronik-help').text_content()
+            assert secure.locator('#wp-luxtronik-external').get_attribute('href')==web_url
+            # SDK content can also be embedded through about:srcdoc in an HTTPS page.
+            secure.evaluate('''(html)=>{
+                document.body.replaceChildren();
+                const frame=document.createElement('iframe');
+                frame.id='sdk';
+                frame.srcdoc=html;
+                document.body.append(frame);
+            }''',Path(artifacts,'configured.html').read_text())
+            sdk=secure.frame_locator('#sdk')
+            sdk.locator('#wp-card svg').wait_for(state='attached')
+            sdk.locator('body').evaluate('(body,url)=>window.handleMessage({type:"update",config:{luxtronikWebInterfaceURL:url}})',web_url)
+            sdk.locator('#gSettings').dispatch_event('click')
+            assert sdk.locator('#wp-luxtronik-dialog').is_visible()
+            assert sdk.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
+            assert 'HTTP' in sdk.locator('#wp-luxtronik-help').text_content()
+            secure.close()
             browser.close()
     finally:
         server.shutdown()

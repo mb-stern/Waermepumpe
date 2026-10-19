@@ -47,7 +47,11 @@ $profiles = [];
 $writes = [];
 $actions = [];
 $instances = [];
+$instanceProperties = [];
 $objectIdents = [];
+function IPS_GetProperty(int $id, string $property): mixed {
+    return $GLOBALS['instanceProperties'][$id][$property] ?? ($property === 'IPAddress' ? '0.0.0.0' : null);
+}
 function IPS_GetInstanceListByModuleID(string $moduleID): array {
     return array_keys(array_filter($GLOBALS['instances'], static fn(string $id): bool => $id === $moduleID));
 }
@@ -481,6 +485,36 @@ check(str_contains($assignmentModule->AssignLuxtronik(61000, '{}', true), 'Manue
 check($assignmentModule->formUpdates === $beforeUpdates, 'Import changed form in manual mode');
 $manualForm = namedFormItems(json_decode(createModule($statusProperties + ['ManualConfiguration' => true])->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR)['elements']);
 check($manualForm['OperatingStatusVariable']['enabled'] === true && $manualForm['LuxtronikAssignButton']['enabled'] === false, 'Saved manual mode not respected');
+
+// Resolve the original web UI address from the selected module, without network I/O.
+$instanceProperties[61000] = ['IPAddress' => '192.0.2.10', 'Port' => 8889];
+$instanceProperties[61001] = ['IPAddress' => '192.0.2.20', 'Port' => 8888];
+$before = [$writes, $actions];
+check(callPrivate(createModule(['LuxtronikInstanceID' => 61000]), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === 'http://192.0.2.10/Webserver/index.html', 'Selected IPAddress not used for web interface');
+check(callPrivate(createModule(['LuxtronikInstanceID' => 61001]), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === 'http://192.0.2.20/Webserver/index.html', 'Wrong web source or data port used');
+check(callPrivate(createModule(), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === '', 'Ambiguous source chosen for web interface');
+check(callPrivate(createModule(['LuxtronikInstanceID' => 61999]), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === '', 'Deleted web source used');
+check(callPrivate(createModule(['LuxtronikInstanceID' => 61002]), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === '', 'Foreign module used for web interface');
+unset($instances[61001]);
+check(callPrivate(createModule(), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === 'http://192.0.2.10/Webserver/index.html', 'Single module not detected for web interface');
+foreach ([
+    ['luxtronik.fritz.box', 'http://luxtronik.fritz.box/Webserver/index.html'],
+    ['2001:db8::10', 'http://[2001:db8::10]/Webserver/index.html'],
+    ['', ''], ['0.0.0.0', ''], ['::', ''], ['host/path', ''], ['javascript:invalid', ''],
+] as [$address, $expected]) {
+    $instanceProperties[61000]['IPAddress'] = $address;
+    check(callPrivate(createModule(), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === $expected, 'Invalid web address derivation');
+}
+foreach ([
+    'https://luxtronik.example:8443/interface/#remote',
+    'http://192.0.2.10:8080/',
+] as $url) {
+    check(callPrivate(createModule(['LuxtronikWebInterfaceURL' => $url]), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === $url, 'Explicit web URL not preserved');
+}
+foreach (['javascript:alert(1)', 'data:text/html,test', '//example.com/', 'http://user:password@example.com/', "http://exam\nple.com/", 'file:///tmp/test'] as $url) {
+    check(callPrivate(createModule(['LuxtronikWebInterfaceURL' => $url]), 'BuildCardConfig')['luxtronikWebInterfaceURL'] === '', 'Unsupported web URL accepted');
+}
+check([$writes, $actions] === $before, 'Web address resolution caused device or variable actions');
 
 $instances = $objectIdents = [];
 $module = createModule();

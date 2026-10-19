@@ -38,6 +38,24 @@ Beim Wechsel der Luxtronik-Quelle werden alte Luxtronik-Zuordnungen in den unter
 
 Ohne Luxtronik wird wie bisher manuell konfiguriert. Auch mit Luxtronik lassen sich externe Sensoren, Zähler oder andere Datenquellen verwenden: Solche Zuordnungen werden beim erneuten Klick auf den Button nicht überschrieben. Zum Ersetzen einer externen Quelle durch Luxtronik das betreffende Feld zunächst auf „Keine“ setzen und die Zuordnung erneut ausführen.
 
+### LUX Bedienfeld: Geräteanzeige und Fernsteuerung
+
+Die bisherige funktionslose Kachel **Einstellungen** wird durch **LUX Bedienfeld** ersetzt, wenn eine Webadresse verfügbar ist. Die Adresse wird aus `IPAddress` der ausgewählten Luxtronik-Instanz abgeleitet: `http://<Adresse>/Webserver/index.html`. Ohne ausgewählte Quelle wird nur eine eindeutig vorhandene Luxtronik-Instanz verwendet. Der Datenport des Luxtronik-Moduls (8888/8889) wird nicht als Webserver-Port übernommen.
+
+Unter **Luxtronik-Webinterface → Abweichende Webadresse (optional)** lässt sich bei Bedarf eine vollständige HTTP- oder HTTPS-Adresse hinterlegen. Das funktioniert auch ohne Luxtronik-Modul. Ohne gültige Adresse bleibt die Kachel ausgeblendet.
+
+Erst ein Klick öffnet eine Verbindung vom Browser zum Regler auf **WebSocket-Port 8214**, mit dem Unterprotokoll `Lux_WS`. Das Bedienfeld verwendet denselben Ablauf wie die bereitgestellte `Lux.js`: `LOGIN`, regelmäßiges `REFRESH` und `GET` mit der aktuell übermittelten Menü-ID der **Fernsteuerung**. Es werden keine festen Menü-IDs verwendet. Die originalen LCD-Bilddaten werden direkt dargestellt; die dekorative Geräteabbildung mit Drehrad wird nicht nachgebaut.
+
+Die Anmeldung erfolgt automatisch mit dem vorbelegten Standardpasswort. Im Bedienfenster lässt es sich für die aktuelle Sitzung ändern und mit **Erneut verbinden** verwenden. Es wird weder als Moduleigenschaft gespeichert noch an das PHP-Modul übertragen. Beim regulären Schließen wird das Eingabefeld auf den Standardwert zurückgesetzt.
+
+Das Display mit **Pfeiltasten** und **Enter/Leertaste** bedienen oder die Pfeil- und Enter-Schaltflächen anklicken. Ein Mausklick auf das Display entspricht Drücken und Loslassen; auch das Mausrad funktioniert entsprechend der Originalsoftware. Die Befehle sind `MOVE;1` (links/oben), `MOVE;0` (rechts/unten), `MOVE;2` (drücken) und `MOVE;6` (loslassen). Beim Öffnen werden keine Bedienbefehle gesendet. Die Tasten bleiben gesperrt, bis gültige Displaydaten vorliegen.
+
+Während das Fenster offen ist, wird jede Sekunde `REFRESH` gesendet. Leere `Values`-Antworten gelten als Lebenszeichen eines unveränderten Displays. Nach einem Verbindungsabbruch oder 15 Sekunden ohne Antwort werden die Tasten gesperrt und bis zu drei Wiederverbindungen mit 1, 3 und 10 Sekunden Abstand versucht. Nach 30 Sekunden erfolgreicher Kommunikation beginnt diese Zählung neu. Hintergrundseiten warten gegebenenfalls bis zur erneuten Sichtbarkeit. Eine Wiederverbindung wiederholt keine alten Tastendrücke. Bei ungültigen Daten, fehlender Fernsteuerung oder einer Anmeldung ohne Displayantwort wird ein Hinweis angezeigt; eine manuelle Wiederverbindung bleibt möglich. Schließen beendet Verbindung, Abfragen und geplante Wiederverbindungen.
+
+**Originalinterface öffnen** öffnet die Webadresse in einem neuen Tab. Diese Alternative bleibt bei Verbindungsproblemen verfügbar. Das bereitgestellte `Lux.js` verwendet einen unverschlüsselten WebSocket; aus einer HTTPS-Visualisierung wird deshalb auf das separat geöffnete Originalinterface verwiesen. Eine abweichende HTTPS-Webadresse rüstet den WebSocket-Port nicht automatisch auf TLS um. Der Browser muss den Regler im lokalen Netz erreichen können; der Datenport des Symcon-Luxtronik-Moduls wird für die Fernsteuerung nicht verwendet.
+
+Die Adresse wird über die dokumentierte Symcon-Funktion `IPS_GetProperty` aus der übernommenen Instanzkonfiguration gelesen. Lokale Tests prüfen die Adressauflösung, das LCD-Format, dynamische Navigation, Tastatur-/Mausbedienung, Verbindungsabbruch und den separaten Tab mit simulierten Gegenstellen. Das reale Gerät und die Ausführung innerhalb der echten Symcon-Visualisierung sind noch nicht geprüft; insbesondere kann der Regler Verbindungen aus einer anderen Browser-Origin ablehnen.
+
 ### Automatisch zuordenbare Felder
 
 Die folgende Zuordnung wurde gegen `mb-stern/Luxtronik`, Branch `development`, Commit `1fa55a2fd6bca7e02566e01fa975d1cdad7383c3` geprüft. Bei mehreren angegebenen Idents wird der erste vorhandene verwendet. Die Werte sind im Luxtronik-Modul bereits umgerechnet; hier erfolgt keine zusätzliche Skalierung.

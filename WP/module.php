@@ -46,6 +46,7 @@ class Waermepumpe extends IPSModuleStrict
 
         $this->RegisterPropertyInteger('LuxtronikInstanceID', 0);
         $this->RegisterPropertyBoolean('ManualConfiguration', false);
+        $this->RegisterPropertyString('LuxtronikWebInterfaceURL', '');
 
         // Zentrale Status- und Steuerungszuordnung
         $this->RegisterPropertyInteger('OperatingStatusVariable', 0);
@@ -388,6 +389,14 @@ class Waermepumpe extends IPSModuleStrict
                         'type' => 'CheckBox',
                         'name' => 'ManualConfiguration',
                         'caption' => 'Manuelle Konfiguration – alle Variablenfelder freigeben'
+                    ],
+                    [
+                        'type' => 'ExpansionPanel',
+                        'caption' => 'Luxtronik-Webinterface',
+                        'items' => [
+                            ['type' => 'Label', 'caption' => 'Der Button „LUX Bedienfeld“ verwendet automatisch IPAddress aus der ausgewählten Luxtronik-Instanz. Die Fernsteuerung wird direkt über WebSocket-Port 8214 geöffnet. Nur für eine abweichende Webadresse hier eine vollständige HTTP- oder HTTPS-Adresse eintragen.'],
+                            ['type' => 'ValidationTextBox', 'name' => 'LuxtronikWebInterfaceURL', 'caption' => 'Abweichende Webadresse (optional)']
+                        ]
                     ]
                 ]
             ],
@@ -590,6 +599,43 @@ class Waermepumpe extends IPSModuleStrict
         $instanceID = $selected ?: $instances[0];
         return ($selected === 0 ? 'Automatischer Vorschlag: ' : 'Gespeicherte Quelle: ')
             . IPS_GetName($instanceID) . ' (#' . $instanceID . ').';
+    }
+
+    private function GetLuxtronikWebInterfaceURL(): string
+    {
+        $url = trim($this->ReadPropertyString('LuxtronikWebInterfaceURL'));
+        if ($url === '') {
+            $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
+            $source = $this->ReadPropertyInteger('LuxtronikInstanceID');
+            if ($source === 0 && count($instances) === 1) {
+                $source = $instances[0];
+            }
+            if (!in_array($source, $instances, true)) {
+                return '';
+            }
+            // Port 8888/8889 belongs to the data protocol, not the web server.
+            $address = IPS_GetProperty($source, 'IPAddress');
+            if (!is_string($address)) {
+                return '';
+            }
+            $address = trim($address);
+            if ($address === '' || in_array($address, ['0.0.0.0', '::'], true)) {
+                return '';
+            }
+            if (filter_var($address, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)) {
+                $address = '[' . $address . ']';
+            } elseif (!filter_var($address, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+                return '';
+            }
+            $url = 'http://' . $address . '/Webserver/index.html';
+        }
+        $parts = parse_url($url);
+        if ($parts === false || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)
+            || empty($parts['host']) || isset($parts['user']) || isset($parts['pass'])
+            || preg_match('/[\x00-\x20\x7f]/', $url)) {
+            return '';
+        }
+        return $url;
     }
 
     private function GetAssignmentValuesScript(array $properties): string
@@ -1304,6 +1350,37 @@ class Waermepumpe extends IPSModuleStrict
         stroke-width: 1.45 !important;
         stroke-dasharray: 3 8 !important;
     }
+    #wp-luxtronik-dialog {
+        width: 760px;
+        max-width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
+        box-sizing: border-box;
+        padding: 12px;
+        border: 1px solid var(--divider-color, #888);
+        border-radius: 10px;
+        background: var(--card-background-color, Canvas);
+        color: var(--content-color, CanvasText);
+    }
+    #wp-luxtronik-dialog[open] { display: flex; flex-direction: column; gap: 10px; }
+    #wp-luxtronik-dialog::backdrop { background: rgba(0, 0, 0, .4); }
+    #wp-luxtronik-dialog .wp-luxtronik-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+    #wp-luxtronik-dialog .wp-luxtronik-header strong { flex: 1; }
+    #wp-luxtronik-dialog a { color: inherit; }
+    #wp-luxtronik-help { margin: 0; font-size: 14px; }
+    #wp-luxtronik-login { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    #wp-luxtronik-password { width: 110px; max-width: 100%; }
+    #wp-luxtronik-device { padding: 24px; border-radius: 14px; background: linear-gradient(145deg, #59616a, #30363d); }
+    #wp-luxtronik-display { display: block; width: 100%; height: auto; background: #0000ff; image-rendering: pixelated; border: 8px solid #252a30; border-radius: 5px; box-sizing: border-box; cursor: pointer; touch-action: manipulation; }
+    #wp-luxtronik-controls { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 14px; border: 0; margin: 22px 0 0; padding: 0; }
+    #wp-luxtronik-controls button { min-height: 48px; padding: 8px 14px; touch-action: manipulation; }
+    #wp-luxtronik-press { min-width: 76px; }
+    #wp-luxtronik-controls:disabled { opacity: .45; }
+    #wp-luxtronik-dialog button, #wp-luxtronik-dialog input { font: inherit; }
+    @media (max-width: 480px) {
+        #wp-luxtronik-device { padding: 12px; }
+        #wp-luxtronik-controls { gap: 6px; }
+        #wp-luxtronik-controls button { padding: 6px 9px; }
+    }
 </style>
 
 <div id="wp-root">
@@ -1312,6 +1389,27 @@ class Waermepumpe extends IPSModuleStrict
     <div id="wp-compact-view" aria-hidden="true"></div>
     <div id="wp-mode-menu"></div>
 </div>
+<dialog id="wp-luxtronik-dialog" aria-labelledby="wp-luxtronik-title">
+    <div class="wp-luxtronik-header">
+        <strong id="wp-luxtronik-title">LUX Bedienfeld</strong>
+        <a id="wp-luxtronik-external" target="_blank" rel="noopener noreferrer">Originalinterface öffnen</a>
+        <button id="wp-luxtronik-close" type="button">Schließen</button>
+    </div>
+    <p id="wp-luxtronik-help" role="status" aria-live="polite"></p>
+    <form id="wp-luxtronik-login">
+        <label for="wp-luxtronik-password">Webinterface-Passwort</label>
+        <input id="wp-luxtronik-password" type="password" value="999999" autocomplete="off" />
+        <button type="submit">Erneut verbinden</button>
+    </form>
+    <div id="wp-luxtronik-device">
+        <canvas id="wp-luxtronik-display" width="160" height="64" tabindex="0" role="img" aria-label="Luxtronik-Gerätedisplay; Bedienung mit Pfeiltasten und Enter"></canvas>
+        <fieldset id="wp-luxtronik-controls" disabled aria-label="Luxtronik bedienen">
+            <button type="button" data-luxtronik-turn="1" aria-label="Pfeil links">←</button>
+            <button type="button" id="wp-luxtronik-press">Enter</button>
+            <button type="button" data-luxtronik-turn="0" aria-label="Pfeil rechts">→</button>
+        </fieldset>
+    </div>
+</dialog>
 
 <script>
 {$appJs}
@@ -1328,6 +1426,7 @@ HTML;
         return [
             'title'                      => '',
             'fullConfigurationPreview'   => $this->ReadPropertyBoolean('FullConfigurationPreview'),
+            'luxtronikWebInterfaceURL'    => $this->GetLuxtronikWebInterfaceURL(),
             'heatingPumpType'            => 'A2W',
 
             'operatingStatus'             => $this->DataKey('OperatingStatusVariable', 'operatingStatus'),
@@ -6523,6 +6622,279 @@ window.SymconHeatPump = {
         };
 
 
+        const luxtronikDialog = document.getElementById('wp-luxtronik-dialog');
+        const luxtronikCanvas = document.getElementById('wp-luxtronik-display');
+        const luxtronikHelp = document.getElementById('wp-luxtronik-help');
+        const luxtronikControls = document.getElementById('wp-luxtronik-controls');
+        let luxtronikSocket = null;
+        let luxtronikRefresh = null;
+        let luxtronikTimeout = null;
+        let luxtronikRetryTimer = null;
+        let luxtronikRetryCount = 0;
+        let luxtronikConnectedAt = 0;
+        let luxtronikReconnectOnVisible = false;
+        let luxtronikMenuID = '';
+        let luxtronikDisplayID = '';
+        let luxtronikReady = false;
+        let luxtronikPressed = false;
+        const getLuxtronikWebURL = () => {
+            try {
+                const url = new URL(currentConfig.luxtronikWebInterfaceURL || '');
+                return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : '';
+            } catch (_) {
+                return '';
+            }
+        };
+        const sendLuxtronikMove = (direction) => {
+            if (luxtronikReady && luxtronikSocket && luxtronikSocket.readyState === WebSocket.OPEN) {
+                luxtronikSocket.send('MOVE;' + direction);
+            }
+        };
+        const releaseLuxtronikButton = () => {
+            if (luxtronikPressed) sendLuxtronikMove(6);
+            luxtronikPressed = false;
+        };
+        const stopLuxtronik = () => {
+            releaseLuxtronikButton();
+            clearInterval(luxtronikRefresh);
+            clearTimeout(luxtronikTimeout);
+            clearTimeout(luxtronikRetryTimer);
+            luxtronikRefresh = luxtronikTimeout = luxtronikRetryTimer = null;
+            luxtronikReconnectOnVisible = false;
+            const socket = luxtronikSocket;
+            luxtronikSocket = null;
+            if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'Bedienverbindung beendet');
+            luxtronikMenuID = luxtronikDisplayID = '';
+            luxtronikReady = false;
+            luxtronikControls.disabled = true;
+            luxtronikCanvas.getContext('2d').clearRect(0, 0, 160, 64);
+        };
+        const failLuxtronik = (message) => {
+            stopLuxtronik();
+            luxtronikHelp.textContent = message;
+        };
+        const retryLuxtronik = (message) => {
+            stopLuxtronik();
+            if (!luxtronikDialog.open) return;
+            if (luxtronikRetryCount >= 3) {
+                luxtronikHelp.textContent = message + ' Bitte erneut verbinden oder das Originalinterface öffnen.';
+                return;
+            }
+            if (document.hidden) {
+                luxtronikReconnectOnVisible = true;
+                luxtronikHelp.textContent = message + ' Die Verbindung wird wiederhergestellt, sobald die Visu sichtbar ist.';
+                return;
+            }
+            const delay = [1000, 3000, 10000][luxtronikRetryCount++];
+            luxtronikHelp.textContent = message + ' Automatische Wiederverbindung in ' + (delay / 1000) + ' Sekunden …';
+            luxtronikRetryTimer = setTimeout(() => {
+                luxtronikRetryTimer = null;
+                if (luxtronikDialog.open) connectLuxtronik(true);
+            }, delay);
+        };
+        // Same 160 x 64, vertically packed monochrome LCD format as Lux.js.
+        const drawLuxtronikDisplay = (encoded) => {
+            const bytes = atob(encoded.trim());
+            if (bytes.length !== 1280) throw new Error('Invalid LCD image');
+            const context = luxtronikCanvas.getContext('2d');
+            const image = context.createImageData(160, 64);
+            for (let row = 0; row < 8; row++) {
+                for (let column = 0; column < 160; column++) {
+                    const byte = bytes.charCodeAt(row * 160 + column);
+                    for (let bit = 0; bit < 8; bit++) {
+                        const offset = ((row * 8 + bit) * 160 + column) * 4;
+                        image.data[offset] = image.data[offset + 1] = byte & (1 << bit) ? 255 : 0;
+                        image.data[offset + 2] = image.data[offset + 3] = 255;
+                    }
+                }
+            }
+            context.putImageData(image, 0, 0);
+            const firstFrame = !luxtronikReady;
+            luxtronikReady = true;
+            luxtronikControls.disabled = false;
+            if (firstFrame && document.activeElement?.tagName !== 'INPUT') luxtronikCanvas.focus({preventScroll: true});
+            luxtronikHelp.textContent = 'Verbunden. Das Display mit Pfeiltasten und Enter bedienen oder die Schaltflächen anklicken. Ein Mausklick auf das Display entspricht Enter; auch das Mausrad wird unterstützt.';
+        };
+        const readLuxtronikResponse = (text) => {
+            if (typeof text !== 'string' || text.length > 262144) throw new Error('Invalid response');
+            const xml = new DOMParser().parseFromString(text, 'application/xml');
+            if (xml.querySelector('parsererror')) throw new Error('Invalid XML');
+            const root = xml.documentElement;
+            const childText = (node, name) => Array.from(node.children).find(child => child.localName === name)?.textContent.trim() || '';
+            if (root.localName === 'Navigation') {
+                const remote = Array.from(root.querySelectorAll('item')).find(item =>
+                    ['fernsteuerung', 'remote control'].includes(childText(item, 'name').toLowerCase()));
+                const id = remote?.getAttribute('id');
+                if (!id || /[;\r\n]/.test(id)) {
+                    failLuxtronik('Die Fernsteuerung wird vom Regler nicht angeboten. Bitte das Originalinterface separat öffnen.');
+                    return;
+                }
+                // Honor the navigation lock used by the original buildNavLine().
+                if (childText(remote, 'readOnly')) {
+                    failLuxtronik('Die Fernsteuerung ist vom Regler nicht zur Bedienung freigegeben. Bitte das Originalinterface öffnen.');
+                    return;
+                }
+                if (id !== luxtronikMenuID) {
+                    releaseLuxtronikButton();
+                    luxtronikReady = false;
+                    luxtronikControls.disabled = true;
+                    luxtronikMenuID = id;
+                    luxtronikDisplayID = '';
+                    luxtronikSocket.send('GET;' + id);
+                }
+            } else if (root.localName === 'Content') {
+                const image = root.querySelector('item > img');
+                if (!image || !image.parentElement.getAttribute('id')) throw new Error('Missing LCD image');
+                luxtronikDisplayID = image.parentElement.getAttribute('id');
+                drawLuxtronikDisplay(image.textContent);
+            } else if (root.localName.toUpperCase() === 'VALUES' && luxtronikDisplayID) {
+                const item = Array.from(root.querySelectorAll('item')).find(node => node.getAttribute('id') === luxtronikDisplayID);
+                if (item) drawLuxtronikDisplay(childText(item, 'value'));
+            }
+            return ['NAVIGATION', 'CONTENT', 'VALUES'].includes(root.localName.toUpperCase());
+        };
+        const connectLuxtronik = (retry = false) => {
+            stopLuxtronik();
+            if (!retry) luxtronikRetryCount = 0;
+            const address = getLuxtronikWebURL();
+            if (!address || !luxtronikDialog.open) return;
+            const url = new URL(address);
+            document.getElementById('wp-luxtronik-external').href = address;
+            // The uploaded Lux.js uses unencrypted ws on 8214, including for HTTPS web URLs.
+            const pageProtocol = window.location.protocol === 'about:'
+                ? new URL(document.baseURI).protocol : window.location.protocol;
+            if (pageProtocol === 'https:') {
+                luxtronikHelp.textContent = 'Die Fernsteuerung verwendet einen unverschlüsselten WebSocket (Port 8214). Aus einer HTTPS-Visu bitte „Originalinterface öffnen“ wählen und dort „Fernsteuerung“ öffnen.';
+                return;
+            }
+            if (!('WebSocket' in window)) {
+                luxtronikHelp.textContent = 'Der Browser unterstützt keine WebSockets. Bitte das Originalinterface öffnen.';
+                return;
+            }
+            url.protocol = 'ws:';
+            url.port = '8214';
+            url.pathname = '/';
+            url.search = url.hash = '';
+            luxtronikHelp.textContent = 'Verbinde mit der Luxtronik …';
+            try {
+                const socket = new WebSocket(url.href, 'Lux_WS');
+                luxtronikSocket = socket;
+                luxtronikTimeout = setTimeout(() => failLuxtronik('Keine Displaydaten empfangen. Passwort und Erreichbarkeit von Port 8214 prüfen oder das Originalinterface öffnen.'), 12000);
+                socket.onopen = () => {
+                    if (luxtronikSocket !== socket) return;
+                    luxtronikConnectedAt = Date.now();
+                    const password = document.getElementById('wp-luxtronik-password').value;
+                    if (/[;\r\n]/.test(password)) {
+                        failLuxtronik('Das Passwort darf keine Semikolons oder Zeilenumbrüche enthalten.');
+                        return;
+                    }
+                    socket.send('LOGIN;' + (password || '0'));
+                    luxtronikHelp.textContent = 'Anmeldung gesendet – warte auf die Geräteanzeige …';
+                    luxtronikRefresh = setInterval(() => {
+                        if (luxtronikSocket === socket && socket.readyState === WebSocket.OPEN) socket.send('REFRESH');
+                    }, 1000);
+                };
+                socket.onmessage = (event) => {
+                    if (luxtronikSocket !== socket) return;
+                    try {
+                        const recognized = readLuxtronikResponse(event.data);
+                        if (recognized && luxtronikSocket === socket && luxtronikReady) {
+                            // Empty Values responses are valid heartbeats for an unchanged LCD.
+                            clearTimeout(luxtronikTimeout);
+                            luxtronikTimeout = setTimeout(() => retryLuxtronik('Keine Antwort vom Regler.'), 15000);
+                            if (Date.now() - luxtronikConnectedAt >= 30000) luxtronikRetryCount = 0;
+                        }
+                    }
+                    catch (_) { failLuxtronik('Die Displaydaten konnten nicht gelesen werden. Bitte erneut verbinden oder das Originalinterface öffnen.'); }
+                };
+                socket.onerror = () => {
+                    if (luxtronikSocket === socket) retryLuxtronik('Verbindung fehlgeschlagen. Der Regler muss auf Port 8214 erreichbar sein.');
+                };
+                socket.onclose = () => {
+                    if (luxtronikSocket === socket) retryLuxtronik('Verbindung zur Luxtronik beendet.');
+                };
+            } catch (_) {
+                failLuxtronik('Der Browser konnte die Verbindung nicht öffnen. Bitte das Originalinterface separat öffnen.');
+            }
+        };
+        const closeLuxtronikWebInterface = () => {
+            if (!luxtronikDialog) return;
+            stopLuxtronik();
+            document.getElementById('wp-luxtronik-password').value = '999999';
+            if (typeof luxtronikDialog.close === 'function') luxtronikDialog.close();
+            else luxtronikDialog.removeAttribute('open');
+        };
+        const openLuxtronikWebInterface = () => {
+            if (!getLuxtronikWebURL() || !luxtronikDialog) return;
+            if (luxtronikDialog.open) return;
+            if (typeof luxtronikDialog.showModal === 'function') luxtronikDialog.showModal();
+            else luxtronikDialog.setAttribute('open', '');
+            connectLuxtronik();
+        };
+        if (luxtronikDialog) {
+            luxtronikDialog.addEventListener('close', () => { if (!luxtronikDialog.open) stopLuxtronik(); });
+            luxtronikDialog.addEventListener('cancel', (event) => {
+                event.preventDefault();
+                closeLuxtronikWebInterface();
+            });
+            window.addEventListener('pagehide', stopLuxtronik);
+            window.addEventListener('blur', releaseLuxtronikButton);
+            document.addEventListener('visibilitychange', () => {
+                if (!document.hidden && luxtronikDialog.open && luxtronikReconnectOnVisible) connectLuxtronik(true);
+            });
+            document.getElementById('wp-luxtronik-close').addEventListener('click', closeLuxtronikWebInterface);
+            document.getElementById('wp-luxtronik-login').addEventListener('submit', (event) => {
+                event.preventDefault();
+                connectLuxtronik();
+            });
+            for (const button of luxtronikControls.querySelectorAll('[data-luxtronik-turn]')) {
+                button.addEventListener('click', () => sendLuxtronikMove(Number(button.dataset.luxtronikTurn)));
+            }
+            const press = () => {
+                if (!luxtronikPressed && luxtronikReady) {
+                    sendLuxtronikMove(2);
+                    luxtronikPressed = true;
+                }
+            };
+            for (const element of [document.getElementById('wp-luxtronik-press'), luxtronikCanvas]) {
+                element.addEventListener('pointerdown', (event) => {
+                    if (event.button !== 0 || !luxtronikReady) return;
+                    element.focus();
+                    element.setPointerCapture(event.pointerId);
+                    press();
+                    event.preventDefault();
+                });
+                for (const name of ['pointerup', 'pointercancel', 'lostpointercapture', 'blur']) {
+                    element.addEventListener(name, releaseLuxtronikButton);
+                }
+                element.addEventListener('keydown', (event) => {
+                    if (['Enter', ' '].includes(event.key)) {
+                        event.preventDefault();
+                        if (!event.repeat) press();
+                    } else if (element === luxtronikCanvas && ['ArrowLeft', 'ArrowUp', 'ArrowRight', 'ArrowDown'].includes(event.key)) {
+                        event.preventDefault();
+                        sendLuxtronikMove(['ArrowLeft', 'ArrowUp'].includes(event.key) ? 1 : 0);
+                    }
+                });
+                element.addEventListener('keyup', (event) => {
+                    if (['Enter', ' '].includes(event.key)) {
+                        event.preventDefault();
+                        releaseLuxtronikButton();
+                    } else if (element === luxtronikCanvas && event.key.startsWith('Arrow')) sendLuxtronikMove(6);
+                });
+            }
+            document.getElementById('wp-luxtronik-press').addEventListener('click', (event) => {
+                // Keyboard is handled above; assistive click actions have no pointer events.
+                if (event.detail === 0) { press(); releaseLuxtronikButton(); }
+            });
+            luxtronikCanvas.addEventListener('wheel', (event) => {
+                if (!luxtronikReady || !event.deltaY) return;
+                event.preventDefault();
+                sendLuxtronikMove(event.deltaY < 0 ? 1 : 0);
+            }, {passive: false});
+        }
+
+
         const applyModernDashboard = (card) => {
             if (!card || !card.content || !card.content.getAttribute('data-symcon-modern')) {
                 return false;
@@ -6547,6 +6919,29 @@ window.SymconHeatPump = {
                     el.textContent = value === null || value === undefined ? '' : String(value);
                 }
             };
+
+            // Reuse the old settings tile for the original LCD protocol and controls.
+            const settings = svg.querySelector('#gSettings');
+            show('#gSettings', !!getLuxtronikWebURL());
+            if (settings) {
+                const texts = settings.querySelectorAll('text');
+                if (texts[0]) texts[0].textContent = 'LUX Bedienfeld';
+                if (texts[1]) texts[1].textContent = '';
+                settings.style.cursor = 'pointer';
+                settings.setAttribute('role', 'button');
+                settings.setAttribute('tabindex', '0');
+                settings.setAttribute('aria-label', 'LUX Bedienfeld öffnen');
+                if (!settings.dataset.symconLuxtronikBound) {
+                    bindTap(settings, openLuxtronikWebInterface);
+                    settings.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openLuxtronikWebInterface();
+                        }
+                    });
+                    settings.dataset.symconLuxtronikBound = '1';
+                }
+            }
 
             const formatted = (key) => {
                 if (!key || !data[key]) return '';
@@ -6649,7 +7044,8 @@ window.SymconHeatPump = {
                 '#gHPStatusHeating',
                 '#gHPStatusCooling',
                 '#gSymconWarmWaterSetpoint',
-                '#gSymconHeatingCorrection'
+                '#gSymconHeatingCorrection',
+                '#gSettings'
             ];
             let nextButtonX = 28;
             const buttonGap = 12;
