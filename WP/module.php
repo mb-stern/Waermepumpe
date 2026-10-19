@@ -221,6 +221,24 @@ class Waermepumpe extends IPSModuleStrict
         }
 
         $variable = IPS_GetVariable($variableId);
+        if ($Ident === 'SetNumericControl') {
+            if ((!is_int($value) && !is_float($value) && !is_string($value))
+                || !is_numeric($value) || !is_finite((float) $value)) {
+                throw new InvalidArgumentException('Der Sollwert muss eine gültige, endliche Zahl sein.');
+            }
+
+            $variableType = (int) $variable['VariableType'];
+            if (!in_array($variableType, [1, 2], true)
+                || ($variableType === 1 && floor((float) $value) !== (float) $value)) {
+                throw new InvalidArgumentException('Der Sollwert passt nicht zum numerischen Variablentyp.');
+            }
+
+            $control = $this->GetNumericControlInfo($function);
+            if ((float) $value < $control['min'] || (float) $value > $control['max']) {
+                throw new InvalidArgumentException('Der Sollwert liegt außerhalb des zulässigen Bereichs.');
+            }
+        }
+
         $typedValue = $this->CastValueForVariableType(
             $value,
             (int) $variable['VariableType']
@@ -1281,8 +1299,8 @@ HTML;
             'hotwater'                     => $this->BuildControlInfo('HotWaterControlVariable'),
             'cooling'                      => $this->BuildControlInfo('CoolingControlVariable'),
             'power'                        => $this->BuildControlInfo('HeatingPumpStatusOnOff'),
-            'warmWaterSetpoint'            => $this->BuildNumericControlInfo('WarmWaterSetpointVariable', 20.0, 80.0, 0.5),
-            'heatingTemperatureCorrection' => $this->BuildNumericControlInfo('HeatingTemperatureCorrectionVariable', -10.0, 10.0, 0.5)
+            'warmWaterSetpoint'            => $this->GetNumericControlInfo('warmWaterSetpoint'),
+            'heatingTemperatureCorrection' => $this->GetNumericControlInfo('heatingTemperatureCorrection')
         ];
     }
 
@@ -1354,6 +1372,15 @@ HTML;
             'enabled'      => $offValues === [] ? true : !$this->ValueInList($currentValue, $offValues),
             'options'      => $options
         ];
+    }
+
+    private function GetNumericControlInfo(string $function): array
+    {
+        return match ($function) {
+            'warmWaterSetpoint' => $this->BuildNumericControlInfo('WarmWaterSetpointVariable', 20.0, 80.0, 0.5),
+            'heatingTemperatureCorrection' => $this->BuildNumericControlInfo('HeatingTemperatureCorrectionVariable', -10.0, 10.0, 0.5),
+            default => throw new InvalidArgumentException('Unbekannte numerische Steuerfunktion.')
+        };
     }
 
     private function BuildNumericControlInfo(
@@ -3369,10 +3396,17 @@ window.SymconHeatPump = {
             plus.textContent = '+';
 
             const clamp = (value) => {
-                let result = value;
-                if (Number.isFinite(min)) result = Math.max(min, result);
-                if (Number.isFinite(max)) result = Math.min(max, result);
-                return Math.round(result / step) * step;
+                if (!Number.isFinite(value) || !Number.isFinite(min)
+                    || !Number.isFinite(max) || min > max
+                    || !Number.isFinite(step) || step <= 0) {
+                    return NaN;
+                }
+                // Use the input's minimum as the step origin. Only select
+                // grid points inside the range, including at either boundary.
+                const lastIndex = Math.floor((max - min) / step + 1e-9);
+                const index = Math.max(0, Math.min(lastIndex, Math.round((value - min) / step)));
+                const result = Number((min + index * step).toPrecision(15));
+                return Math.max(min, Math.min(max, result));
             };
 
             minus.addEventListener('click', (e) => {
@@ -3404,6 +3438,9 @@ window.SymconHeatPump = {
                 e.preventDefault();
                 e.stopPropagation();
 
+                if (input.value.trim() === '') {
+                    return;
+                }
                 const value = clamp(Number(input.value));
                 if (!Number.isFinite(value)) {
                     return;

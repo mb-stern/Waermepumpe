@@ -40,14 +40,24 @@ class IPSModuleStrict
 }
 $variables = [];
 $formattedValues = [];
+$variableMetadata = [];
+$profiles = [];
+$writes = [];
+$actions = [];
 function IPS_GetKernelRunlevel(): int { return KR_READY; }
 function IPS_VariableExists(int $id): bool { return isset($GLOBALS['variables'][$id]); }
 function IPS_GetVariable(int $id): array {
-    return ['VariableType' => 2, 'VariableProfile' => '', 'VariableCustomProfile' => '', 'VariableAction' => 0, 'VariableCustomAction' => 0];
+    return ($GLOBALS['variableMetadata'][$id] ?? []) + ['VariableType' => 2, 'VariableProfile' => '', 'VariableCustomProfile' => '', 'VariableAction' => 0, 'VariableCustomAction' => 0];
 }
+function IPS_VariableProfileExists(string $name): bool { return isset($GLOBALS['profiles'][$name]); }
+function IPS_GetVariableProfile(string $name): array { return $GLOBALS['profiles'][$name]; }
 function GetValue(int $id): mixed { return $GLOBALS['variables'][$id]; }
 function GetValueFormatted(int $id): string { return $GLOBALS['formattedValues'][$id] ?? (string) GetValue($id); }
-function SetValue(int $id, mixed $value): void { $GLOBALS['variables'][$id] = $value; }
+function SetValue(int $id, mixed $value): void {
+    $GLOBALS['writes'][] = [$id, $value];
+    $GLOBALS['variables'][$id] = $value;
+}
+function RequestAction(int $id, mixed $value): void { $GLOBALS['actions'][] = [$id, $value]; }
 require __DIR__ . '/../WP/module.php';
 $checks = 0;
 function check(bool $condition, string $message): void {
@@ -153,6 +163,70 @@ check($data['refluxTemperatureHeating']['value'] === 28.9, 'Existing return actu
 check($data['returnTemperatureSetpoint']['value'] === 30.0, 'Return setpoint not in payload');
 $module->ApplyChanges();
 check(isset($module->messages[30005], $module->messages[30006]), 'Return values not subscribed');
+
+// Numeric controls must reject invalid input before either side-effect route.
+foreach ([
+    ['warmWaterSetpoint', 'WarmWaterSetpointVariable', 20.0, 80.0],
+    ['heatingTemperatureCorrection', 'HeatingTemperatureCorrectionVariable', -10.0, 10.0]
+] as [$function, $property, $min, $max]) {
+    foreach (['direct', 'standard', 'custom'] as $route) {
+        $variables[50001] = 25.0;
+        $variableMetadata[50001] = [
+            'VariableAction' => $route === 'standard' ? 10001 : 0,
+            'VariableCustomAction' => $route === 'custom' ? 10002 : 0,
+        ];
+        $module = createModule([$property => 50001]);
+        foreach ([null, '', 'invalid', '1e999', true, false, [], NAN, INF, -INF, $min - 0.1, $max + 0.1] as $invalid) {
+            $before = [$writes, $actions, $variables[50001]];
+            $rejected = false;
+            try {
+                $module->RequestAction('SetNumericControl', ['function' => $function, 'value' => $invalid]);
+            } catch (InvalidArgumentException) { $rejected = true; }
+            check($rejected && [$writes, $actions, $variables[50001]] === $before, 'Invalid numeric input caused a side effect: ' . $function . '/' . $route);
+        }
+        $before = [$writes, $actions];
+        $rejected = false;
+        try { $module->RequestAction('SetNumericControl', ['function' => $function]); }
+        catch (InvalidArgumentException) { $rejected = true; }
+        check($rejected && [$writes, $actions] === $before, 'Missing numeric value accepted');
+        foreach ([$min, $max, (string) (($min + $max) / 2)] as $valid) {
+            $before = [count($writes), count($actions)];
+            $module->RequestAction('SetNumericControl', json_encode(['function' => $function, 'value' => $valid], JSON_THROW_ON_ERROR));
+            $calls = $route === 'direct' ? $writes : $actions;
+            check(end($calls) === [50001, (float) $valid], 'Valid numeric value not delivered with correct type');
+            check([count($writes), count($actions)] === [$before[0] + ($route === 'direct' ? 1 : 0), $before[1] + ($route === 'direct' ? 0 : 1)], 'Wrong numeric action route');
+        }
+    }
+}
+// The same custom profile limits must be used by the UI and action handler.
+$profiles['Test.Setpoint'] = ['MinValue' => 21.2, 'MaxValue' => 60.2, 'StepSize' => 0.3, 'Suffix' => ' °C'];
+$variableMetadata[50001] = ['VariableCustomProfile' => 'Test.Setpoint'];
+$module = createModule(['WarmWaterSetpointVariable' => 50001]);
+$info = callPrivate($module, 'BuildControlData')['warmWaterSetpoint'];
+check($info['min'] === 21.2 && $info['max'] === 60.2 && $info['step'] === 0.3, 'Custom profile limits lost');
+foreach ([21.2, 60.2] as $valid) {
+    $module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => $valid]);
+    check(end($writes) === [50001, $valid], 'Custom profile boundary rejected');
+}
+foreach ([20.0, 60.3] as $invalid) {
+    $before = [$writes, $actions];
+    $rejected = false;
+    try { $module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => $invalid]); }
+    catch (InvalidArgumentException) { $rejected = true; }
+    check($rejected && [$writes, $actions] === $before, 'Custom profile limit bypassed');
+}
+// Numeric actions must not silently truncate fractions or target booleans/strings.
+foreach ([0, 1, 3] as $type) {
+    $variableMetadata[50001] = ['VariableType' => $type];
+    $before = [$writes, $actions];
+    $rejected = false;
+    try { $module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => 25.5]); }
+    catch (InvalidArgumentException) { $rejected = true; }
+    check($rejected && [$writes, $actions] === $before, 'Incompatible numeric variable type accepted');
+}
+$variableMetadata[50001] = ['VariableType' => 1];
+$module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => 25]);
+check(end($writes) === [50001, 25], 'Integer setpoint type lost');
 $module = createModule();
 $html = $module->GetVisualizationTile();
 check(str_contains($html, 'SymconHeatPump.init('), 'Visualization not generated');

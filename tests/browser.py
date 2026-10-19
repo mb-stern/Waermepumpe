@@ -57,6 +57,42 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 }''')
                 target_key=payload['config']['returnTemperatureSetpoint']
                 actual_key=payload['config']['refluxTemperatureHeating']
+                # Drive real numeric popups and capture only simulated SDK actions.
+                page.evaluate('''() => {
+                    window.testActions=[];
+                    window.requestAction=(ident,value)=>window.testActions.push({ident,payload:JSON.parse(value)});
+                }''')
+                for function, selector in [
+                    ('warmWaterSetpoint', '#gSymconWarmWaterSetpoint'),
+                    ('heatingTemperatureCorrection', '#gSymconHeatingCorrection')
+                ]:
+                    for minimum, maximum, step, value, expected in [
+                        (20,80,0.3,80,80),
+                        (20.1,80,0.3,80,79.8),
+                        (20.1,80,0.3,-100,20.1),
+                        (-10,10,0.3,10,9.8),
+                        (-10,10,0.3,-11,-10),
+                        (20,80,0.5,50.5,50.5),
+                        (0,10,1,4,4),
+                    ]:
+                        controls=json.loads(json.dumps(payload['controls']))
+                        controls[function].update(min=minimum,max=maximum,step=step,currentValue=value)
+                        page.evaluate('(controls)=>window.handleMessage({type:"update",controls})',controls)
+                        page.locator(selector).dispatch_event('click')
+                        field=page.locator('#wp-mode-menu input')
+                        field.fill(str(value))
+                        page.get_by_role('button',name='Übernehmen',exact=True).dispatch_event('click')
+                        action=page.evaluate('window.testActions.at(-1)')
+                        assert action=={'ident':'SetNumericControl','payload':{'function':function,'value':expected}},action
+                        assert minimum<=action['payload']['value']<=maximum,action
+                        # An empty correction must not turn into zero or a boundary.
+                        page.locator(selector).dispatch_event('click')
+                        field.fill('')
+                        before=page.evaluate('window.testActions.length')
+                        page.get_by_role('button',name='Übernehmen',exact=True).dispatch_event('click')
+                        assert page.evaluate('window.testActions.length')==before
+                        page.keyboard.press('Escape')
+                page.evaluate('(controls)=>window.handleMessage({type:"update",controls})',payload['controls'])
                 # Actual running variables drive overlays; updates keep their identity.
                 assert page.locator('.wp-live-flow').count() > 0
                 page.evaluate("document.querySelector('.wp-live-flow').dataset.testIdentity='retained'")
