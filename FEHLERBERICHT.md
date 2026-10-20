@@ -2,7 +2,7 @@
 
 Stand: 20.10.2026 · Branch: `development` · ursprünglicher Fehlerstand: `7808018eeb6c61658862d23219b135ea09475d94`.
 
-F-01 und F-02 wurden auf dem genannten ursprünglichen Stand reproduziert und inzwischen auf `development` korrigiert. F-03 wurde auf dem späteren Stand `21a623d` ergänzt. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
+F-01 und F-02 wurden auf dem genannten ursprünglichen Stand reproduziert und inzwischen auf `development` korrigiert. F-03 wurde auf dem späteren Stand `21a623d` ergänzt. Die ursprünglichen beiden Befunde betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
 
 ## F-01: Fehlende Validierung numerischer Steuerungswerte im PHP-Modul
 
@@ -50,19 +50,17 @@ F-01 und F-02 wurden auf dem genannten ursprünglichen Stand reproduziert und in
 
 **Abnahme:** Nicht am Raster liegende Unter- und Obergrenzen sowie negative Bereiche prüfen. Kein Ergebnis darf Minimum oder Maximum verletzen; das vereinbarte Schrittraster muss eingehalten werden. Bestehende Standardprofile müssen weiterhin funktionieren.
 
-## F-03: Gefundene Luxtronik-Idents werden bei leeren gespeicherten Feldern nicht direkt genutzt
+## F-03: Luxtronik-Zuordnung bleibt auf der echten Installation offen
 
-**Stand:** `21a623d`, gemeldet nach Modulupdate und erneutem Zuordnen/Übernehmen.
+**Gemeldetes Verhalten:** Verdichterdrehzahl und Kondensationstemperatur bleiben trotz ausgewählter Luxtronik-Quelle, Modulupdate sowie erneutem Zuordnen/Übernehmen unzugeordnet. Viele andere Idents werden zugeordnet. Die Instanz-ID wird vom Formular übernommen und darf nicht fest eingebaut werden.
 
-**Auslöser:** Eine gültige Luxtronik-Quelle und andere Variablenzuordnungen sind gespeichert. `CompressorValue`, `CondenserTemperature` oder `OutdoorTemperature` stehen weiterhin auf null, obwohl die passenden Idents unter der gewählten Quelle existieren.
+**Bisherige Eingrenzung:** Die Einträge `Verdichterdrehzahl` und `Kondensationstemperatur` stehen sowohl im Wärmepumpen-Mapping als auch in der zentralen Datenpunktkonfiguration des aktuellen Luxtronik-Repositorys. Der tatsächliche Objektbestand und geladene Modulstand der Nutzerinstallation liegen noch nicht vor. Die lokalen Testdaten belegen keine erfolgreiche Zuordnung auf dieser Installation.
 
-**Ursache im Datenpfad:** `AddVariableData()` und `DataKey()` lesen ausschließlich die gespeicherte Variablen-ID. Die Ident-Suche läuft bisher nur für Formularvorschläge und den Zuordnungsbutton. Eine vorhandene Luxtronik-Variable allein genügt dadurch nicht für die Anzeige. Warum die Formularübernahme auf der gemeldeten echten Installation leere Felder hinterließ, ist mit dem lokalen Symcon-Ersatz nicht nachgewiesen.
+**Zurückgenommener Ansatz:** Commit `1743f1d` ergänzte eine direkte Laufzeitauflösung nur für Außentemperatur, Verdichterdrehzahl und Kondensationstemperatur. Dieser Sonderweg behob laut Rückmeldung das Problem nicht. Die dort lokal nachgewiesene fehlende Laufzeitauflösung leerer Eigenschaften war keine bestätigte Erklärung für die gescheiterte Formularübernahme.
 
-**Reproduktion:** Im Regressionstest werden eine Luxtronik-Instanz mit `Verdichterdrehzahl`, `Kondensationstemperatur` und `Aussentemperatur`, eine gespeicherte Quelle und weitere korrekte Zuordnungen angelegt. Die drei Messwert-Eigenschaften bleiben null. Vor der Korrektur fehlen ihre Daten in der Visualisierung; der neue Test schlägt fehl. Es werden keine echten Geräte angesprochen.
+**Aktueller Stand:** Der Sonderweg wurde durch einen gemeinsamen Resolver für alle Einträge der Ident-Tabelle ersetzt. Formular, Anzeige, Betriebsstatusauswertung, Abonnements, Bedieninformationen und Aktionsziele verwenden dieselbe Auflösung. Gefundene Idents der gewählten Quelle haben im Automatikmodus einheitlich Vorrang; manuelle Konfiguration und externe Fallbacks ohne verfügbaren Ident bleiben möglich. Es gibt keine feldspezifischen Ausnahmen. Eine rein lesende Zuordnungsdiagnose zeigt den tatsächlich geladenen Stand, die erkannte Quelle und alle vorhandenen Idents sowie gefundene, gespeicherte und verwendete IDs.
 
-**Korrektur:** Im Automatikmodus werden diese drei Messwerte direkt per Ident aus der ausgewählten bzw. eindeutig erkannten Quelle aufgelöst. Visualisierungsdaten, Konfigurationsschlüssel, Update-Abonnements und Zuordnungsübersicht verwenden die passende Quelle. Das Formular zeigt die verwendete Variable als schreibgeschützte Beschriftung statt eines leeren Pickers. Gespeicherte manuelle Zuordnungen bleiben unverändert; im manuellen Modus werden sie wieder verwendet. Instanz- und Variablen-IDs sind nicht fest eingebaut.
-
-**Prüfung:** Regressionen prüfen leere gespeicherte Felder, unveränderte Eigenschaften, manuelle Konfiguration, mehrdeutige oder fehlende Quellen, einen Quellenwechsel und neu angelegte Variablen mit gleichem Ident. Browserprüfungen verwenden zusätzlich aus PHP erzeugte Live-Daten und eine echte `MessageSink()`-Nachricht im lokalen Symcon-Ersatz. Die Prüfung auf der echten IP-Symcon-Installation steht aus.
+**Offen:** Der gemeldete Fehler auf der echten Installation ist noch nicht abschließend erklärt oder dort als behoben bestätigt. Die Ausgabe von **Zuordnungsdiagnose anzeigen** wird für die weitere Eingrenzung benötigt. Es wurden keine echten Geräteaktionen ausgeführt.
 
 ## Prüfstatus und Quellen
 

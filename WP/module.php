@@ -40,9 +40,6 @@ class Waermepumpe extends IPSModuleStrict
         'ThermalSolarPanelTemp' => ['Fuehler_Solarkollektor']
     ];
 
-    // These heat-pump readings are bound directly by Ident in automatic mode.
-    private const LUXTRONIK_LIVE_PROPERTIES = ['OutdoorTemperature', 'CompressorValue', 'CondenserTemperature'];
-
     public function Create(): void
     {
         parent::Create();
@@ -258,7 +255,7 @@ class Waermepumpe extends IPSModuleStrict
             throw new InvalidArgumentException('Unbekannte Steuerfunktion.');
         }
 
-        $variableId = $this->ReadPropertyInteger($propertyMap[$function]);
+        $variableId = $this->GetVisualizationVariableID($propertyMap[$function]);
         if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
             throw new RuntimeException('Für diese Funktion ist keine gültige Steuervariable konfiguriert.');
         }
@@ -369,7 +366,7 @@ class Waermepumpe extends IPSModuleStrict
                 'items' => [
                     [
                         'type' => 'Label',
-                        'caption' => 'Luxtronik auswählen und Variablen zuordnen. Eine einzelne Instanz wird automatisch vorgeschlagen. Außentemperatur, Verdichterdrehzahl und Kondensationstemperatur werden im Automatikmodus direkt per Ident aus der gewählten Quelle gelesen, auch ohne Zuordnungsbutton. Andere externe Quellen bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern.'
+                        'caption' => 'Luxtronik auswählen und Variablen zuordnen. Eine einzelne Instanz wird automatisch vorgeschlagen. Alle verfügbaren Luxtronik-Idents werden im Automatikmodus einheitlich aus der gewählten Quelle gelesen. Externe Quellen für fehlende Datenpunkte bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern.'
                     ],
                     [
                         'type' => 'Label',
@@ -392,6 +389,14 @@ class Waermepumpe extends IPSModuleStrict
                         'type' => 'CheckBox',
                         'name' => 'ManualConfiguration',
                         'caption' => 'Manuelle Konfiguration – alle Variablenfelder freigeben'
+                    ],
+                    [
+                        'type' => 'ExpansionPanel',
+                        'caption' => 'Zuordnung prüfen',
+                        'items' => [
+                            ['type' => 'Label', 'caption' => 'Zeigt die erkannte Quelle, gefundene Idents und verwendete Variablen-IDs. Liest keine Messwerte oder Zugangsdaten aus und verändert keine Einstellungen.'],
+                            ['type' => 'Button', 'name' => 'LuxtronikDiagnoseButton', 'caption' => 'Zuordnungsdiagnose anzeigen', 'onClick' => 'echo WP_DiagnoseLuxtronik($id, $LuxtronikInstanceID);']
+                        ]
                     ],
                     [
                         'type' => 'ExpansionPanel',
@@ -718,44 +723,56 @@ class Waermepumpe extends IPSModuleStrict
         return 0;
     }
 
+    private function GetLuxtronikSource(int $selected): int
+    {
+        $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
+        if ($selected === 0 && count($instances) === 1) {
+            return $instances[0];
+        }
+        return in_array($selected, $instances, true) ? $selected : 0;
+    }
+
+    private function ResolveVariableID(string $property, int $configuredID, int $selected, bool $manual): int
+    {
+        if ($manual || !isset(self::LUXTRONIK_IDENT_MAP[$property])) {
+            return $configuredID;
+        }
+        $source = $this->GetLuxtronikSource($selected);
+        if ($source === 0) {
+            return $configuredID;
+        }
+        $variableID = $this->FindLuxtronikVariable($property, $source);
+        if ($variableID !== 0) {
+            return $variableID;
+        }
+        // A missing Ident must not leave a different Luxtronik data point/unit active.
+        // External sources and unresolved saved IDs remain available for manual use.
+        $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
+        return $configuredID > 0 && IPS_VariableExists($configuredID)
+            && in_array(IPS_GetParent($configuredID), $instances, true) ? 0 : $configuredID;
+    }
+
     private function GetVisualizationVariableID(string $property): int
     {
-        if (in_array($property, self::LUXTRONIK_LIVE_PROPERTIES, true)
-            && !$this->ReadPropertyBoolean('ManualConfiguration')) {
-            $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
-            $source = $this->ReadPropertyInteger('LuxtronikInstanceID');
-            if ($source === 0 && count($instances) === 1) {
-                $source = $instances[0];
-            }
-            if (in_array($source, $instances, true)) {
-                $variableID = $this->FindLuxtronikVariable($property, $source);
-                if ($variableID !== 0) {
-                    return $variableID;
-                }
-            }
-        }
-        // Preserve saved manual assignments, including setups without Luxtronik.
-        return $this->ReadPropertyInteger($property);
+        return $this->ResolveVariableID(
+            $property,
+            $this->ReadPropertyInteger($property),
+            $this->ReadPropertyInteger('LuxtronikInstanceID'),
+            $this->ReadPropertyBoolean('ManualConfiguration')
+        );
     }
 
     private function BuildAssignmentReport(int $instanceID, array $values, array $fields, bool $manual = false): array
     {
         $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
-        $source = in_array($instanceID, $instances, true) ? $instanceID : 0;
-        if ($instanceID === 0 && count($instances) === 1) {
-            $source = $instances[0];
-        }
+        $source = $this->GetLuxtronikSource($instanceID);
         $rows = [];
         $statuses = [];
         $counts = ['ident' => 0, 'external' => 0, 'manual' => 0, 'missing' => 0, 'invalid' => 0];
         foreach ($fields as $property => $caption) {
-            $variableID = $values[$property];
+            $variableID = $this->ResolveVariableID($property, $values[$property], $instanceID, $manual);
             $expected = $source === 0 ? 0 : $this->FindLuxtronikVariable($property, $source);
-            $automatic = !$manual && $expected !== 0
-                && in_array($property, self::LUXTRONIK_LIVE_PROPERTIES, true);
-            if ($automatic) {
-                $variableID = $expected;
-            }
+            $automatic = !$manual && $expected !== 0 && $variableID === $expected;
             $ident = implode(' / ', self::LUXTRONIK_IDENT_MAP[$property] ?? []);
             $variable = '—';
             $kind = 'missing';
@@ -812,7 +829,7 @@ class Waermepumpe extends IPSModuleStrict
                 $property = $element['name'];
                 $element['onChange'] = $script;
                 $element['enabled'] = $manual || !$statuses[$property]['ident'];
-                if (in_array($property, self::LUXTRONIK_LIVE_PROPERTIES, true)) {
+                if (isset(self::LUXTRONIK_IDENT_MAP[$property])) {
                     // A property-backed picker would display its saved value (often
                     // zero), overriding a derived value. Show the actual live source
                     // separately and retain the original picker for manual mode.
@@ -849,7 +866,7 @@ class Waermepumpe extends IPSModuleStrict
         $this->UpdateFormField('LuxtronikAssignButton', 'enabled', !$manual);
         foreach ($report['fields'] as $property => $status) {
             $this->UpdateFormField($property, 'enabled', $manual || !$status['ident']);
-            if (in_array($property, self::LUXTRONIK_LIVE_PROPERTIES, true)) {
+            if (isset(self::LUXTRONIK_IDENT_MAP[$property])) {
                 $this->UpdateFormField($property, 'visible', !$status['automatic']);
                 $this->UpdateFormField('Automatic' . $property, 'visible', $status['automatic']);
                 $captionParts = explode(' · ', $fields[$property]);
@@ -857,6 +874,39 @@ class Waermepumpe extends IPSModuleStrict
                 $this->UpdateFormField('Automatic' . $property, 'caption', $caption . ': ' . $status['automaticLabel']);
             }
         }
+    }
+
+    public function DiagnoseLuxtronik(int $selected): string
+    {
+        $source = $this->GetLuxtronikSource($selected);
+        $manual = $this->ReadPropertyBoolean('ManualConfiguration');
+        $variables = [];
+        foreach ($source === 0 ? [] : IPS_GetChildrenIDs($source) as $variableID) {
+            if (!IPS_VariableExists($variableID)) continue;
+            $variables[] = [
+                'id' => $variableID,
+                'ident' => (string) (IPS_GetObject($variableID)['ObjectIdent'] ?? '')
+            ];
+        }
+        $mapping = [];
+        foreach (self::LUXTRONIK_IDENT_MAP as $property => $idents) {
+            $configured = $this->ReadPropertyInteger($property);
+            $mapping[$property] = [
+                'gesuchteIdents' => $idents,
+                'gefunden' => $source === 0 ? 0 : $this->FindLuxtronikVariable($property, $source),
+                'gespeichert' => $configured,
+                'verwendet' => $this->GetVisualizationVariableID($property)
+            ];
+        }
+        return json_encode([
+            'zuordnungsstand' => 'einheitlich-2026-10-20',
+            'ausgewaehlteQuelle' => $selected,
+            'gespeicherteQuelle' => $this->ReadPropertyInteger('LuxtronikInstanceID'),
+            'erkannteQuelle' => $source,
+            'manuell' => $manual,
+            'zuordnungen' => $mapping,
+            'vorhandeneVariablen' => $variables
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
     }
 
     public function AssignLuxtronik(int $instanceID, string $formValues, bool $manual = false): string
@@ -889,18 +939,11 @@ class Waermepumpe extends IPSModuleStrict
             if (!is_int($current) || $current < 0) {
                 throw new InvalidArgumentException('Ungültige Variablenzuordnung: ' . $property);
             }
-            $variableID = $this->FindLuxtronikVariable($property, $instanceID);
-            // Keep unresolved IDs and external sources, except the requested
-            // heat-pump readings that prefer the selected unit's exact Ident.
-            if ($current !== 0) {
-                if (!IPS_VariableExists($current)) {
-                    continue;
-                }
-                if (!in_array(IPS_GetParent($current), $instances, true)
-                    && (!in_array($property, self::LUXTRONIK_LIVE_PROPERTIES, true)
-                        || $variableID === 0)) {
-                    continue;
-                }
+            $variableID = $this->ResolveVariableID($property, $current, $instanceID, false);
+            // Preserve an external/manual fallback only when no matching Ident exists.
+            if ($current !== 0 && $variableID === $current
+                && $this->FindLuxtronikVariable($property, $instanceID) === 0) {
+                continue;
             }
             if ($variableID !== 0) {
                 $assignments[$property] = $variableID;
@@ -1679,7 +1722,7 @@ HTML;
         }
 
         if ($this->HasOperatingStatus()) {
-            $statusValue = GetValue($this->ReadPropertyInteger('OperatingStatusVariable'));
+            $statusValue = GetValue($this->GetVisualizationVariableID('OperatingStatusVariable'));
 
             $data['heatingPumpHeatingMode'] = $this->BinaryData(
                 $this->ValueMatchesCsv($statusValue, $this->ReadPropertyString('OperatingStatusHeatingValues'))
@@ -1695,7 +1738,7 @@ HTML;
             );
         }
 
-        $fanSpeedId = $this->ReadPropertyInteger('FanSpeed');
+        $fanSpeedId = $this->GetVisualizationVariableID('FanSpeed');
         if ($fanSpeedId > 0 && IPS_VariableExists($fanSpeedId)) {
             $fanValue = GetValue($fanSpeedId);
             $data['hpRunning'] = $this->BinaryData(
@@ -1760,7 +1803,7 @@ HTML;
 
     private function HasOperatingStatus(): bool
     {
-        $variableId = $this->ReadPropertyInteger('OperatingStatusVariable');
+        $variableId = $this->GetVisualizationVariableID('OperatingStatusVariable');
         return $variableId > 0 && IPS_VariableExists($variableId);
     }
 
@@ -1793,7 +1836,7 @@ HTML;
 
         if ($hasOperatingStatus) {
             $operatingStatusValue = GetValue(
-                $this->ReadPropertyInteger('OperatingStatusVariable')
+                $this->GetVisualizationVariableID('OperatingStatusVariable')
             );
         }
 
@@ -1830,7 +1873,7 @@ HTML;
     ): bool {
         if ($this->HasOperatingStatus()) {
             $status = GetValue(
-                $this->ReadPropertyInteger('OperatingStatusVariable')
+                $this->GetVisualizationVariableID('OperatingStatusVariable')
             );
 
             return $this->ValueMatchesCsv(
@@ -1839,7 +1882,7 @@ HTML;
             );
         }
 
-        $variableId = $this->ReadPropertyInteger($directProperty);
+        $variableId = $this->GetVisualizationVariableID($directProperty);
 
         if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
             return false;
@@ -1850,7 +1893,7 @@ HTML;
 
     private function BuildControlInfo(string $property): array
     {
-        $variableId = $this->ReadPropertyInteger($property);
+        $variableId = $this->GetVisualizationVariableID($property);
 
         if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
             return [
@@ -1909,7 +1952,7 @@ HTML;
         float $fallbackMax,
         float $fallbackStep
     ): array {
-        $variableId = $this->ReadPropertyInteger($property);
+        $variableId = $this->GetVisualizationVariableID($property);
 
         if ($variableId <= 0 || !IPS_VariableExists($variableId)) {
             return [

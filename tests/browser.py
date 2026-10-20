@@ -413,6 +413,12 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 live_errors=[]
                 live_page.on('pageerror',lambda e: live_errors.append(str(e)))
                 live_page.goto(f'http://127.0.0.1:{server.server_port}/live-ident.html')
+                resolved=live_page.evaluate("""() => {
+                    const script=[...document.scripts].find(s=>s.textContent.trim().startsWith('SymconHeatPump.init('));
+                    const p=JSON.parse(script.textContent.trim().slice('SymconHeatPump.init('.length,-2));
+                    return Object.fromEntries(['operatingStatus','supplyTemperature','fanSpeed','outdoorTemperature','compressorValue','condenserTemperature'].map(key=>[key,p.data[key].variableId]));
+                }""")
+                assert resolved=={'operatingStatus':62000,'supplyTemperature':62001,'fanSpeed':62007,'outdoorTemperature':62004,'compressorValue':62012,'condenserTemperature':62013},resolved
                 assert live_page.locator('#textCompressorSpeedValue').text_content()=='3000 rpm'
                 assert live_page.locator('#textCondenserTemperature').text_content()=='42.5 °C'
                 assert live_page.locator('#pathCompressor').evaluate('e=>parseFloat(getComputedStyle(e).animationDuration)')==1.0
