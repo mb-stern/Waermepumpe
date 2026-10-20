@@ -1366,15 +1366,10 @@ class Waermepumpe extends IPSModuleStrict
     #wp-luxtronik-dialog .wp-luxtronik-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
     #wp-luxtronik-dialog .wp-luxtronik-header strong { flex: 1; }
     #wp-luxtronik-dialog a { color: inherit; }
-    #wp-luxtronik-help, #wp-luxtronik-recognition { margin: 0; font-size: 14px; }
+    #wp-luxtronik-help { margin: 0; font-size: 14px; }
     #wp-luxtronik-login { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     #wp-luxtronik-password { width: 110px; max-width: 100%; }
     #wp-luxtronik-device { padding: 24px; border-radius: 14px; background: linear-gradient(145deg, #59616a, #30363d); }
-    #wp-luxtronik-screen { position: relative; }
-    #wp-luxtronik-targets { position: absolute; inset: 8px; pointer-events: none; }
-    #wp-luxtronik-targets button { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 1px; background: transparent; pointer-events: auto; cursor: pointer; }
-    #wp-luxtronik-targets button:hover, #wp-luxtronik-targets button:focus-visible, #wp-luxtronik-targets button[data-pointer-held] { outline: 2px solid #ffd45c; outline-offset: -2px; background: rgba(255, 212, 92, .12); }
-    #wp-luxtronik-targets button:disabled { pointer-events: none; }
     #wp-luxtronik-display { display: block; width: 100%; height: auto; background: #0000ff; image-rendering: pixelated; border: 8px solid #252a30; border-radius: 5px; box-sizing: border-box; cursor: pointer; touch-action: manipulation; }
     #wp-luxtronik-controls { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 14px; border: 0; margin: 22px 0 0; padding: 0; }
     #wp-luxtronik-controls button { min-height: 48px; padding: 8px 14px; touch-action: manipulation; }
@@ -1405,14 +1400,9 @@ class Waermepumpe extends IPSModuleStrict
         <label for="wp-luxtronik-password">Webinterface-Passwort</label>
         <input id="wp-luxtronik-password" type="password" value="999999" autocomplete="off" />
         <button type="submit">Erneut verbinden</button>
-        <button type="button" id="wp-luxtronik-save" disabled>Displaybild speichern</button>
     </form>
-    <p id="wp-luxtronik-recognition" role="status" aria-live="polite"></p>
     <div id="wp-luxtronik-device">
-        <div id="wp-luxtronik-screen">
-            <canvas id="wp-luxtronik-display" width="160" height="64" tabindex="0" role="img" aria-label="Luxtronik-Gerätedisplay; Bedienung mit Pfeiltasten und Enter"></canvas>
-            <div id="wp-luxtronik-targets" aria-label="Erkannte Displayelemente"></div>
-        </div>
+        <canvas id="wp-luxtronik-display" width="160" height="64" tabindex="0" role="img" aria-label="Luxtronik-Gerätedisplay; Bedienung mit Pfeiltasten und Enter"></canvas>
         <fieldset id="wp-luxtronik-controls" disabled aria-label="Luxtronik bedienen">
             <button type="button" data-luxtronik-turn="1" aria-label="Pfeil links">←</button>
             <button type="button" id="wp-luxtronik-press">Enter</button>
@@ -2009,7 +1999,7 @@ HTML;
      */
     private function GetEmbeddedJavaScript(): string
     {
-        return file_get_contents(__DIR__ . '/luxtronik-display.js') . "\n" . <<<'SYMC0N_HEATPUMP_JAVASCRIPT'
+        return <<<'SYMC0N_HEATPUMP_JAVASCRIPT'
 class HeatPumpCard extends HTMLElement {
   constructor() {
     super();
@@ -6647,7 +6637,6 @@ window.SymconHeatPump = {
         let luxtronikDisplayID = '';
         let luxtronikReady = false;
         let luxtronikPressed = false;
-        let luxtronikLastDirectActivation = -Infinity;
         const getLuxtronikWebURL = () => {
             try {
                 const url = new URL(currentConfig.luxtronikWebInterfaceURL || '');
@@ -6656,104 +6645,17 @@ window.SymconHeatPump = {
                 return '';
             }
         };
-        const sendLuxtronikMove = (direction, automatic = false) => {
-            if (!automatic) {
-                cancelLuxtronikPointer();
-                luxtronikNavigation.cancel();
-            }
+        const sendLuxtronikMove = (direction) => {
             if (luxtronikReady && luxtronikSocket && luxtronikSocket.readyState === WebSocket.OPEN) {
-                if (automatic && direction === 2) luxtronikLastDirectActivation = performance.now();
                 luxtronikSocket.send('MOVE;' + direction);
             }
         };
-        const luxtronikTargets = document.getElementById('wp-luxtronik-targets');
-        let luxtronikPointer = null;
-        const cancelLuxtronikPointer = () => {
-            const gesture = luxtronikPointer;
-            luxtronikPointer = null;
-            luxtronikTargets.querySelectorAll('[data-pointer-held]').forEach(button => button.removeAttribute('data-pointer-held'));
-            if (gesture && luxtronikTargets.hasPointerCapture(gesture.pointerId)) luxtronikTargets.releasePointerCapture(gesture.pointerId);
-        };
-        const activateLuxtronikTarget = id => {
-            releaseLuxtronikButton();
-            luxtronikCanvas.focus({preventScroll: true});
-            luxtronikNavigation.activate(id);
-        };
-        const luxtronikRecognition = document.getElementById('wp-luxtronik-recognition');
-        const luxtronikSave = document.getElementById('wp-luxtronik-save');
-        const luxtronikNavigation = new LuxtronikClickNavigation({
-            move: direction => sendLuxtronikMove(direction, true),
-            refresh: () => {
-                if (luxtronikSocket?.readyState === WebSocket.OPEN) luxtronikSocket.send('REFRESH');
-            },
-            status: message => { luxtronikHelp.textContent = message; },
-            render: (model, busy) => {
-                const message = model.targets.length
-                    ? (busy ? 'Eintrag wird ausgewählt …' : 'Direkt anklickbare Displayelemente: ' + model.targets.length)
-                    : 'Keine Klickflächen erkannt. Ein Displayklick bestätigt die aktuelle Auswahl mit Enter.';
-                if (luxtronikRecognition.textContent !== message) luxtronikRecognition.textContent = message;
-                const ids = model.targets.map(target => target.id);
-                const children = Array.from(luxtronikTargets.children);
-                if (children.map(child => child.dataset.target).join('|') !== ids.join('|')) {
-                    luxtronikTargets.replaceChildren(...model.targets.map(target => {
-                        const button = document.createElement('button');
-                        button.type = 'button';
-                        button.dataset.target = target.id;
-                        // Pointer clicks are completed on the stable overlay container below.
-                        button.addEventListener('click', event => {
-                            if (event.detail === 0 && luxtronikReady && !button.disabled) activateLuxtronikTarget(target.id);
-                        });
-                        return button;
-                    }));
-                }
-                model.targets.forEach((target, index) => {
-                    const button = luxtronikTargets.children[index];
-                    button.dataset.kind = target.kind;
-                    button.setAttribute('aria-label', target.label + ' öffnen');
-                    button.setAttribute('title', target.label + ' öffnen');
-                    button.style.left = (target.x / 160 * 100) + '%';
-                    button.style.top = (target.y / 64 * 100) + '%';
-                    button.style.width = (target.w / 160 * 100) + '%';
-                    button.style.height = (target.h / 64 * 100) + '%';
-                    button.disabled = busy;
-                });
-            }
-        });
-        luxtronikTargets.addEventListener('pointerdown', event => {
-            const button = event.target.closest('button[data-target]');
-            if (event.button !== 0 || !luxtronikReady || !button || button.disabled || luxtronikPointer) return;
-            event.preventDefault();
-            releaseLuxtronikButton();
-            luxtronikPointer = {pointerId: event.pointerId, id: button.dataset.target, layout: luxtronikNavigation.model.layout};
-            button.setAttribute('data-pointer-held', '');
-            luxtronikTargets.setPointerCapture(event.pointerId);
-        });
-        luxtronikTargets.addEventListener('pointerup', event => {
-            const gesture = luxtronikPointer;
-            if (!gesture || gesture.pointerId !== event.pointerId) return;
-            cancelLuxtronikPointer();
-            if (!luxtronikReady || luxtronikNavigation.pending || luxtronikNavigation.model.layout !== gesture.layout) return;
-            const button = Array.from(luxtronikTargets.children).find(child => child.dataset.target === gesture.id);
-            if (!button || button.disabled) return;
-            const bounds = button.getBoundingClientRect();
-            if (event.clientX >= bounds.left && event.clientX < bounds.right && event.clientY >= bounds.top && event.clientY < bounds.bottom) {
-                activateLuxtronikTarget(gesture.id);
-            }
-        });
-        luxtronikTargets.addEventListener('pointercancel', event => {
-            if (luxtronikPointer?.pointerId === event.pointerId) cancelLuxtronikPointer();
-        });
-        luxtronikTargets.addEventListener('lostpointercapture', event => {
-            if (luxtronikPointer?.pointerId === event.pointerId && !luxtronikTargets.hasPointerCapture(event.pointerId)) cancelLuxtronikPointer();
-        });
         const releaseLuxtronikButton = () => {
             if (luxtronikPressed) sendLuxtronikMove(6);
             luxtronikPressed = false;
         };
         const stopLuxtronik = () => {
-            cancelLuxtronikPointer();
             releaseLuxtronikButton();
-            luxtronikNavigation.reset();
             clearInterval(luxtronikRefresh);
             clearTimeout(luxtronikTimeout);
             clearTimeout(luxtronikRetryTimer);
@@ -6764,10 +6666,7 @@ window.SymconHeatPump = {
             if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'Bedienverbindung beendet');
             luxtronikMenuID = luxtronikDisplayID = '';
             luxtronikReady = false;
-            luxtronikLastDirectActivation = -Infinity;
             luxtronikControls.disabled = true;
-            luxtronikRecognition.textContent = '';
-            luxtronikSave.disabled = true;
             luxtronikCanvas.getContext('2d').clearRect(0, 0, 160, 64);
         };
         const failLuxtronik = (message) => {
@@ -6813,10 +6712,8 @@ window.SymconHeatPump = {
             const firstFrame = !luxtronikReady;
             luxtronikReady = true;
             luxtronikControls.disabled = false;
-            luxtronikSave.disabled = false;
             if (firstFrame && document.activeElement?.tagName !== 'INPUT') luxtronikCanvas.focus({preventScroll: true});
-            luxtronikHelp.textContent = 'Verbunden. Erkannte Menüzeilen, Symbole und Pfeile direkt anklicken. Alternativ mit Pfeiltasten, Enter oder Mausrad bedienen.';
-            luxtronikNavigation.update(bytes);
+            luxtronikHelp.textContent = 'Verbunden. Das Display mit Pfeiltasten und Enter bedienen oder die Schaltflächen anklicken. Ein Mausklick auf das Display entspricht Enter; auch das Mausrad wird unterstützt.';
         };
         const readLuxtronikResponse = (text) => {
             if (typeof text !== 'string' || text.length > 262144) throw new Error('Invalid response');
@@ -6927,33 +6824,9 @@ window.SymconHeatPump = {
             if (typeof luxtronikDialog.close === 'function') luxtronikDialog.close();
             else luxtronikDialog.removeAttribute('open');
         };
-        const applyLuxtronikTheme = () => {
-            const foreground = resolveLayoutTextColor();
-            const context = document.createElement('canvas').getContext('2d');
-            const luminance = color => {
-                context.clearRect(0, 0, 1, 1);
-                context.fillStyle = color;
-                context.fillRect(0, 0, 1, 1);
-                const rgb = Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3)
-                    .map(value => value / 255).map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4);
-                return rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722;
-            };
-            const lightness = luminance(foreground);
-            let background = resolveThemeCssValue([
-                '--card-background-color', '--content-background-color', '--content-background', '--background-color'
-            ], lightness > .4 ? '#18222f' : '#f8fafc');
-            const backgroundLightness = luminance(background);
-            if ((Math.max(lightness, backgroundLightness) + .05) / (Math.min(lightness, backgroundLightness) + .05) < 4.5) {
-                background = lightness > .4 ? '#18222f' : '#f8fafc';
-            }
-            luxtronikDialog.style.color = foreground;
-            luxtronikDialog.style.background = background;
-            luxtronikDialog.style.colorScheme = lightness > .4 ? 'dark' : 'light';
-        };
         const openLuxtronikWebInterface = () => {
             if (!getLuxtronikWebURL() || !luxtronikDialog) return;
             if (luxtronikDialog.open) return;
-            applyLuxtronikTheme();
             if (typeof luxtronikDialog.showModal === 'function') luxtronikDialog.showModal();
             else luxtronikDialog.setAttribute('open', '');
             connectLuxtronik();
@@ -6966,18 +6839,10 @@ window.SymconHeatPump = {
             });
             window.addEventListener('pagehide', stopLuxtronik);
             window.addEventListener('blur', releaseLuxtronikButton);
-            window.addEventListener('blur', cancelLuxtronikPointer);
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden && luxtronikDialog.open && luxtronikReconnectOnVisible) connectLuxtronik(true);
             });
             document.getElementById('wp-luxtronik-close').addEventListener('click', closeLuxtronikWebInterface);
-            luxtronikSave.addEventListener('click', () => {
-                if (!luxtronikReady) return;
-                const link = document.createElement('a');
-                link.download = 'luxtronik-display.png';
-                link.href = luxtronikCanvas.toDataURL('image/png');
-                link.click();
-            });
             document.getElementById('wp-luxtronik-login').addEventListener('submit', (event) => {
                 event.preventDefault();
                 connectLuxtronik();
@@ -6991,15 +6856,9 @@ window.SymconHeatPump = {
                     luxtronikPressed = true;
                 }
             };
-            luxtronikCanvas.addEventListener('pointerdown', () => {
-                luxtronikCanvas.focus();
-                if (!luxtronikNavigation.pending?.opened) luxtronikNavigation.cancel();
-            });
             for (const element of [document.getElementById('wp-luxtronik-press'), luxtronikCanvas]) {
                 element.addEventListener('pointerdown', (event) => {
                     if (event.button !== 0 || !luxtronikReady) return;
-                    if (element === luxtronikCanvas && (luxtronikNavigation.model.targets.length
-                        || luxtronikNavigation.pending || performance.now() - luxtronikLastDirectActivation < 750)) return;
                     element.focus();
                     element.setPointerCapture(event.pointerId);
                     press();
@@ -7028,7 +6887,7 @@ window.SymconHeatPump = {
                 // Keyboard is handled above; assistive click actions have no pointer events.
                 if (event.detail === 0) { press(); releaseLuxtronikButton(); }
             });
-            document.getElementById('wp-luxtronik-screen').addEventListener('wheel', (event) => {
+            luxtronikCanvas.addEventListener('wheel', (event) => {
                 if (!luxtronikReady || !event.deltaY) return;
                 event.preventDefault();
                 sendLuxtronikMove(event.deltaY < 0 ? 1 : 0);
