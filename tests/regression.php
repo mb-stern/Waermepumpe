@@ -288,9 +288,11 @@ $objectIdents[61000] = [
     'Anpassung_WW' => 62009,
     'Anpassung_Temp' => 62010,
     'Ausgang_Verdichter_1' => 62011,
+    'Verdichterdrehzahl' => 62012,
+    'Kondensationstemperatur' => 62013,
 ];
 foreach ([62000 => 7, 62001 => 37.5, 62002 => 28.9, 62003 => 30.0, 62004 => 10.0,
-          62005 => 48.0, 62007 => 250, 62008 => 0, 62009 => 50.0, 62010 => -1.0, 62011 => true] as $variableID => $value) {
+          62005 => 48.0, 62007 => 250, 62008 => 0, 62009 => 50.0, 62010 => -1.0, 62011 => true, 62012 => 3000, 62013 => 42.5] as $variableID => $value) {
     $variables[$variableID] = $value;
 }
 $variableMetadata[62008] = ['VariableType' => 1, 'VariableAction' => 61000];
@@ -338,6 +340,28 @@ $manualOutdoor = createModule(['OutdoorTemperature' => 62060, 'ManualConfigurati
 $before = [$writes, $actions, $manualOutdoor->properties];
 $manualOutdoor->AssignLuxtronik(61000, '{}', true);
 check($manualOutdoor->formUpdates === [] && [$writes, $actions, $manualOutdoor->properties] === $before, 'Manual outdoor sensor overwritten or device operated');
+// These heat-pump readings also prefer exact Idents over external selections.
+foreach (['CompressorValue' => 'Verdichterdrehzahl', 'CondenserTemperature' => 'Kondensationstemperatur'] as $property => $ident) {
+    $expected = $objectIdents[61000][$ident];
+    $reading = createModule([$property => 62060, 'SupplyTemperature' => 62060]);
+    $before = [$writes, $actions, $reading->properties];
+    $reading->AssignLuxtronik(61000, '{}');
+    check($reading->formUpdates[$property]['value'] === $expected, 'Heat pump Ident did not replace external reading: ' . $property);
+    check($reading->formUpdates[$property]['enabled'] === false, 'Imported heat pump reading not locked: ' . $property);
+    check(!isset($reading->formUpdates['SupplyTemperature']['value']), 'Unrelated external reading overwritten');
+    check([$writes, $actions, $reading->properties] === $before, 'Reading assignment persisted or operated a device');
+    foreach ([0, 62998] as $unavailableID) {
+        if ($unavailableID === 0) unset($objectIdents[61000][$ident]);
+        else $objectIdents[61000][$ident] = $unavailableID;
+        $reading = createModule([$property => 62060]);
+        $reading->AssignLuxtronik(61000, '{}');
+        check(!isset($reading->formUpdates[$property]['value']), 'Missing heat pump Ident discarded the external reading: ' . $property);
+    }
+    $objectIdents[61000][$ident] = $expected;
+    $reading = createModule([$property => 62060, 'ManualConfiguration' => true]);
+    $reading->AssignLuxtronik(61000, '{}', true);
+    check($reading->formUpdates === [], 'Manual reading overwritten: ' . $property);
+}
 $unsavedLuxtronik = createModule(['OutdoorTemperature' => 62060]);
 $unsavedLuxtronik->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62050], JSON_THROW_ON_ERROR));
 check($unsavedLuxtronik->formUpdates['OutdoorTemperature']['value'] === 62004, 'Current form source not used for refresh');
@@ -367,7 +391,7 @@ check(str_contains($message, 'Übernehmen'), 'Saving instructions missing');
 
 $objectIdents[61000]['Temperatur_Brauchwasser_Oben'] = 62006;
 $variables[62006] = 49.0;
-$module = createModule(['OutdoorTemperature' => 62060]);
+$module = createModule(['OutdoorTemperature' => 62060, 'CompressorValue' => 62060, 'CondenserTemperature' => 62060]);
 $module->AssignLuxtronik(0, '{}');
 check($module->formUpdates['TankTempWWUp']['value'] === 62006, 'Specific tank sensor not preferred');
 // Simulate pressing Apply: normal data, actions and subscriptions use the saved IDs.
@@ -378,6 +402,8 @@ $module->ApplyChanges();
 $data = callPrivate($module, 'BuildVisualizationData');
 check($data['outdoorTemperature']['value'] === 10.0 && isset($module->messages[62004]) && !isset($module->messages[62060]), 'Imported outdoor temperature not displayed or subscribed to the heat pump sensor');
 check($data['returnTemperatureSetpoint']['value'] === 30.0 && $data['refluxTemperatureHeating']['value'] === 28.9, 'Imported return temperatures not used');
+check($data['compressorValue']['value'] === 3000 && $data['condenserTemperature']['value'] === 42.5, 'Imported compressor speed or condensation temperature not displayed');
+check(isset($module->messages[62012], $module->messages[62013]), 'Imported compressor/condensation readings not subscribed');
 check($data['heatingPumpCoolingMode']['value'], 'Wrong operating-status Ident or decoding');
 check(isset($module->messages[62000], $module->messages[62002], $module->messages[62003], $module->messages[62009]), 'Imported variables not subscribed');
 $module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => 51.0]);

@@ -366,7 +366,7 @@ class Waermepumpe extends IPSModuleStrict
                 'items' => [
                     [
                         'type' => 'Label',
-                        'caption' => 'Luxtronik auswählen und Variablen zuordnen. Eine einzelne Instanz wird automatisch vorgeschlagen. Externe Quellen bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern.'
+                        'caption' => 'Luxtronik auswählen und Variablen zuordnen. Eine einzelne Instanz wird automatisch vorgeschlagen. Außentemperatur, Verdichterdrehzahl und Kondensationstemperatur werden bevorzugt aus Luxtronik übernommen. Andere externe Quellen bleiben erhalten. Alte Luxtronik-Zuordnungen ohne passenden Datenpunkt werden auf „Keine“ gesetzt. Anschließend prüfen und mit „Übernehmen“ speichern.'
                     ],
                     [
                         'type' => 'Label',
@@ -833,14 +833,15 @@ class Waermepumpe extends IPSModuleStrict
                 throw new InvalidArgumentException('Ungültige Variablenzuordnung: ' . $property);
             }
             $variableID = $this->FindLuxtronikVariable($property, $instanceID);
-            // Keep unresolved IDs and external sources. Outdoor temperature
-            // explicitly prefers the selected heat pump's Ident when available.
+            // Keep unresolved IDs and external sources, except the requested
+            // heat-pump readings that prefer the selected unit's exact Ident.
             if ($current !== 0) {
                 if (!IPS_VariableExists($current)) {
                     continue;
                 }
                 if (!in_array(IPS_GetParent($current), $instances, true)
-                    && ($property !== 'OutdoorTemperature' || $variableID === 0)) {
+                    && (!in_array($property, ['OutdoorTemperature', 'CompressorValue', 'CondenserTemperature'], true)
+                        || $variableID === 0)) {
                     continue;
                 }
             }
@@ -7458,16 +7459,28 @@ window.SymconHeatPump = {
                 );
             });
 
-            // Verdichterlogik wie im Original: CompressorRunning dreht das Verdichtersymbol.
+            // Use raw rpm, never a formatted profile string, for the schematic speed.
+            const compressorRaw = raw(cfg.compressorValue);
+            const compressorSpeed = typeof compressorRaw === 'number' ? compressorRaw
+                : typeof compressorRaw === 'string' && compressorRaw.trim() !== ''
+                    ? Number(compressorRaw.replace(',', '.')) : NaN;
+            const hasCompressorSpeed = Number.isFinite(compressorSpeed);
+            // A configured OFF signal or a measured zero must keep the rotor still.
+            // Without usable rpm, retain the existing running-state fallback.
+            const compressorActive = hasCompressorSpeed
+                ? compressorSpeed > 0 && (!cfg.compressorRunning || binary(cfg.compressorRunning))
+                : binary(cfg.compressorRunning);
             const compressor = svg.querySelector('#pathCompressor');
             if (compressor) {
-                const compressorRunning = !!cfg.compressorRunning && binary(cfg.compressorRunning);
+                const duration = compressorActive
+                    ? (hasCompressorSpeed ? Math.max(0.6, Math.min(3.0, 3000 / compressorSpeed)) : 1.4)
+                    : 0;
                 compressor.style.setProperty('transform-box', 'fill-box', 'important');
                 compressor.style.setProperty('transform-origin', 'center', 'important');
+                // Allow the SVG's reduced-motion rule to override this animation.
                 compressor.style.setProperty(
                     'animation',
-                    compressorRunning ? 'symcon-modern-rotate 1.4s linear infinite' : 'none',
-                    'important'
+                    duration > 0 ? 'symcon-modern-rotate ' + duration.toFixed(2) + 's linear infinite' : 'none'
                 );
             }
 
@@ -7515,7 +7528,6 @@ window.SymconHeatPump = {
             });
 
             // Live flow overlays use actual running variables; no idle animation.
-            const compressorActive = binary(cfg.compressorRunning);
             const heatingActive = [cfg.heatingCircuitPumpRunning,
                 cfg.heatingCircuitPumpRunning2, cfg.heatingCircuitPumpRunning3].some(binary);
             const chargingActive = binary(cfg.storageChargingPumpRunning);

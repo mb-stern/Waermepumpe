@@ -325,6 +325,43 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                         assert page.evaluate('window.testActions.length')==before
                         page.keyboard.press('Escape')
                 page.evaluate('(controls)=>window.handleMessage({type:"update",controls})',payload['controls'])
+                # Exact-Ident readings feed the display and schematic compressor speed.
+                def compressor_reading(speed, running=True, configure_speed=True,
+                                       configure_running=True, missing_speed=False):
+                    sample=json.loads(json.dumps(payload))
+                    speed_key=sample['config']['compressorValue']
+                    running_key=sample['config']['compressorRunning']
+                    sample['data'][speed_key]['value']=speed
+                    sample['data'][speed_key]['formatted']=f'{speed} rpm'
+                    sample['data'][running_key]['value']=running
+                    if not configure_speed: sample['config']['compressorValue']=''
+                    if not configure_running: sample['config']['compressorRunning']=''
+                    if missing_speed: sample['data'].pop(speed_key)
+                    condensation_key=sample['config']['condenserTemperature']
+                    sample['data'][condensation_key]['value']=42.5
+                    sample['data'][condensation_key]['formatted']='42.5 °C'
+                    page.evaluate('(p)=>window.handleMessage({type:"update",config:p.config,data:p.data,controls:p.controls})',sample)
+                    return page.locator('#pathCompressor').evaluate(
+                        'e=>({name:getComputedStyle(e).animationName,duration:parseFloat(getComputedStyle(e).animationDuration)})')
+
+                for speed, expected_duration in [(1500,2.0),(3000,1.0),(1,3.0),(100000,0.6),('1500,0',2.0)]:
+                    rotor=compressor_reading(speed)
+                    assert rotor=={'name':'symcon-modern-rotate','duration':expected_duration},(speed,rotor)
+                    assert page.locator('#textCompressorSpeedValue').text_content()==f'{speed} rpm'
+                    assert page.locator('#textCondenserTemperature').text_content()=='42.5 °C'
+                for speed in [0,-1]:
+                    assert compressor_reading(speed)['name']=='none'
+                    assert page.locator('#gRefrigerantCircuit .wp-live-flow').count()==0
+                assert compressor_reading(3000,running=False)['name']=='none'
+                for speed in [None,'','unavailable',False]:
+                    assert compressor_reading(speed)=={'name':'symcon-modern-rotate','duration':1.4}
+                assert compressor_reading(3000,missing_speed=True)['duration']==1.4
+                assert compressor_reading(3000,configure_speed=False)['duration']==1.4
+                assert compressor_reading(3000,configure_running=False)['duration']==1.0
+                assert page.locator('#gRefrigerantCircuit .wp-live-flow').count()>0
+                assert compressor_reading(0,configure_speed=False,configure_running=False)['name']=='none'
+                page.evaluate('(p)=>window.handleMessage({type:"update",config:p.config,data:p.data,controls:p.controls})',payload)
+
                 # Actual running variables drive overlays; updates keep their identity.
                 assert page.locator('.wp-live-flow').count() > 0
                 page.evaluate("document.querySelector('.wp-live-flow').dataset.testIdentity='retained'")
@@ -348,6 +385,7 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                     assert page.locator('#wp-error').text_content()==''
                 page.emulate_media(reduced_motion='reduce')
                 assert page.locator('.wp-live-flow').first.evaluate("e=>getComputedStyle(e).animationName")=='none'
+                assert page.locator('#pathCompressor').evaluate("e=>getComputedStyle(e).animationName")=='none'
                 idle=json.loads(json.dumps(payload))
                 for key in ['compressorRunning','storageChargingPumpRunning',
                             'heatingCircuitPumpRunning','heatingCircuitPumpRunning2',
