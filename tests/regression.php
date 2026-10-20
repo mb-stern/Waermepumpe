@@ -261,7 +261,7 @@ $module->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 
 check(end($writes) === [50001, 25], 'Integer setpoint type lost');
 
 // Optional Luxtronik assignment is a form suggestion, never a device action.
-// Exact Idents checked against mb-stern/Luxtronik development 1fa55a2.
+// Outdoor-temperature Ident rechecked against mb-stern/Luxtronik development 874688b.
 $luxtronikID = '{3884C1C3-F4FF-9A56-B982-B986E934A5E7}';
 $module = createModule();
 $before = [$writes, $actions, $module->properties];
@@ -317,9 +317,27 @@ check($refresh->formUpdates['SupplyTemperature']['value'] === 62001, 'Incorrect 
 check($refresh->formUpdates['OutdoorTemperature']['value'] === 62004, 'Old Luxtronik source not replaced');
 check(!isset($refresh->formUpdates['WarmWaterSetpointVariable']['value']), 'External module assignment overwritten');
 check([$writes, $actions, $refresh->properties] === $before, 'Refresh persisted settings or triggered actions');
-$unsavedExternal = createModule(['OutdoorTemperature' => 62004]);
-$unsavedExternal->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62060], JSON_THROW_ON_ERROR));
-check(!isset($unsavedExternal->formUpdates['OutdoorTemperature']['value']), 'Unsaved external assignment overwritten');
+$unsavedExternal = createModule(['OutdoorTemperature' => 62004, 'SupplyTemperature' => 62001]);
+$unsavedExternal->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62060, 'SupplyTemperature' => 62060], JSON_THROW_ON_ERROR));
+check($unsavedExternal->formUpdates['OutdoorTemperature']['value'] === 62004, 'External outdoor sensor not replaced by the heat pump Ident');
+check(!isset($unsavedExternal->formUpdates['SupplyTemperature']['value']), 'Other unsaved external assignment overwritten');
+
+// An unavailable outdoor-temperature Ident must not discard a working sensor.
+foreach ([0, 62998] as $unavailableID) {
+    if ($unavailableID === 0) unset($objectIdents[61000]['Aussentemperatur']);
+    else $objectIdents[61000]['Aussentemperatur'] = $unavailableID;
+    $externalOutdoor = createModule(['OutdoorTemperature' => 62060]);
+    $externalOutdoor->AssignLuxtronik(61000, '{}');
+    check(!isset($externalOutdoor->formUpdates['OutdoorTemperature']['value']), 'Unavailable outdoor Ident replaced the external sensor');
+}
+$objectIdents[61000]['Aussentemperatur'] = 62004;
+$deletedOutdoor = createModule(['OutdoorTemperature' => 62998]);
+$deletedOutdoor->AssignLuxtronik(61000, '{}');
+check(!isset($deletedOutdoor->formUpdates['OutdoorTemperature']['value']), 'Unresolved outdoor assignment overwritten');
+$manualOutdoor = createModule(['OutdoorTemperature' => 62060, 'ManualConfiguration' => true]);
+$before = [$writes, $actions, $manualOutdoor->properties];
+$manualOutdoor->AssignLuxtronik(61000, '{}', true);
+check($manualOutdoor->formUpdates === [] && [$writes, $actions, $manualOutdoor->properties] === $before, 'Manual outdoor sensor overwritten or device operated');
 $unsavedLuxtronik = createModule(['OutdoorTemperature' => 62060]);
 $unsavedLuxtronik->AssignLuxtronik(61000, json_encode(['OutdoorTemperature' => 62050], JSON_THROW_ON_ERROR));
 check($unsavedLuxtronik->formUpdates['OutdoorTemperature']['value'] === 62004, 'Current form source not used for refresh');
@@ -329,11 +347,13 @@ check($sourceChange->formUpdates['OutdoorTemperature']['value'] === 62050, 'Sele
 check($sourceChange->formUpdates['OperatingStatusVariable']['value'] === 0, 'Missing data point retained from the old unit');
 
 unset($instances[61001]);
+$variables[63000] = 18.5; // Free sensor without a parent instance.
 $module = createModule(['OutdoorTemperature' => 63000]);
 $before = [$writes, $actions, $module->properties];
 // Include a manual edit that has not yet been saved in the instance.
 $message = $module->AssignLuxtronik(0, json_encode(['SupplyTemperature' => 63001], JSON_THROW_ON_ERROR));
-check(!isset($module->formUpdates['OutdoorTemperature']['value']) && !isset($module->formUpdates['SupplyTemperature']['value']), 'Manual assignment overwritten');
+check($module->formUpdates['OutdoorTemperature']['value'] === 62004, 'Free outdoor sensor not replaced by the heat pump Ident');
+check(!isset($module->formUpdates['SupplyTemperature']['value']), 'Other manual assignment overwritten');
 check($module->formUpdates['LuxtronikInstanceID']['value'] === 61000, 'Single Luxtronik instance not detected');
 foreach (['OperatingStatusVariable' => 62000, 'RefluxTemperatureHeating1' => 62002,
           'ReturnTemperatureSetpointVariable' => 62003, 'TankTempWWUp' => 62005,
@@ -347,7 +367,7 @@ check(str_contains($message, 'Übernehmen'), 'Saving instructions missing');
 
 $objectIdents[61000]['Temperatur_Brauchwasser_Oben'] = 62006;
 $variables[62006] = 49.0;
-$module = createModule();
+$module = createModule(['OutdoorTemperature' => 62060]);
 $module->AssignLuxtronik(0, '{}');
 check($module->formUpdates['TankTempWWUp']['value'] === 62006, 'Specific tank sensor not preferred');
 // Simulate pressing Apply: normal data, actions and subscriptions use the saved IDs.
@@ -356,6 +376,7 @@ foreach ($module->formUpdates as $property => $parameters) {
 }
 $module->ApplyChanges();
 $data = callPrivate($module, 'BuildVisualizationData');
+check($data['outdoorTemperature']['value'] === 10.0 && isset($module->messages[62004]) && !isset($module->messages[62060]), 'Imported outdoor temperature not displayed or subscribed to the heat pump sensor');
 check($data['returnTemperatureSetpoint']['value'] === 30.0 && $data['refluxTemperatureHeating']['value'] === 28.9, 'Imported return temperatures not used');
 check($data['heatingPumpCoolingMode']['value'], 'Wrong operating-status Ident or decoding');
 check(isset($module->messages[62000], $module->messages[62002], $module->messages[62003], $module->messages[62009]), 'Imported variables not subscribed');
@@ -399,11 +420,15 @@ function WP_AssignLuxtronik(int $id, int $source, string $formValues, bool $manu
 $assignmentModule = createModule();
 foreach ($assignmentModule->properties as $property => $value) $$property = $value;
 $id = $assignmentModule->InstanceID;
-$OutdoorTemperature = 63100; // Unsaved user choice must survive the button.
+$variables[63100] = 21.0;
+$OutdoorTemperature = 63100; // Outdoor temperature explicitly prefers the heat pump.
+$SupplyTemperature = 63100; // Other unsaved external choices must survive.
 $buttonScript = $singleForm['elements'][0]['items'][3]['onClick'];
 ob_start();
 try { eval($buttonScript); } finally { $buttonMessage = ob_get_clean(); }
-check(!isset($assignmentModule->formUpdates['OutdoorTemperature']['value']), 'Button overwrote unsaved manual input');
+check($assignmentModule->formUpdates['OutdoorTemperature']['value'] === 62004, 'Button did not replace the external outdoor sensor');
+check($assignmentModule->formUpdates['OutdoorTemperature']['enabled'] === false, 'Imported outdoor Ident picker not locked');
+check(!isset($assignmentModule->formUpdates['SupplyTemperature']['value']), 'Button overwrote other unsaved manual input');
 check(isset($assignmentModule->formUpdates['RefluxTemperatureHeating1']), 'Button did not populate matching Idents');
 check(str_contains($buttonMessage, 'Übernehmen'), 'Button did not explain how to save');
 

@@ -832,13 +832,18 @@ class Waermepumpe extends IPSModuleStrict
             if (!is_int($current) || $current < 0) {
                 throw new InvalidArgumentException('Ungültige Variablenzuordnung: ' . $property);
             }
-            // Keep external sources and unresolved IDs. Existing links to any
-            // Luxtronik instance can be refreshed or moved to the selected unit.
-            if ($current !== 0 && (!IPS_VariableExists($current)
-                || !in_array(IPS_GetParent($current), $instances, true))) {
-                continue;
-            }
             $variableID = $this->FindLuxtronikVariable($property, $instanceID);
+            // Keep unresolved IDs and external sources. Outdoor temperature
+            // explicitly prefers the selected heat pump's Ident when available.
+            if ($current !== 0) {
+                if (!IPS_VariableExists($current)) {
+                    continue;
+                }
+                if (!in_array(IPS_GetParent($current), $instances, true)
+                    && ($property !== 'OutdoorTemperature' || $variableID === 0)) {
+                    continue;
+                }
+            }
             if ($variableID !== 0) {
                 $assignments[$property] = $variableID;
             }
