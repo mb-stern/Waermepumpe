@@ -134,7 +134,11 @@ $walk = function (array $item) use (&$walk, &$fields, &$allFormNames, &$selector
     if (isset($item['name'])) {
         check(!isset($allFormNames[$item['name']]), 'Duplicate field: ' . $item['name']);
         $allFormNames[$item['name']] = $item;
-        if (!in_array($item['type'], ['Label', 'List', 'Button'], true)) {
+        $derivedPicker = $item['type'] === 'SelectVariable' && str_starts_with($item['name'], 'Automatic');
+        if ($derivedPicker) {
+            check(!isset($module->registered[$item['name']]) && isset($module->registered[substr($item['name'], 9)]), 'Derived picker is not display-only');
+            check($item['enabled'] === false && !isset($item['onChange']), 'Derived picker may edit or trigger actions');
+        } elseif (!in_array($item['type'], ['Label', 'List', 'Button'], true)) {
             check(isset($module->registered[$item['name']]), 'Unregistered field: ' . $item['name']);
             $fields[$item['name']] = true;
             if ($item['type'] === 'SelectVariable') $selectors[] = $item['name'];
@@ -379,6 +383,41 @@ $commonModule->ApplyChanges();
 $commonManualData = callPrivate($commonModule, 'BuildVisualizationData');
 check($commonManualData['supplyTemperature']['variableId'] === 62050 && $commonManualData['compressorValue']['variableId'] === 62050, 'Manual selection not respected consistently');
 
+// Reproduce the reported installation's exact Idents with unrelated instance/variable IDs.
+$instances[61236] = $luxtronikID;
+$objectIdents[61236] = [
+    'Betriebszustand' => 62100,
+    'Vorlauftemperatur_Heizkreis' => 62101,
+    'Verdichterfrequenz' => 62102,
+    'Verdichterfrequenz_Soll' => 62103,
+    'Liquefaction_Temperature' => 62104,
+];
+foreach ([62100 => 7, 62101 => 35.5, 62102 => 50, 62103 => 75, 62104 => 41.5] as $variableID => $value) $variables[$variableID] = $value;
+$reportedModule = createModule(['LuxtronikInstanceID' => 61236]);
+$before = [$writes, $actions, $reportedModule->properties];
+$reportedModule->ApplyChanges();
+$reportedData = callPrivate($reportedModule, 'BuildVisualizationData');
+check($reportedData['compressorValue']['variableId'] === 62102 && $reportedData['compressorValue']['value'] === 50, 'Reported compressor Ident not resolved or target used as actual');
+check($reportedData['condenserTemperature']['variableId'] === 62104 && $reportedData['condenserTemperature']['value'] === 41.5, 'Reported condensation Ident not resolved or rescaled');
+check($reportedData['compressorValue']['ident'] === 'Verdichterfrequenz' && $reportedData['condenserTemperature']['ident'] === 'Liquefaction_Temperature', 'Actual Ident metadata missing for correct visualization');
+check(isset($reportedModule->messages[62102], $reportedModule->messages[62104]) && !isset($reportedModule->messages[62103]), 'Wrong Ident subscriptions on reported source');
+$reportedItems = namedFormItems(json_decode($reportedModule->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR)['elements']);
+foreach (['CompressorValue' => ['Verdichterdrehzahl', 62102], 'CondenserTemperature' => ['Kondensationstemperatur', 62104]] as $property => [$caption, $expected]) {
+    $picker = $reportedItems['Automatic' . $property];
+    check($picker['type'] === 'SelectVariable' && $picker['visible'] === true && $picker['enabled'] === false && $picker['value'] === $expected, 'Reported source is not selected in a visible grey variable picker: ' . $property);
+    check(reportRow($reportedItems['AssignmentOverview']['values'], $caption)['status'] === 'Per Ident zugeordnet', 'Reported Ident still marked unassigned');
+}
+check([$writes, $actions, $reportedModule->properties] === $before, 'Alias resolution changed configuration or operated a device');
+$reportedModule->AssignLuxtronik(61236, '{}');
+check($reportedModule->formUpdates['CompressorValue']['value'] === 62102 && $reportedModule->formUpdates['CondenserTemperature']['value'] === 62104, 'Assignment button uses different alias resolution');
+unset($objectIdents[61236]['Verdichterfrequenz']);
+check(!isset(callPrivate($reportedModule, 'BuildVisualizationData')['compressorValue']), 'Compressor target frequency used when actual frequency absent');
+$objectIdents[61236]['Verdichterfrequenz'] = 62102;
+$objectIdents[61236]['Verdichterdrehzahl'] = 62105;
+$variables[62105] = 3000;
+check(callPrivate($reportedModule, 'BuildVisualizationData')['compressorValue']['variableId'] === 62105, 'Original compressor Ident no longer preferred when present');
+unset($instances[61236], $objectIdents[61236]);
+
 // Refresh incorrect Luxtronik links and switch units while retaining external modules.
 $objectIdents[61002] = ['ExternalRoomSensor' => 62060];
 $variables[62060] = 22.0;
@@ -470,7 +509,7 @@ $module->AssignLuxtronik(0, '{}');
 check($module->formUpdates['TankTempWWUp']['value'] === 62006, 'Specific tank sensor not preferred');
 // Simulate pressing Apply: normal data, actions and subscriptions use the saved IDs.
 foreach ($module->formUpdates as $property => $parameters) {
-    if (array_key_exists('value', $parameters)) $module->properties[$property] = $parameters['value'];
+    if (array_key_exists('value', $parameters) && isset($module->registered[$property])) $module->properties[$property] = $parameters['value'];
 }
 $module->ApplyChanges();
 $data = callPrivate($module, 'BuildVisualizationData');
@@ -485,7 +524,7 @@ check(end($actions) === [62009, 51.0], 'Imported control did not use its normal 
 $module->formUpdates = [];
 $module->AssignLuxtronik(61000, '{}');
 foreach ($module->formUpdates as $property => $parameters) {
-    if (array_key_exists('value', $parameters)) {
+    if (array_key_exists('value', $parameters) && isset($module->registered[$property])) {
         check($module->properties[$property] === $parameters['value'], 'Repeated import changed an already correct assignment');
     }
 }
@@ -580,7 +619,8 @@ foreach (['OutdoorTemperature' => ['Außentemperatur', 62004],
           'HeatingControlVariable' => ['Heizen', 62008],
           'WarmWaterSetpointVariable' => ['Warmwasser-Solltemperatur', 62009]] as $property => [$caption, $variableID]) {
     check($liveForm[$property]['visible'] === false && $liveForm[$property]['enabled'] === false, 'Live Ident still shown as an empty picker: ' . $property);
-    check($liveForm['Automatic' . $property]['visible'] === true && str_contains($liveForm['Automatic' . $property]['caption'], '#' . $variableID), 'Resolved source missing from form: ' . $property);
+    check($liveForm['Automatic' . $property]['visible'] === true && $liveForm['Automatic' . $property]['value'] === $variableID, 'Resolved variable missing from automatic picker: ' . $property);
+    check($liveForm['Automatic' . $property]['type'] === 'SelectVariable' && $liveForm['Automatic' . $property]['enabled'] === false, 'Automatic assignment not shown as a native grey picker: ' . $property);
     check(reportRow($liveForm['AssignmentOverview']['values'], $caption)['status'] === 'Per Ident zugeordnet', 'Empty saved field incorrectly reported unassigned: ' . $property);
     check($liveFormModule->properties[$property] === 0 && !isset($liveFormModule->registered['Automatic' . $property]), 'Form overwrote saved configuration for derived source');
 }
@@ -591,7 +631,7 @@ foreach (['OutdoorTemperature', 'CompressorValue', 'CondenserTemperature'] as $p
 }
 $liveFormModule->RefreshAssignmentStatus(61001, '{}');
 check($liveFormModule->formUpdates['CompressorValue']['visible'] === true && $liveFormModule->formUpdates['AutomaticCompressorValue']['visible'] === false, 'Source without speed Ident retained previous live display');
-check(str_contains($liveFormModule->formUpdates['AutomaticOutdoorTemperature']['caption'], '#62050'), 'Unsaved source selection did not update live source display');
+check($liveFormModule->formUpdates['AutomaticOutdoorTemperature']['value'] === 62050, 'Unsaved source selection did not update automatic picker');
 
 $statusRow = reportRow($overview['values'], 'Betriebsstatus');
 check($statusRow['status'] === 'Per Ident zugeordnet' && $statusRow['ident'] === 'Betriebszustand' && $statusRow['rowColor'] === '#eeeeee', 'Correct Ident not highlighted');
@@ -627,7 +667,9 @@ $liveRows = json_decode($assignmentModule->formUpdates['AssignmentOverview']['va
 check(reportRow($liveRows, 'Betriebsstatus')['status'] === 'Externe / manuelle Quelle', 'Report ignored unsaved selection');
 check($assignmentModule->formUpdates['OperatingStatusVariable']['enabled'] === true, 'Changed external source remained locked');
 check([$writes, $actions, $assignmentModule->properties] === $before, 'Status refresh persisted values or triggered actions');
-foreach ($assignmentModule->formUpdates as $parameters) check(!array_key_exists('value', $parameters), 'Status refresh changed a selection');
+foreach ($assignmentModule->formUpdates as $property => $parameters) {
+    if (isset($assignmentModule->registered[$property])) check(!array_key_exists('value', $parameters), 'Status refresh changed a saved manual selection');
+}
 $ManualConfiguration = true;
 eval($statusItems['ManualConfiguration']['onChange']);
 foreach ($selectors as $property) check($assignmentModule->formUpdates[$property]['enabled'] === true, 'Manual mode did not unlock picker: ' . $property);
@@ -742,6 +784,21 @@ if ($artifactDir !== false && $artifactDir !== '') {
     file_put_contents($artifactDir . '/live-ident-update.json', json_encode(end($liveModule->updates), JSON_THROW_ON_ERROR));
     $variables[62012] = 3000;
     $formattedValues[62012] = '3000 rpm';
+    // The user's legacy names pass through the same map and data path.
+    unset($objectIdents[61000]['Verdichterdrehzahl'], $objectIdents[61000]['Kondensationstemperatur']);
+    $objectIdents[61000]['Verdichterfrequenz'] = 62012;
+    $objectIdents[61000]['Liquefaction_Temperature'] = 62013;
+    $objectIdents[61000]['Verdichterfrequenz_Soll'] = 62014;
+    $variables[62014] = 75;
+    $variables[62012] = 50;
+    $formattedValues[62012] = '50 Hz';
+    $aliasModule = createModule($liveConfigured);
+    $aliasModule->ApplyChanges();
+    file_put_contents($artifactDir . '/alias-ident.html', '<meta charset="utf-8">' . $aliasModule->GetVisualizationTile());
+    $variables[62012] = 80;
+    $formattedValues[62012] = '80 Hz';
+    $aliasModule->MessageSink(time(), 62012, VM_UPDATE, []);
+    file_put_contents($artifactDir . '/alias-ident-update.json', json_encode(end($aliasModule->updates), JSON_THROW_ON_ERROR));
     preg_match_all('~<script[^>]*>(.*?)</script>~s', $html, $scripts);
     foreach ($scripts[1] as $index => $js) file_put_contents($artifactDir . '/script-' . $index . '.js', $js);
 }

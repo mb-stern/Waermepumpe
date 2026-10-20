@@ -50,17 +50,23 @@ F-01 und F-02 wurden auf dem genannten ursprünglichen Stand reproduziert und in
 
 **Abnahme:** Nicht am Raster liegende Unter- und Obergrenzen sowie negative Bereiche prüfen. Kein Ergebnis darf Minimum oder Maximum verletzen; das vereinbarte Schrittraster muss eingehalten werden. Bestehende Standardprofile müssen weiterhin funktionieren.
 
-## F-03: Luxtronik-Zuordnung bleibt auf der echten Installation offen
+## F-03: Zwei vorhandene Luxtronik-Idents fehlen in der Zuordnungstabelle
 
-**Gemeldetes Verhalten:** Verdichterdrehzahl und Kondensationstemperatur bleiben trotz ausgewählter Luxtronik-Quelle, Modulupdate sowie erneutem Zuordnen/Übernehmen unzugeordnet. Viele andere Idents werden zugeordnet. Die Instanz-ID wird vom Formular übernommen und darf nicht fest eingebaut werden.
+**Gemeldetes Verhalten:** Verdichterdrehzahl und Kondensationstemperatur bleiben trotz korrekt ausgewählter Luxtronik-Quelle und vieler anderer erfolgreicher Zuordnungen unzugeordnet.
 
-**Bisherige Eingrenzung:** Die Einträge `Verdichterdrehzahl` und `Kondensationstemperatur` stehen sowohl im Wärmepumpen-Mapping als auch in der zentralen Datenpunktkonfiguration des aktuellen Luxtronik-Repositorys. Der tatsächliche Objektbestand und geladene Modulstand der Nutzerinstallation liegen noch nicht vor. Die lokalen Testdaten belegen keine erfolgreiche Zuordnung auf dieser Installation.
+**Bestätigte Ursache:** Die vom Nutzer bereitgestellte Diagnose des geladenen Stands `einheitlich-2026-10-20` findet für `Verdichterdrehzahl` und `Kondensationstemperatur` jeweils keine Variable. Die tatsächlichen direkten Untervariablen und die anschließenden Screenshots zeigen stattdessen die Idents **`Verdichterfrequenz`** und **`Liquefaction_Temperature`**. `Verdichterfrequenz_Soll` existiert zusätzlich und ist ein Sollwert. Quelle und geladener Codestand stimmen; die Instanz-ID ist nicht die Ursache. Die vorherige Annahme eines Problems beim Übernehmen leerer Formularfelder erklärte diesen Fall nicht.
 
-**Zurückgenommener Ansatz:** Commit `1743f1d` ergänzte eine direkte Laufzeitauflösung nur für Außentemperatur, Verdichterdrehzahl und Kondensationstemperatur. Dieser Sonderweg behob laut Rückmeldung das Problem nicht. Die dort lokal nachgewiesene fehlende Laufzeitauflösung leerer Eigenschaften war keine bestätigte Erklärung für die gescheiterte Formularübernahme.
+**Korrektur:** Die vorhandene zentrale Ident-Tabelle enthält nun `Verdichterdrehzahl` / `Verdichterfrequenz` und `Kondensationstemperatur` / `Liquefaction_Temperature`. Es wird derselbe gemeinsame Resolver wie für alle anderen Idents verwendet. Originale Idents behalten Vorrang, wenn beide Varianten verfügbar sind. `Verdichterfrequenz_Soll` wird nicht als Istwert verwendet. Profilwerte werden unverändert angezeigt; für die Frequenzanimation wird eine passende schematische Skala verwendet, ohne eine physikalische Drehzahlumrechnung zu behaupten.
 
-**Aktueller Stand:** Der Sonderweg wurde durch einen gemeinsamen Resolver für alle Einträge der Ident-Tabelle ersetzt. Formular, Anzeige, Betriebsstatusauswertung, Abonnements, Bedieninformationen und Aktionsziele verwenden dieselbe Auflösung. Gefundene Idents der gewählten Quelle haben im Automatikmodus einheitlich Vorrang; manuelle Konfiguration und externe Fallbacks ohne verfügbaren Ident bleiben möglich. Es gibt keine feldspezifischen Ausnahmen. Eine rein lesende Zuordnungsdiagnose zeigt den tatsächlich geladenen Stand, die erkannte Quelle und alle vorhandenen Idents sowie gefundene, gespeicherte und verwendete IDs.
+**Prüfung:** Regressionen bilden die tatsächlich gemeldeten Ident-Namen unter einer beliebigen Testinstanz nach, prüfen die ausgewählten IDs, Werte, Abonnements, grauen Picker und die Zuordnungsübersicht. Sie prüfen ausdrücklich einen zusätzlich vorhandenen Sollwert sowie den Fall, dass nur der Sollwert existiert. Browserprüfungen verwenden daraus erzeugte PHP-Daten und Variablenmeldungen für Anzeige und Frequenzanimation. Die Bestätigung nach dem Update auf der echten Installation steht aus.
 
-**Offen:** Der gemeldete Fehler auf der echten Installation ist noch nicht abschließend erklärt oder dort als behoben bestätigt. Die Ausgabe von **Zuordnungsdiagnose anzeigen** wird für die weitere Eingrenzung benötigt. Es wurden keine echten Geräteaktionen ausgeführt.
+## F-04: Automatisch erkannte Variablen wurden als Text statt als graue Picker dargestellt
+
+**Ursache:** Die Formularänderungen ab `1743f1d` blendeten die ursprünglichen Picker bei einer automatischen Zuordnung aus und ersetzten sie durch Quellenbeschriftungen. Dadurch fehlten die ausdrücklich gewünschten grauen Variablen-Picker.
+
+**Korrektur:** Automatisch erkannte Variablen werden wieder als native `SelectVariable`-Felder mit aufgelöster ID, `visible: true` und `enabled: false` dargestellt. Diese Anzeige-Picker besitzen keine registrierte Konfigurationseigenschaft; ihr expliziter Wert wird daher nicht durch eine leere gespeicherte manuelle ID überschrieben. Die ursprünglichen Eigenschaften und manuellen Picker bleiben erhalten und werden mit **Manuelle Konfiguration** wieder verwendet. Dieselbe Darstellung gilt für alle Einträge der Ident-Tabelle.
+
+**Prüfung:** Regressionen prüfen Feldtyp, Sichtbarkeit, ausgewählte ID, deaktivierten Zustand und den manuellen Modus. Sie prüfen außerdem, dass Anzeige-Picker keine Eigenschaften registrieren oder gespeicherte manuelle Zuordnungen verändern. Die Symcon-Ersatztests prüfen die erzeugte Formularstruktur; sie ersetzen keine Sichtprüfung in einer echten Symcon-Konsole.
 
 ## Prüfstatus und Quellen
 

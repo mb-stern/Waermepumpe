@@ -23,12 +23,12 @@ class Waermepumpe extends IPSModuleStrict
         'FanSpeed' => ['Ventilator_Drehzahl'],
         'HpRunning' => ['Ausgang_Solepumpe_Ventilator'],
         'CompressorRunning' => ['Ausgang_Verdichter_1'],
-        'CompressorValue' => ['Verdichterdrehzahl'],
+        'CompressorValue' => ['Verdichterdrehzahl', 'Verdichterfrequenz'],
         'HeatingPumpPower' => ['Waermeleistung'],
         'EvaporatorPressure' => ['Niederdruck'],
         'EvaporatorTemperature' => ['Vapourisation_Temperature'],
         'CondenserPressure' => ['Hochdruck'],
-        'CondenserTemperature' => ['Kondensationstemperatur'],
+        'CondenserTemperature' => ['Kondensationstemperatur', 'Liquefaction_Temperature'],
         'SupplyTemperatureHeating1' => ['Vorlauftemperatur_Heizkreis'],
         'RefluxTemperatureHeating1' => ['Ruecklauftemperatur_Heizkreis'],
         'HeatingCircuitPumpRunning1' => ['Ausgang_Heizungsumwaelzpumpe'],
@@ -803,7 +803,7 @@ class Waermepumpe extends IPSModuleStrict
             $statuses[$property] = [
                 'ident' => $kind === 'ident',
                 'automatic' => $automatic,
-                'automaticLabel' => $automatic ? $variable : ''
+                'variableID' => $variableID
             ];
             $rows[] = [
                 'field' => $caption,
@@ -830,18 +830,20 @@ class Waermepumpe extends IPSModuleStrict
                 $element['onChange'] = $script;
                 $element['enabled'] = $manual || !$statuses[$property]['ident'];
                 if (isset(self::LUXTRONIK_IDENT_MAP[$property])) {
-                    // A property-backed picker would display its saved value (often
-                    // zero), overriding a derived value. Show the actual live source
-                    // separately and retain the original picker for manual mode.
+                    // Show the resolved ID in a native, disabled picker. It has no
+                    // registered property, so its explicit value is not replaced by
+                    // the saved manual ID; retain that original picker for manual mode.
                     $element['visible'] = !$statuses[$property]['automatic'];
                     $element = [
                         'type' => 'ColumnLayout',
                         'items' => [
                             $element,
                             [
-                                'type' => 'Label',
+                                'type' => 'SelectVariable',
                                 'name' => 'Automatic' . $property,
-                                'caption' => $element['caption'] . ': ' . $statuses[$property]['automaticLabel'],
+                                'caption' => $element['caption'],
+                                'value' => $statuses[$property]['variableID'],
+                                'enabled' => false,
                                 'visible' => $statuses[$property]['automatic']
                             ]
                         ]
@@ -869,9 +871,7 @@ class Waermepumpe extends IPSModuleStrict
             if (isset(self::LUXTRONIK_IDENT_MAP[$property])) {
                 $this->UpdateFormField($property, 'visible', !$status['automatic']);
                 $this->UpdateFormField('Automatic' . $property, 'visible', $status['automatic']);
-                $captionParts = explode(' · ', $fields[$property]);
-                $caption = end($captionParts);
-                $this->UpdateFormField('Automatic' . $property, 'caption', $caption . ': ' . $status['automaticLabel']);
+                $this->UpdateFormField('Automatic' . $property, 'value', $status['variableID']);
             }
         }
     }
@@ -1767,6 +1767,7 @@ HTML;
 
         $data[$key] = [
             'variableId'=> $variableId,
+            'ident'     => (string) (IPS_GetObject($variableId)['ObjectIdent'] ?? ''),
             'value'     => $binary ? $this->NormalizeBinaryValue($value) : $value,
             'formatted' => $binary ? '' : GetValueFormatted($variableId),
             'unit'      => $binary ? '' : $this->GetVariableUnit($variableId),
@@ -7572,8 +7573,11 @@ window.SymconHeatPump = {
                 : binary(cfg.compressorRunning);
             const compressor = svg.querySelector('#pathCompressor');
             if (compressor) {
+                // Frequency and rpm use different schematic scales. The displayed
+                // value/profile is unchanged; no conversion to physical rpm is inferred.
+                const referenceSpeed = data[cfg.compressorValue]?.ident === 'Verdichterfrequenz' ? 100 : 3000;
                 const duration = compressorActive
-                    ? (hasCompressorSpeed ? Math.max(0.6, Math.min(3.0, 3000 / compressorSpeed)) : 1.4)
+                    ? (hasCompressorSpeed ? Math.max(0.6, Math.min(3.0, referenceSpeed / compressorSpeed)) : 1.4)
                     : 0;
                 compressor.style.setProperty('transform-box', 'fill-box', 'important');
                 compressor.style.setProperty('transform-origin', 'center', 'important');

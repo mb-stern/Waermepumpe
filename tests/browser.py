@@ -427,7 +427,18 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 assert live_page.locator('#pathCompressor').evaluate('e=>parseFloat(getComputedStyle(e).animationDuration)')==2.0
                 assert not live_errors,live_errors
                 live_page.close()
-            print(json.dumps({'direct_ident':'PASS','ident_variable_updates':'PASS'}))
+            alias_update=json.loads(Path(artifacts,'alias-ident-update.json').read_text())
+            for width in [1200,390]:
+                alias_page=browser.new_page(viewport={'width':width,'height':850})
+                alias_page.goto(f'http://127.0.0.1:{server.server_port}/alias-ident.html')
+                assert alias_page.locator('#textCompressorSpeedValue').text_content()=='50 Hz'
+                assert alias_page.locator('#textCondenserTemperature').text_content()=='42.5 °C'
+                assert alias_page.locator('#pathCompressor').evaluate('e=>parseFloat(getComputedStyle(e).animationDuration)')==2.0
+                alias_page.evaluate('(p)=>window.handleMessage(p)',alias_update)
+                assert alias_page.locator('#textCompressorSpeedValue').text_content()=='80 Hz'
+                assert alias_page.locator('#pathCompressor').evaluate('e=>parseFloat(getComputedStyle(e).animationDuration)')==1.25
+                alias_page.close()
+            print(json.dumps({'direct_ident':'PASS','ident_variable_updates':'PASS','reported_aliases':'PASS','frequency_animation':'PASS'}))
 
             # Exercise inactivity and retry limits without waiting for real timeouts.
             liveness=browser.new_page()

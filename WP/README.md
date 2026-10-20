@@ -12,14 +12,14 @@ Die Visualisierung unterstützt die Instanzen des Moduls [mb-stern/Luxtronik](ht
 
 **Einheitliche Ident-Zuordnung:** Alle Felder der untenstehenden Zuordnungstabelle verwenden im Automatikmodus denselben Resolver für Quelle und Ident. Die Auflösung gilt für Formular, Visualisierungsdaten, Update-Abonnements, Betriebsstatus, Bedienvariablen und deren Aktionen. Für einzelne Messwerte gibt es keine Sonderliste und keinen separaten Zugriff. Bei genau einer Instanz genügt die automatische Erkennung; bei mehreren die gewünschte Quelle auswählen und **Übernehmen**. Instanz- und Variablen-IDs werden nicht fest eingebaut.
 
-Ein verfügbarer Ident der gewählten Quelle hat im Automatikmodus Vorrang vor der gespeicherten Variablen-ID. Das funktioniert auch bei leeren Feldern. Das Formular zeigt die tatsächlich verwendete Quelle mit Name und Variablen-ID als schreibgeschützte Beschriftung; die Übersicht zeigt **Per Ident zugeordnet** und eine graue Zeile. Mit **Manuelle Konfiguration** werden die bisherigen Picker wieder sichtbar und die gespeicherten eigenen Zuordnungen maßgeblich. Die reine Ident-Auflösung verändert diese gespeicherten Eigenschaften nicht.
+Ein verfügbarer Ident der gewählten Quelle hat im Automatikmodus Vorrang vor der gespeicherten Variablen-ID. Das funktioniert auch bei leeren Feldern. Das Formular zeigt die tatsächlich verwendete Variable in einem **sichtbaren, grau gesperrten Variablen-Picker**; die Übersicht zeigt **Per Ident zugeordnet** und eine graue Zeile. Mit **Manuelle Konfiguration** werden die bisherigen Picker wieder sichtbar und die gespeicherten eigenen Zuordnungen maßgeblich. Die reine Ident-Auflösung verändert diese gespeicherten Eigenschaften nicht.
 
 Fehlt ein passender Ident, bleiben externe/manuelle Quellen als Fallback verfügbar. Eine andere Luxtronik-Variable oder ein Messwert einer zuvor ausgewählten Luxtronik-Anlage wird dafür nicht verwendet. Felder ohne Eintrag in der Zuordnungstabelle bleiben manuell konfigurierbar.
 
 1. Im Formular **Luxtronik automatisch zuordnen (optional)** öffnen. Bei genau einer vorhandenen Luxtronik-Instanz wird deren Name und ID als Vorschlag angezeigt.
 2. Bei mehreren Instanzen die gewünschte Quelle im **Instanz-Picker** auswählen. „Keine“ bedeutet automatische Erkennung einer einzelnen Instanz; bei mehreren wird keine willkürlich ausgewählt.
 3. Optional **Luxtronik-Variablen zuordnen** klicken, um die gefundenen IDs zusätzlich in die Variablenfelder zu übernehmen. Alle hinterlegten Idents verwenden dabei denselben Resolver. Ohne passenden Ident bleiben externe Quellen und nicht mehr auflösbare gespeicherte IDs erhalten; unpassende alte Luxtronik-Verknüpfungen werden auf „Keine“ gesetzt.
-4. Die **Zuordnungsübersicht** prüfen und anschließend **Übernehmen**. Der Button selbst speichert keine Eigenschaften und löst keine Geräteaktion aus. Im Automatikmodus zeigen erkannte Idents ihre tatsächliche Quelle schreibgeschützt an. Externe Fallbacks und offene Felder bleiben bearbeitbar. Für freie Änderungen **Manuelle Konfiguration – alle Variablenfelder freigeben** aktivieren; in diesem Modus ist der Zuordnungsbutton deaktiviert.
+4. Die **Zuordnungsübersicht** prüfen und anschließend **Übernehmen**. Der Button selbst speichert keine Eigenschaften und löst keine Geräteaktion aus. Im Automatikmodus zeigen erkannte Idents die zugehörige Variable im grauen, gesperrten Variablen-Picker an. Externe Fallbacks und offene Felder bleiben bearbeitbar. Für freie Änderungen **Manuelle Konfiguration – alle Variablenfelder freigeben** aktivieren; in diesem Modus ist der Zuordnungsbutton deaktiviert.
 
 ### Zuordnungsübersicht und graue Felder
 
@@ -27,7 +27,7 @@ Die Übersicht zeigt alle 57 Variablenfelder mit Bereich, Zuordnungsstatus, tats
 
 | Anzeige | Bedeutung |
 | --- | --- |
-| Per Ident zugeordnet | Die Variable entspricht der passenden Zuordnung der gewählten Luxtronik-Instanz. Die Tabellenzeile ist hellgrau; der Variablen-Picker ist grau und gesperrt oder bei direkter Ident-Bindung durch eine Quellenbeschriftung ersetzt. |
+| Per Ident zugeordnet | Die Variable entspricht der passenden Zuordnung der gewählten Luxtronik-Instanz. Die Tabellenzeile ist hellgrau; die aufgelöste Variable ist im sichtbaren Variablen-Picker ausgewählt, der Picker ist grau und gesperrt. |
 | Externe / manuelle Quelle | Die Variable stammt aus einem anderen Modul oder ist eine freie manuelle Variable. Sie ist bearbeitbar. Im Automatikmodus hat ein verfügbarer Luxtronik-Ident Vorrang; im manuellen Modus gilt die eigene Auswahl. |
 | Luxtronik, manuell | Eine Luxtronik-Variable ist gewählt, entspricht aber nicht der automatischen Zuordnung dieses Feldes. |
 | Andere Luxtronik-Instanz | Die Variable gehört zu einer anderen Luxtronik-Quelle als der aktuell ausgewählten. |
@@ -42,13 +42,13 @@ Der **Betriebsstatus** bleibt eine eigene Zustandsvariable. Die drei getrennten 
 
 Beim Wechsel der Luxtronik-Quelle werden alte Luxtronik-Zuordnungen in den unterstützten Feldern auf „Keine“ gesetzt, wenn die neue Quelle keinen passenden Datenpunkt bereitstellt. Dadurch bleiben dort keine Messwerte einer anderen Anlage verknüpft. Nicht mehr auflösbare Variablen-IDs werden vorsichtshalber erhalten und müssen manuell geprüft werden.
 
-Ohne Luxtronik wird wie bisher manuell konfiguriert. Auch mit Luxtronik bleiben externe Sensoren, Zähler und weitere Datenquellen für nicht abgedeckte Datenpunkte nutzbar. Sollen verfügbare Luxtronik-Idents ausdrücklich durch eigene Quellen ersetzt werden, **Manuelle Konfiguration** aktivieren. Benötigte Datenpunkte müssen im Luxtronik-Modul aktiviert sein, beispielsweise **Aussentemperatur** (Java-ID 15), **Verdichterdrehzahl** (193) und **Kondensationstemperatur** (198).
+Ohne Luxtronik wird wie bisher manuell konfiguriert. Auch mit Luxtronik bleiben externe Sensoren, Zähler und weitere Datenquellen für nicht abgedeckte Datenpunkte nutzbar. Sollen verfügbare Luxtronik-Idents ausdrücklich durch eigene Quellen ersetzt werden, **Manuelle Konfiguration** aktivieren. Benötigte Datenpunkte müssen im Luxtronik-Modul aktiviert sein, beispielsweise **Aussentemperatur** (Java-ID 15), **Verdichterdrehzahl** (193) oder **Verdichterfrequenz** (231) sowie **Kondensationstemperatur** (198) oder **Liquefaction_Temperature** (233).
 
 ### Zuordnung auf einer echten Installation prüfen
 
 Unter **Luxtronik automatisch zuordnen → Zuordnung prüfen → Zuordnungsdiagnose anzeigen** wird ein ausschließlich lesender Bericht ausgegeben. Er enthält den Zuordnungsstand `einheitlich-2026-10-20`, die ausgewählte, gespeicherte und erkannte Quelle sowie für jedes Feld den gesuchten Ident, die gefundene, gespeicherte und tatsächlich verwendete ID. Zusätzlich werden die tatsächlich vorhandenen direkten Variablen-Idents der Quelle aufgeführt. Messwerte, IP-Adresse und Zugangsdaten werden nicht ausgelesen; Konfiguration und Geräte bleiben unverändert. Fehlt dieser Diagnosebutton, ist der hier beschriebene Stand in der geöffneten Konfiguration noch nicht geladen.
 
-Die bisherigen Korrekturen konnten das gemeldete Problem auf der echten Installation noch nicht bestätigen oder abschließend erklären. Die Diagnose dient dazu, abweichende Idents, eine andere Quelle oder einen älteren geladenen Codestand festzustellen, statt aus lokalen Testdaten auf den tatsächlichen Zustand zu schließen.
+Die Nutzerdiagnose hat die fehlenden Zuordnungen inzwischen konkret erklärt: Auf der betroffenen Installation existieren `Verdichterfrequenz` und `Liquefaction_Temperature`, während zuvor nur `Verdichterdrehzahl` und `Kondensationstemperatur` gesucht wurden. Beide tatsächlich vorhandenen Namen sind jetzt als alternative Idents in derselben Tabelle hinterlegt. `Verdichterfrequenz_Soll` wird nicht als Istwert verwendet. Die Diagnose bleibt für weitere Abweichungen verfügbar.
 
 ### LUX Bedienfeld: Geräteanzeige und Fernsteuerung
 
@@ -85,17 +85,17 @@ Die folgende Zuordnung wurde gegen `mb-stern/Luxtronik`, Branch `development`, C
 | Heizkreis 1 Rücklauf Ist | `Ruecklauftemperatur_Heizkreis` |
 | Rücklauf Soll, nur Anzeige | `Ruecklauf_Soll_Heizkreis` |
 | Lüfterdrehzahl / Lüfter aktiv | `Ventilator_Drehzahl` / `Ausgang_Solepumpe_Ventilator` |
-| Verdichter aktiv / Drehzahl | `Ausgang_Verdichter_1` / `Verdichterdrehzahl` |
+| Verdichter aktiv / Drehzahl oder Frequenz | `Ausgang_Verdichter_1` / `Verdichterdrehzahl`, alternativ `Verdichterfrequenz` (Istwert) |
 | Leistung | `Waermeleistung` (thermisch, kW) |
 | Niederdruck / Verdampfungstemperatur | `Niederdruck` / `Vapourisation_Temperature` |
-| Hochdruck / Kondensationstemperatur | `Hochdruck` / `Kondensationstemperatur` |
+| Hochdruck / Kondensationstemperatur | `Hochdruck` / `Kondensationstemperatur`, alternativ `Liquefaction_Temperature` |
 | Heizkreis 1 Pumpe / Pumpenwert | `Ausgang_Heizungsumwaelzpumpe` / `Steuersignal_Umwaelzpumpe` |
 | Warmwasserspeicher oben | `Temperatur_Brauchwasser_Oben`, alternativ `Warmwasser_Ist_Temperatur` |
 | Warmwasser-Umschaltventil und Speicherladepumpe | `Ausgang_Brauchwasserpumpe_Umstellventil` |
 | Zirkulationspumpe | `Ausgang_Zirkulationspumpe` |
 | Solar-Kollektortemperatur | `Fuehler_Solarkollektor` |
 
-Das Verdichtersymbol dreht abhängig vom Rohwert der **Verdichterdrehzahl**: höhere Drehzahl bedeutet schnellere Animation. Die Bewegung ist zur besseren Lesbarkeit verlangsamt und begrenzt; der Zahlenwert bleibt unverändert. Drehzahl null oder ein ausgeschalteter **Verdichter aktiv** stoppen das Symbol und die zugehörigen Flusspunkte. Ist keine nutzbare Drehzahl vorhanden, steuert **Verdichter aktiv** die bisherige feste Animation. Ohne separates Aktivsignal reicht eine positive Drehzahl. Bei reduzierter Bewegung bleibt das Symbol still. Die **Kondensationstemperatur** wird mit dem bereits vom Luxtronik-Modul umgerechneten Wert am Kondensator angezeigt.
+Das Verdichtersymbol dreht abhängig vom Rohwert der **Verdichterdrehzahl**: höhere Drehzahl bedeutet schnellere Animation. Die Bewegung ist zur besseren Lesbarkeit verlangsamt und begrenzt; Drehzahl und Frequenz verwenden passende schematische Animationsskalen. Zahlenwert und Profilformat bleiben unverändert; eine Frequenz wird nicht in U/min umgerechnet. Drehzahl null oder ein ausgeschalteter **Verdichter aktiv** stoppen das Symbol und die zugehörigen Flusspunkte. Ist keine nutzbare Drehzahl vorhanden, steuert **Verdichter aktiv** die bisherige feste Animation. Ohne separates Aktivsignal reicht eine positive Drehzahl. Bei reduzierter Bewegung bleibt das Symbol still. Die **Kondensationstemperatur** wird mit dem bereits vom Luxtronik-Modul umgerechneten Wert am Kondensator angezeigt.
 
 Luxtronik legt nur aktivierte Datenpunkte und Bedienvariablen an. Fehlende Idents werden nicht anhand ähnlich klingender Namen oder beliebiger Nummern geraten. Benötigte Datenpunkte bzw. Bedienvariablen müssen zuerst im Luxtronik-Modul aktiviert werden. Steuerfelder werden nur automatisch zugeordnet, wenn die gefundene Variable numerisch ist und eine Standard- oder benutzerdefinierte Aktion besitzt; reine Ist- oder Sollwertmessungen werden dadurch nicht zu Stellbefehlen.
 
