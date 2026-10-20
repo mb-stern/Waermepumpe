@@ -43,9 +43,9 @@ class LuxtronikDisplay {
                 if (indices.length && indices.at(-1) - indices[0] + 1 !== indices.length) return null;
                 for (let x = 0; x < glyph.w; x++) mismatch += row[x] !== glyph.bits[glyph.h - 1 - y][x];
             }
-            if (mismatch > 4) return null;
+            if (mismatch > glyph.w * glyph.h * .18) return null;
             const center = row => row.reduce((sum, bit, x) => sum + bit * x, 0) / row.reduce((a, b) => a + b, 0);
-            const offset = center(glyph.bits[0]) - (glyph.w - 1) / 2;
+            const offset = (center(glyph.bits[0]) + center(glyph.bits.at(-1))) / 2 - (glyph.w - 1) / 2;
             return Math.abs(offset) >= 1 ? (offset > 0 ? 'right' : 'left') : null;
         };
         const arrows = [];
@@ -71,33 +71,47 @@ class LuxtronikDisplay {
             if (candidates.length) arrows.push(candidates[0]);
         }
 
-        // A menu selection is a broad inverse rectangle, unlike a numeric edit field.
-        const inverseRows = Array.from({length: 64}, (_, y) => {
-            let count = 0;
-            for (let x = 18; x < 159; x++) count += pixel(x, y);
-            return pixel(18, y) && pixel(158, y) && count >= 75;
-        });
-        const inverse = this.bands(inverseRows).filter(band => {
-            if (band.start < 8 || band.length < 7 || band.length > 10) return false;
-            for (let x = 18; x < 158; x += 20) {
-                let white = 0;
-                for (let y = band.start; y < band.start + band.length; y++) {
-                    for (let dx = 0; dx < 20; dx++) white += pixel(x + dx, y);
+        // Infer the rectangle from its empty top/bottom margin, not a fixed x coordinate.
+        // A real controller can start the same menu at x=19 rather than x=18.
+        const rectangles = new Map();
+        for (let y = 8; y < 64; y++) {
+            const runs = this.bands(Array.from({length: 160}, (_, x) => pixel(x, y)));
+            for (const run of runs) {
+                if (run.start < 14 || run.start > 28 || run.length < 110 || run.start + run.length < 156) continue;
+                const right = run.start + run.length - 1;
+                const inside = yy => {
+                    if (yy < 8 || yy >= 64 || !pixel(run.start, yy) || !pixel(right, yy)) return false;
+                    let white = 0;
+                    for (let x = run.start; x <= right; x++) white += pixel(x, yy);
+                    return white >= run.length * .5;
+                };
+                let top = y, bottom = y;
+                while (inside(top - 1)) top--;
+                while (inside(bottom + 1)) bottom++;
+                const height = bottom - top + 1;
+                if (height < 7 || height > 11) continue;
+                let valid = true;
+                for (let x = run.start; x <= right; x += 20) {
+                    const width = Math.min(20, right - x + 1);
+                    let white = 0;
+                    for (let yy = top; yy <= bottom; yy++) for (let dx = 0; dx < width; dx++) white += pixel(x + dx, yy);
+                    if (white < height * Math.min(2, width)) valid = false;
                 }
-                if (white < band.length * 2) return false;
+                if (valid) rectangles.set(`${run.start}:${top}:${run.length}:${height}`,
+                    {x: run.start, start: top, w: run.length, length: height});
             }
-            return true;
-        });
-        let grid = inverse.length === 1 ? {y: inverse[0].start, pitch: inverse[0].length} : null;
+        }
+        const inverse = Array.from(rectangles.values());
+        let grid = inverse.length === 1 ? {x: inverse[0].x, w: inverse[0].w, y: inverse[0].start, pitch: inverse[0].length} : null;
         if (!grid && previous?.kind === 'menu' && arrows.some(arrow => arrow.selected)) grid = previous.grid;
         if (grid) {
             const rows = [];
             for (let y = grid.y % grid.pitch; y + grid.pitch <= 64; y += grid.pitch) {
                 if (y < 8) continue; // Heading is not a selectable line.
                 const selected = inverse.length === 1 && y === inverse[0].start;
-                const glyph = signature({x: 18, y, w: 141, h: grid.pitch}, selected);
+                const glyph = signature({x: grid.x, y, w: grid.w, h: grid.pitch}, selected);
                 if (glyph && glyph.h >= 5 && glyph.h <= 9 && glyph.w >= 5) rows.push({
-                    x: 18, y, w: 141, h: grid.pitch, selected, kind: 'row',
+                    x: grid.x, y, w: grid.w, h: grid.pitch, selected, kind: 'row',
                     id: 'row:' + glyph.id, label: 'Menüzeile ' + (rows.length + 1)
                 });
             }

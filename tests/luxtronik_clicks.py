@@ -22,7 +22,7 @@ class LCD:
                         self.pixels[y + yy][x + xx] = value
             x += 6
 
-    def arrow(self, side, selected=False):
+    def arrow(self, side, selected=False, asymmetric=False):
         x, y, width, height = (0 if side == 'left' else 145), 49, 15, 15
         self.rect(x, y, width, height, int(selected))
         self.rect(x, y, width, 1)
@@ -31,6 +31,8 @@ class LCD:
         self.rect(x + width - 1, y, 1, height)
         rows = ['0000001000','0000001100','0000001110','1111111111',
                 '1111111111','1111111111','0000001110','0000001100','0000001000']
+        if asymmetric:
+            rows[6:] = ['0000011110','0000011100','0000011000']
         for yy, row in enumerate(rows):
             for xx, bit in enumerate(row if side == 'right' else row[::-1]):
                 if bit == '1':
@@ -42,7 +44,7 @@ class LCD:
             for row in range(8) for column in range(160))).decode()
 
 
-def menu_frame(selected=0, duplicate=False, pitch=9):
+def menu_frame(selected=0, duplicate=False, pitch=9, origin_x=18):
     lcd = LCD()
     lcd.text('SERVICE', 20, 0)
     lcd.rect(15, 9, 1, 36)
@@ -53,8 +55,8 @@ def menu_frame(selected=0, duplicate=False, pitch=9):
     for index, text in enumerate(labels):
         y = 9 + index * pitch
         if index == selected and y + pitch <= 64:
-            lcd.rect(18, y, 141, pitch)
-        lcd.text(text, 20, y + 1, 0 if index == selected else 1)
+            lcd.rect(origin_x, y, 159 - origin_x, pitch)
+        lcd.text(text, origin_x + 2, y + 1, 0 if index == selected else 1)
     return lcd.packed()
 
 
@@ -79,9 +81,12 @@ def icons_frame(selected=0):
 
 
 def check_click_navigation(browser, base_url, fixture_type, width):
+    def menu(selected=0):
+        return menu_frame(selected,pitch=10,origin_x=19)
+
     page = browser.new_page(viewport={'width': width, 'height': 850})
     peer = fixture_type()
-    peer.image = menu_frame()
+    peer.image = menu()
     state = {'mode': 'menu', 'selected': 0, 'opened': [], 'ignore': False, 'wrong': False}
 
     def move(message, route, connection):
@@ -103,7 +108,7 @@ def check_click_navigation(browser, base_url, fixture_type, width):
             return
         elif value == 6:
             return
-        peer.image = menu_frame(state['selected']) if state['mode'] == 'menu' else icons_frame(state['selected'])
+        peer.image = menu(state['selected']) if state['mode'] == 'menu' else icons_frame(state['selected'])
 
     peer.on_move = move
     page.route_web_socket(re.compile(r'^ws://127\.0\.0\.1:8214/$'), peer.connect)
@@ -130,11 +135,16 @@ def check_click_navigation(browser, base_url, fixture_type, width):
     for selected in range(5):
         detected=model(menu_frame(selected,pitch=10))
         assert detected['kind']=='menu' and len(detected['targets'])==6,detected
+    for x in [17,18,19,20,22]:
+        for pitch in [9,10]:
+            detected=model(menu_frame(pitch=pitch,origin_x=x))
+            assert detected['kind']=='menu' and detected['grid']['x']==x,(x,pitch,detected)
     for side in ['left','right']:
-        lcd=LCD()
-        lcd.arrow(side,True)
-        arrow=model(lcd.packed())
-        assert len(arrow['targets'])==1 and arrow['selected']=='arrow:'+side,arrow
+        for asymmetric in [False,True]:
+            lcd=LCD()
+            lcd.arrow(side,True,asymmetric=asymmetric)
+            arrow=model(lcd.packed())
+            assert len(arrow['targets'])==1 and arrow['selected']=='arrow:'+side,arrow
     for selected in range(5):
         icons=model(icons_frame(selected))
         assert icons['kind']=='icons' and len(icons['targets'])==5,icons
@@ -151,7 +161,7 @@ def check_click_navigation(browser, base_url, fixture_type, width):
     assert state['opened']==[0],state
     state['opened'].clear()
     peer.commands.clear()
-    push(menu_frame())
+    push(menu())
     # Three confirmed steps, then exactly one Enter pair, on both viewport sizes.
     page.get_by_role('button',name='Menüzeile 4 öffnen',exact=True).click()
     page.wait_for_function('!document.querySelector("#wp-luxtronik-targets button")')
@@ -161,7 +171,7 @@ def check_click_navigation(browser, base_url, fixture_type, width):
 
     # Direct arrow activation, followed by lower icon bar navigation.
     state.update(mode='menu',selected=0)
-    push(menu_frame())
+    push(menu())
     page.get_by_role('button',name='Zurück öffnen',exact=True).click()
     page.wait_for_function('!document.querySelector("#wp-luxtronik-targets button")')
     assert state['opened'][-1]==-1,state
@@ -173,7 +183,7 @@ def check_click_navigation(browser, base_url, fixture_type, width):
 
     # The transparent click regions must not swallow the original wheel operation.
     state.update(mode='menu',selected=0)
-    push(menu_frame())
+    push(menu())
     before=len(state['opened'])
     command_count=len(peer.commands)
     page.get_by_role('button',name='Menüzeile 2 öffnen',exact=True).dispatch_event('wheel',{'deltaY':100})
@@ -185,18 +195,18 @@ def check_click_navigation(browser, base_url, fixture_type, width):
     # No blind Enter when a step is ignored, skipped, or a different screen appears.
     for case in ['wrong','screen','manual','timeout','close']:
         state.update(mode='menu',selected=0,ignore=True,wrong=False)
-        push(menu_frame())
+        push(menu())
         before=len(state['opened'])
         page.get_by_role('button',name='Menüzeile 3 öffnen',exact=True).click()
         page.wait_for_timeout(50)
         if case=='wrong':
-            push(menu_frame(2))  # Skipped the expected immediate neighbor.
+            push(menu(2))  # Skipped the expected immediate neighbor.
         elif case=='screen':
             push(icons_frame())
         elif case=='manual':
             page.locator('#wp-luxtronik-display').focus()
             page.keyboard.press('ArrowLeft')
-            push(menu_frame(1))
+            push(menu(1))
         elif case=='timeout':
             page.wait_for_timeout(3200)
         else:

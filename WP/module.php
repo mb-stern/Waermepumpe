@@ -1366,7 +1366,7 @@ class Waermepumpe extends IPSModuleStrict
     #wp-luxtronik-dialog .wp-luxtronik-header { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
     #wp-luxtronik-dialog .wp-luxtronik-header strong { flex: 1; }
     #wp-luxtronik-dialog a { color: inherit; }
-    #wp-luxtronik-help { margin: 0; font-size: 14px; }
+    #wp-luxtronik-help, #wp-luxtronik-recognition { margin: 0; font-size: 14px; }
     #wp-luxtronik-login { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
     #wp-luxtronik-password { width: 110px; max-width: 100%; }
     #wp-luxtronik-device { padding: 24px; border-radius: 14px; background: linear-gradient(145deg, #59616a, #30363d); }
@@ -1405,7 +1405,9 @@ class Waermepumpe extends IPSModuleStrict
         <label for="wp-luxtronik-password">Webinterface-Passwort</label>
         <input id="wp-luxtronik-password" type="password" value="999999" autocomplete="off" />
         <button type="submit">Erneut verbinden</button>
+        <button type="button" id="wp-luxtronik-save" disabled>Displaybild speichern</button>
     </form>
+    <p id="wp-luxtronik-recognition" role="status" aria-live="polite"></p>
     <div id="wp-luxtronik-device">
         <div id="wp-luxtronik-screen">
             <canvas id="wp-luxtronik-display" width="160" height="64" tabindex="0" role="img" aria-label="Luxtronik-Gerätedisplay; Bedienung mit Pfeiltasten und Enter"></canvas>
@@ -6645,6 +6647,7 @@ window.SymconHeatPump = {
         let luxtronikDisplayID = '';
         let luxtronikReady = false;
         let luxtronikPressed = false;
+        let luxtronikLastDirectActivation = -Infinity;
         const getLuxtronikWebURL = () => {
             try {
                 const url = new URL(currentConfig.luxtronikWebInterfaceURL || '');
@@ -6656,10 +6659,13 @@ window.SymconHeatPump = {
         const sendLuxtronikMove = (direction, automatic = false) => {
             if (!automatic) luxtronikNavigation.cancel();
             if (luxtronikReady && luxtronikSocket && luxtronikSocket.readyState === WebSocket.OPEN) {
+                if (automatic && direction === 2) luxtronikLastDirectActivation = performance.now();
                 luxtronikSocket.send('MOVE;' + direction);
             }
         };
         const luxtronikTargets = document.getElementById('wp-luxtronik-targets');
+        const luxtronikRecognition = document.getElementById('wp-luxtronik-recognition');
+        const luxtronikSave = document.getElementById('wp-luxtronik-save');
         const luxtronikNavigation = new LuxtronikClickNavigation({
             move: direction => sendLuxtronikMove(direction, true),
             refresh: () => {
@@ -6667,6 +6673,10 @@ window.SymconHeatPump = {
             },
             status: message => { luxtronikHelp.textContent = message; },
             render: (model, busy) => {
+                const message = model.targets.length
+                    ? (busy ? 'Eintrag wird ausgewählt …' : 'Direkt anklickbare Displayelemente: ' + model.targets.length)
+                    : 'Keine Klickflächen erkannt. Ein Displayklick bestätigt die aktuelle Auswahl mit Enter.';
+                if (luxtronikRecognition.textContent !== message) luxtronikRecognition.textContent = message;
                 const ids = model.targets.map(target => target.id);
                 const children = Array.from(luxtronikTargets.children);
                 if (children.map(child => child.dataset.target).join('|') !== ids.join('|')) {
@@ -6712,7 +6722,10 @@ window.SymconHeatPump = {
             if (socket && socket.readyState < WebSocket.CLOSING) socket.close(1000, 'Bedienverbindung beendet');
             luxtronikMenuID = luxtronikDisplayID = '';
             luxtronikReady = false;
+            luxtronikLastDirectActivation = -Infinity;
             luxtronikControls.disabled = true;
+            luxtronikRecognition.textContent = '';
+            luxtronikSave.disabled = true;
             luxtronikCanvas.getContext('2d').clearRect(0, 0, 160, 64);
         };
         const failLuxtronik = (message) => {
@@ -6758,6 +6771,7 @@ window.SymconHeatPump = {
             const firstFrame = !luxtronikReady;
             luxtronikReady = true;
             luxtronikControls.disabled = false;
+            luxtronikSave.disabled = false;
             if (firstFrame && document.activeElement?.tagName !== 'INPUT') luxtronikCanvas.focus({preventScroll: true});
             luxtronikHelp.textContent = 'Verbunden. Erkannte Menüzeilen, Symbole und Pfeile direkt anklicken. Alternativ mit Pfeiltasten, Enter oder Mausrad bedienen.';
             luxtronikNavigation.update(bytes);
@@ -6914,6 +6928,13 @@ window.SymconHeatPump = {
                 if (!document.hidden && luxtronikDialog.open && luxtronikReconnectOnVisible) connectLuxtronik(true);
             });
             document.getElementById('wp-luxtronik-close').addEventListener('click', closeLuxtronikWebInterface);
+            luxtronikSave.addEventListener('click', () => {
+                if (!luxtronikReady) return;
+                const link = document.createElement('a');
+                link.download = 'luxtronik-display.png';
+                link.href = luxtronikCanvas.toDataURL('image/png');
+                link.click();
+            });
             document.getElementById('wp-luxtronik-login').addEventListener('submit', (event) => {
                 event.preventDefault();
                 connectLuxtronik();
@@ -6933,7 +6954,9 @@ window.SymconHeatPump = {
             });
             for (const element of [document.getElementById('wp-luxtronik-press'), luxtronikCanvas]) {
                 element.addEventListener('pointerdown', (event) => {
-                    if (event.button !== 0 || !luxtronikReady || element === luxtronikCanvas) return;
+                    if (event.button !== 0 || !luxtronikReady) return;
+                    if (element === luxtronikCanvas && (luxtronikNavigation.model.targets.length
+                        || luxtronikNavigation.pending || performance.now() - luxtronikLastDirectActivation < 750)) return;
                     element.focus();
                     element.setPointerCapture(event.pointerId);
                     press();

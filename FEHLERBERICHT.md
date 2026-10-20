@@ -1,8 +1,8 @@
 # Dokumentierte Fehler
 
-Stand: 19.10.2026 · Branch: `development` · ursprünglicher Fehlerstand: `7808018eeb6c61658862d23219b135ea09475d94`.
+Stand: 20.10.2026 · Branch: `development` · ursprünglicher Fehlerstand F-01/F-02: `7808018eeb6c61658862d23219b135ea09475d94`.
 
-Die folgenden zwei Befunde wurden auf dem genannten Stand reproduziert und inzwischen auf `development` korrigiert. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
+F-01 und F-02 wurden auf dem genannten Stand reproduziert und inzwischen auf `development` korrigiert. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. F-03 beschreibt die später ergänzte Luxtronik-Klickerkennung. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
 
 ## F-01: Fehlende Validierung numerischer Steuerungswerte im PHP-Modul
 
@@ -50,7 +50,25 @@ Die folgenden zwei Befunde wurden auf dem genannten Stand reproduziert und inzwi
 
 **Abnahme:** Nicht am Raster liegende Unter- und Obergrenzen sowie negative Bereiche prüfen. Kein Ergebnis darf Minimum oder Maximum verletzen; das vereinbarte Schrittraster muss eingehalten werden. Bestehende Standardprofile müssen weiterhin funktionieren.
 
-## Prüfstatus und Quellen
+## F-03: Feste Pixelposition verhindert die Erkennung von Luxtronik-Menüzeilen
+
+**Priorität:** Mittel; die neue direkte Mausbedienung ist betroffen.
+
+**Fehlerstand:** `5adf27f4ecd21224e86085309c2be7870181e8b6`.
+
+**Fundstellen:** `WP/luxtronik-display.js`, `LuxtronikDisplay.analyze()`; `WP/module.php`, Pointer-Behandlung des LCD-Canvas.
+
+**Nutzerrückmeldung:** Es erscheinen keine gelben Umrandungen und Mausklicks bewirken nichts. Das zeigt, dass keine Klickflächen angeboten werden. Die exakten LCD-Bilddaten des betroffenen Geräts liegen noch nicht als Datei vor; die folgende lokale Reproduktion belegt einen konkreten Fehler, bestätigt aber noch nicht die vollständige Ursache am Regler.
+
+**Reproduktion:** Gleiches synthetisches Menübild, gleicher Auswahlbalken und gleiche Schrift; ausschließlich der horizontale Ursprung wird verschoben. Bei x=18 werden sieben Klickflächen erkannt, bei x=19 und x=20 keine. Ein Pixel Abweichung genügt. Die bisherigen Testbilder verwendeten den erwarteten Ursprung und deckten diesen Unterschied nicht ab.
+
+**Ursache:** Die Auswahlprüfung und die Zeilenbereiche waren auf x=18 und eine feste rechte Kante zugeschnitten. Zugleich wurde der ursprüngliche Displayklick als Enter entfernt. Ohne erkannte Flächen gab es dadurch keine Mausbedienung auf dem Display.
+
+**Status: lokal korrigiert, Abnahme am Regler offen.** Die Balkenkanten werden jetzt aus dem Bild bestimmt. Varianten mit leicht asymmetrischen Pfeilkonturen werden berücksichtigt. Eine eigene Anzeige nennt die Anzahl anklickbarer Elemente bzw. den Ersatzbetrieb. Ohne erkannte Flächen bestätigt ein Displayklick wieder die aktuelle Auswahl mit Enter; ein Doppelklickschutz verhindert eine sofortige Bestätigung der nächsten Ansicht nach einem automatischen Öffnen. Der neue PNG-Export speichert das unveränderte LCD-Bild für die Prüfung tatsächlicher Firmware-Layouts.
+
+**Abnahme:** Menübilder mit x=17/18/19/20/22 und Zeilenhöhen 9/10 prüfen, direkte Klickabläufe auch mit x=19 und Zeilenhöhe 10 ausführen, Pfeilvarianten und unverändert blockierte mehrdeutige Bilder prüfen. Bei unbekanntem Bild muss ein manueller Displayklick genau Drücken und Loslassen übertragen. PNG-Export muss 160 × 64 Pixel haben; Verbindungsabbruch und Schließen müssen Export und Bedienung sperren. Die echten LCD-Daten und die gelben Klickflächen am Regler sind noch zu prüfen.
+
+## Prüfstatus und Quellen für F-01/F-02
 
 - PHP-Syntaxprüfung auf `development`: erfolgreich.
 - PHP-Regressionstests nach der Korrektur: **724 Prüfungen erfolgreich**, mit lokalem Symcon-Ersatz. Für diesen Lauf wurde die lokal installierte PHP-DOM-Erweiterung ausdrücklich geladen.

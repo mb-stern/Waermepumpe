@@ -11,6 +11,7 @@ import os
 import re
 from pathlib import Path
 import shutil
+import struct
 import subprocess
 import tempfile
 import threading
@@ -121,6 +122,7 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 # Only an intercepted local WebSocket and a local fallback page are used.
                 assert not page.locator('#gSettings').is_visible()
                 assert not luxtronik.connections
+                assert page.locator('#wp-luxtronik-save').is_disabled()
                 web_payload=json.loads(json.dumps(payload))
                 web_url=f'http://127.0.0.1:{server.server_port}/luxtronik-test.html'
                 web_payload['config']['luxtronikWebInterfaceURL']=web_url
@@ -139,6 +141,12 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                     return [[0,0],[0,1],[159,63]].map(([x,y])=>Array.from(ctx.getImageData(x,y,1,1).data));
                 }''')
                 assert pixels==[[255,255,255,255],[0,0,255,255],[255,255,255,255]],pixels
+                assert 'Keine Klickflächen' in page.locator('#wp-luxtronik-recognition').text_content()
+                with page.expect_download() as saved:
+                    page.locator('#wp-luxtronik-save').click()
+                assert saved.value.suggested_filename=='luxtronik-display.png'
+                png=Path(saved.value.path()).read_bytes()
+                assert png[:8]==b'\x89PNG\r\n\x1a\n' and struct.unpack('>II',png[16:24])==(160,64)
                 assert not any(command.startswith('MOVE;') for command in luxtronik.commands)
                 before=len(luxtronik.commands)
                 page.get_by_role('button',name='Pfeil links',exact=True).click()
@@ -150,7 +158,7 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 page.locator('#wp-luxtronik-display').click()
                 page.locator('#wp-luxtronik-display').dispatch_event('wheel',{'deltaY':-100})
                 page.locator('#wp-luxtronik-display').dispatch_event('wheel',{'deltaY':100})
-                expected_moves=[1,0,2,6,1,6,0,6,1,6,0,6,2,6,2,6,1,0]
+                expected_moves=[1,0,2,6,1,6,0,6,1,6,0,6,2,6,2,6,2,6,1,0]
                 page.wait_for_timeout(50)
                 moves=[command for command in luxtronik.commands[before:] if command.startswith('MOVE;')]
                 assert moves==['MOVE;'+str(value) for value in expected_moves],moves
@@ -170,6 +178,7 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 page.wait_for_timeout(50)
                 assert luxtronik.connections[-1]['closed']
                 assert page.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
+                assert page.locator('#wp-luxtronik-save').is_disabled()
                 for key in ['Enter','Space']:
                     page.locator('#gSettings').focus()
                     page.keyboard.press(key)
