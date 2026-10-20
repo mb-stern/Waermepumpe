@@ -6,55 +6,17 @@ Das Modul stellt den kompletten Wärmepumpenprozess grafisch dar und verbindet d
 
 Die Konfiguration erfolgt vollständig über das IP-Symcon-Konfigurationsformular.
 
-## Luxtronik automatisch zuordnen oder manuell konfigurieren
+## Luxtronik (optional)
 
-Die Visualisierung unterstützt die Instanzen des Moduls [mb-stern/Luxtronik](https://github.com/mb-stern/Luxtronik/tree/development) mit der Modul-ID `{3884C1C3-F4FF-9A56-B982-B986E934A5E7}`. Die Zuordnung verwendet die echten Variablen-Idents dieses Moduls; ein Umbenennen der Variablen in der Konsole ändert diese Erkennung nicht. Das Luxtronik-Modul ist optional.
+Im Picker **Luxtronik (optional)** die gewünschte Instanz auswählen. Passende Variablen werden über ihre Idents zugeordnet und direkt in den Variablenpickern angezeigt. Felder ohne passenden Ident bleiben frei wählbar.
 
-**Einheitliche Ident-Zuordnung:** Alle Felder der untenstehenden Zuordnungstabelle verwenden im Automatikmodus denselben Resolver für Quelle und Ident. Die Auflösung gilt für Formular, Visualisierungsdaten, Update-Abonnements, Betriebsstatus, Bedienvariablen und deren Aktionen. Für einzelne Messwerte gibt es keine Sonderliste und keinen separaten Zugriff. Bei genau einer Instanz genügt die automatische Erkennung; bei mehreren die gewünschte Quelle auswählen und **Übernehmen**. Instanz- und Variablen-IDs werden nicht fest eingebaut.
-
-Ein verfügbarer Ident der gewählten Quelle hat im Automatikmodus Vorrang vor der gespeicherten Variablen-ID. Das funktioniert auch bei leeren Feldern. Das Formular zeigt die tatsächlich verwendete Variable in einem **sichtbaren, grau gesperrten Variablen-Picker**; die Übersicht zeigt **Per Ident zugeordnet** und eine graue Zeile. Mit **Manuelle Konfiguration** werden die bisherigen Picker wieder sichtbar und die gespeicherten eigenen Zuordnungen maßgeblich. Die reine Ident-Auflösung verändert diese gespeicherten Eigenschaften nicht.
-
-Fehlt ein passender Ident, bleiben externe/manuelle Quellen als Fallback verfügbar. Eine andere Luxtronik-Variable oder ein Messwert einer zuvor ausgewählten Luxtronik-Anlage wird dafür nicht verwendet. Felder ohne Eintrag in der Zuordnungstabelle bleiben manuell konfigurierbar.
-
-1. Im Formular **Luxtronik automatisch zuordnen (optional)** öffnen. Bei genau einer vorhandenen Luxtronik-Instanz wird deren Name und ID als Vorschlag angezeigt.
-2. Bei mehreren Instanzen die gewünschte Quelle im **Instanz-Picker** auswählen. „Keine“ bedeutet automatische Erkennung einer einzelnen Instanz; bei mehreren wird keine willkürlich ausgewählt.
-3. Optional **Luxtronik-Variablen zuordnen** klicken, um die gefundenen IDs zusätzlich in die Variablenfelder zu übernehmen. Alle hinterlegten Idents verwenden dabei denselben Resolver. Ohne passenden Ident bleiben externe Quellen und nicht mehr auflösbare gespeicherte IDs erhalten; unpassende alte Luxtronik-Verknüpfungen werden auf „Keine“ gesetzt.
-4. Die **Zuordnungsübersicht** prüfen und anschließend **Übernehmen**. Der Button selbst speichert keine Eigenschaften und löst keine Geräteaktion aus. Im Automatikmodus zeigen erkannte Idents die zugehörige Variable im grauen, gesperrten Variablen-Picker an. Externe Fallbacks und offene Felder bleiben bearbeitbar. Für freie Änderungen **Manuelle Konfiguration – alle Variablenfelder freigeben** aktivieren; in diesem Modus ist der Zuordnungsbutton deaktiviert.
-
-### Zuordnungsübersicht und graue Felder
-
-Die Übersicht zeigt alle 57 Variablenfelder mit Bereich, Zuordnungsstatus, tatsächlichem bzw. gesuchtem Ident sowie Quelle, Variablenname und ID. Sie wird beim Öffnen aus den gespeicherten Zuordnungen erzeugt. Nach einer automatischen Zuordnung, einer manuellen Variablenauswahl oder einem Wechsel der Luxtronik-Quelle werden die noch nicht gespeicherten Formularwerte angezeigt.
-
-| Anzeige | Bedeutung |
-| --- | --- |
-| Per Ident zugeordnet | Die Variable entspricht der passenden Zuordnung der gewählten Luxtronik-Instanz. Die Tabellenzeile ist hellgrau; die aufgelöste Variable ist im sichtbaren Variablen-Picker ausgewählt, der Picker ist grau und gesperrt. |
-| Externe / manuelle Quelle | Die Variable stammt aus einem anderen Modul oder ist eine freie manuelle Variable. Sie ist bearbeitbar. Im Automatikmodus hat ein verfügbarer Luxtronik-Ident Vorrang; im manuellen Modus gilt die eigene Auswahl. |
-| Luxtronik, manuell | Eine Luxtronik-Variable ist gewählt, entspricht aber nicht der automatischen Zuordnung dieses Feldes. |
-| Andere Luxtronik-Instanz | Die Variable gehört zu einer anderen Luxtronik-Quelle als der aktuell ausgewählten. |
-| Nicht zugeordnet | Das Feld ist leer; eine passende Variable ist verfügbar oder es ist noch keine eindeutige Luxtronik-Quelle gewählt. |
-| Datenpunkt fehlt | Für die gewählte Quelle ist keine passende, nutzbare Variable verfügbar. Bei Bedienvariablen sind ein numerischer Typ und eine Aktion erforderlich. |
-| Manuell zuordnen | Für dieses leere Feld ist keine automatische Luxtronik-Zuordnung hinterlegt. |
-| Ungültige Variablen-ID | Die eingetragene Variable existiert nicht mehr und muss geprüft werden. |
-
-„Per Ident zugeordnet“ beschreibt die aktuell passende Verknüpfung, unabhängig davon, ob sie ursprünglich per Button oder von Hand gewählt wurde. Das Formular speichert die Übersicht und ihre Farben nicht als Konfiguration. Die Sperre verhindert versehentliche Änderungen an erkannten Zuordnungen; sie lässt sich mit **Manuelle Konfiguration** jederzeit aufheben. Im manuellen Modus wird weiterhin angezeigt, welche Idents passen, die Picker sind jedoch frei bedienbar. Im Hintergrund werden keine manuellen Variablenzuordnungen überschrieben.
-
-Der **Betriebsstatus** bleibt eine eigene Zustandsvariable. Die drei getrennten Bedienvariablen stehen gemeinsam im aufklappbaren Bereich **Betriebsarten bedienen**. Technische Zusätze wie „Integer“ entfallen in den Feldbeschriftungen; gespeicherte Eigenschaften und ihre Auswertung bleiben gleich.
-
-Beim Wechsel der Luxtronik-Quelle werden alte Luxtronik-Zuordnungen in den unterstützten Feldern auf „Keine“ gesetzt, wenn die neue Quelle keinen passenden Datenpunkt bereitstellt. Dadurch bleiben dort keine Messwerte einer anderen Anlage verknüpft. Nicht mehr auflösbare Variablen-IDs werden vorsichtshalber erhalten und müssen manuell geprüft werden.
-
-Ohne Luxtronik wird wie bisher manuell konfiguriert. Auch mit Luxtronik bleiben externe Sensoren, Zähler und weitere Datenquellen für nicht abgedeckte Datenpunkte nutzbar. Sollen verfügbare Luxtronik-Idents ausdrücklich durch eigene Quellen ersetzt werden, **Manuelle Konfiguration** aktivieren. Benötigte Datenpunkte müssen im Luxtronik-Modul aktiviert sein, beispielsweise **Aussentemperatur** (Java-ID 15), **Verdichterdrehzahl** (193) oder **Verdichterfrequenz** (231) sowie **Kondensationstemperatur** (198) oder **Liquefaction_Temperature** (233).
-
-### Zuordnung auf einer echten Installation prüfen
-
-Unter **Luxtronik automatisch zuordnen → Zuordnung prüfen → Zuordnungsdiagnose anzeigen** wird ein ausschließlich lesender Bericht ausgegeben. Er enthält den Zuordnungsstand `einheitlich-2026-10-20`, die ausgewählte, gespeicherte und erkannte Quelle sowie für jedes Feld den gesuchten Ident, die gefundene, gespeicherte und tatsächlich verwendete ID. Zusätzlich werden die tatsächlich vorhandenen direkten Variablen-Idents der Quelle aufgeführt. Messwerte, IP-Adresse und Zugangsdaten werden nicht ausgelesen; Konfiguration und Geräte bleiben unverändert. Fehlt dieser Diagnosebutton, ist der hier beschriebene Stand in der geöffneten Konfiguration noch nicht geladen.
-
-Die Nutzerdiagnose hat die fehlenden Zuordnungen inzwischen konkret erklärt: Auf der betroffenen Installation existieren `Verdichterfrequenz` und `Liquefaction_Temperature`, während zuvor nur `Verdichterdrehzahl` und `Kondensationstemperatur` gesucht wurden. Beide tatsächlich vorhandenen Namen sind jetzt als alternative Idents in derselben Tabelle hinterlegt. `Verdichterfrequenz_Soll` wird nicht als Istwert verwendet. Die Diagnose bleibt für weitere Abweichungen verfügbar.
+Bei **Keine** sind alle Variablen frei wählbar, auch wenn nur eine Luxtronik-Instanz installiert ist. Gespeicherte manuelle Zuordnungen bleiben erhalten und werden nach dem Entfernen der Luxtronik-Auswahl wieder verwendet. Änderungen wie gewohnt mit **Übernehmen** speichern.
 
 ### LUX Bedienfeld: Geräteanzeige und Fernsteuerung
 
-Die bisherige funktionslose Kachel **Einstellungen** wird durch **LUX Bedienfeld** ersetzt, wenn eine Webadresse verfügbar ist. Die Adresse wird aus `IPAddress` der ausgewählten Luxtronik-Instanz abgeleitet: `http://<Adresse>/Webserver/index.html`. Ohne ausgewählte Quelle wird nur eine eindeutig vorhandene Luxtronik-Instanz verwendet. Der Datenport des Luxtronik-Moduls (8888/8889) wird nicht als Webserver-Port übernommen.
+Die bisherige funktionslose Kachel **Einstellungen** wird durch **LUX Bedienfeld** ersetzt, wenn eine Webadresse verfügbar ist. Die Adresse wird aus `IPAddress` der ausgewählten Luxtronik-Instanz abgeleitet: `http://<Adresse>/Webserver/index.html`. Ohne ausgewählte Quelle wird keine Instanz automatisch verwendet. Der Datenport des Luxtronik-Moduls (8888/8889) wird nicht als Webserver-Port übernommen.
 
-Unter **Luxtronik-Webinterface → Abweichende Webadresse (optional)** lässt sich bei Bedarf eine vollständige HTTP- oder HTTPS-Adresse hinterlegen. Das funktioniert auch ohne Luxtronik-Modul. Ohne gültige Adresse bleibt die Kachel ausgeblendet.
+Eine bereits gespeicherte abweichende Webadresse bleibt erhalten. Ohne gültige Adresse bleibt die Kachel ausgeblendet.
 
 Erst ein Klick öffnet eine Verbindung vom Browser zum Regler auf **WebSocket-Port 8214**, mit dem Unterprotokoll `Lux_WS`. Das Bedienfeld verwendet denselben Ablauf wie die bereitgestellte `Lux.js`: `LOGIN`, regelmäßiges `REFRESH` und `GET` mit der aktuell übermittelten Menü-ID der **Fernsteuerung**. Es werden keine festen Menü-IDs verwendet. Die originalen LCD-Bilddaten werden direkt dargestellt; die dekorative Geräteabbildung mit Drehrad wird nicht nachgebaut.
 
@@ -101,7 +63,7 @@ Luxtronik legt nur aktivierte Datenpunkte und Bedienvariablen an. Fehlende Ident
 
 Die physische Zuordnung zusätzlicher Mischkreise, einzelner Heizstäbe und weiterer Speicherfühler ist anlagenabhängig. Für diese Felder sowie für die Expansionsventil-Öffnung und freie Zusatzwerte gibt es hier keine automatische Zuordnung. Sie bleiben manuell konfigurierbar. Anlagenkomponenten wie Speicher, Heizkreistypen und Anzahl der Heizstäbe werden ebenfalls nicht automatisch geändert. Die gemeinsame Luxtronik-Ausgabe „Brauchwasserpumpe/Umstellventil“ und die Zuordnung des ungemischten Hauptkreises zu Heizkreis 1 müssen zur tatsächlichen Hydraulik passen.
 
-Die lokalen Regressionstests prüfen Erkennung, Auswahl mehrerer Instanzen, Idents, externe Quellen, ungespeicherte manuelle Änderungen, Quellenwechsel, Formularvorschläge und die anschließenden Daten-/Aktionswege mit einem Symcon-Ersatz. Die Bedienung des Konfigurationsformulars auf einem echten IP-Symcon-System muss zusätzlich geprüft werden.
+Die lokalen Regressionstests prüfen Erkennung, Auswahl mehrerer Instanzen, Idents, externe Quellen, ungespeicherte manuelle Änderungen, Quellenwechsel, Variablenpicker und die anschließenden Daten-/Aktionswege mit einem Symcon-Ersatz. Die Bedienung des Konfigurationsformulars auf einem echten IP-Symcon-System muss zusätzlich geprüft werden.
 
 ---
 
