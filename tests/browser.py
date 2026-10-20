@@ -16,6 +16,7 @@ import tempfile
 import threading
 
 from playwright.sync_api import sync_playwright
+from luxtronik_clicks import check_click_navigation
 
 repository = Path(__file__).resolve().parent.parent
 chromium = shutil.which("chromium") or shutil.which("chromium-browser")
@@ -35,6 +36,7 @@ class LuxtronikFixture:
         self.commands = []
         self.empty_updates = False
         self.silent = False
+        self.on_move = None
         # Packed bytes cover vertical bits, row boundaries and the last pixel.
         self.image = base64.b64encode(bytes([1] + [0] * 1278 + [128])).decode()
 
@@ -63,6 +65,8 @@ class LuxtronikFixture:
                 route.send('<Content><name>Fernsteuerung</name><item><name>Gerät</name>'
                            f'<item id="{connection["lcd"]}"><name>LCD</name><img>{self.image}</img>'
                            '</item></item></Content>')
+            elif message.startswith('MOVE;') and self.on_move:
+                self.on_move(message, route, connection)
 
         route.on_message(receive)
         route.on_close(lambda code, reason: connection.update(closed=True))
@@ -146,7 +150,7 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 page.locator('#wp-luxtronik-display').click()
                 page.locator('#wp-luxtronik-display').dispatch_event('wheel',{'deltaY':-100})
                 page.locator('#wp-luxtronik-display').dispatch_event('wheel',{'deltaY':100})
-                expected_moves=[1,0,2,6,1,6,0,6,1,6,0,6,2,6,2,6,2,6,1,0]
+                expected_moves=[1,0,2,6,1,6,0,6,1,6,0,6,2,6,2,6,1,0]
                 page.wait_for_timeout(50)
                 moves=[command for command in luxtronik.commands[before:] if command.startswith('MOVE;')]
                 assert moves==['MOVE;'+str(value) for value in expected_moves],moves
@@ -368,6 +372,8 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 assert not errors,errors
                 print(json.dumps({'viewport':width,**result,'updates':'PASS'}))
                 page.close()
+            for width in [1200,390]:
+                check_click_navigation(browser,f'http://127.0.0.1:{server.server_port}',LuxtronikFixture,width)
             # Exercise inactivity and retry limits without waiting for real timeouts.
             liveness=browser.new_page()
             liveness.clock.install()
@@ -418,9 +424,15 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
             secure.route('https://symcon.test/**', lambda route: route.fulfill(
                 content_type='text/html', body=Path(artifacts,'configured.html').read_text()))
             secure.goto('https://symcon.test/configured.html')
+            # Some SDK themes supply a light foreground with no matching dialog background.
+            secure.evaluate('''()=>{
+                document.documentElement.style.setProperty('--content-color','#ffffff');
+                document.documentElement.style.setProperty('--card-background-color','#ffffff');
+            }''')
             secure.evaluate('(url)=>window.handleMessage({type:"update",config:{luxtronikWebInterfaceURL:url}})',web_url)
             secure.locator('#gSettings').dispatch_event('click')
             assert secure.locator('#wp-luxtronik-dialog').is_visible()
+            assert secure.locator('#wp-luxtronik-dialog').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(24, 34, 47)'
             assert secure.locator('#wp-luxtronik-controls').evaluate('e=>e.disabled')
             assert 'HTTP' in secure.locator('#wp-luxtronik-help').text_content()
             assert secure.locator('#wp-luxtronik-external').get_attribute('href')==web_url
