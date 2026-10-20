@@ -2,7 +2,7 @@
 
 Stand: 20.10.2026 · Branch: `development` · ursprünglicher Fehlerstand F-01/F-02: `7808018eeb6c61658862d23219b135ea09475d94`.
 
-F-01 und F-02 wurden auf dem genannten Stand reproduziert und inzwischen auf `development` korrigiert. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. F-03 beschreibt die später ergänzte Luxtronik-Klickerkennung. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
+F-01 und F-02 wurden auf dem genannten Stand reproduziert und inzwischen auf `development` korrigiert. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. F-03 und F-04 beschreiben die später ergänzte Luxtronik-Klickerkennung. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
 
 ## F-01: Fehlende Validierung numerischer Steuerungswerte im PHP-Modul
 
@@ -67,6 +67,20 @@ F-01 und F-02 wurden auf dem genannten Stand reproduziert und inzwischen auf `de
 **Status: lokal korrigiert, Abnahme am Regler offen.** Die Balkenkanten werden jetzt aus dem Bild bestimmt. Varianten mit leicht asymmetrischen Pfeilkonturen werden berücksichtigt. Eine eigene Anzeige nennt die Anzahl anklickbarer Elemente bzw. den Ersatzbetrieb. Ohne erkannte Flächen bestätigt ein Displayklick wieder die aktuelle Auswahl mit Enter; ein Doppelklickschutz verhindert eine sofortige Bestätigung der nächsten Ansicht nach einem automatischen Öffnen. Der neue PNG-Export speichert das unveränderte LCD-Bild für die Prüfung tatsächlicher Firmware-Layouts.
 
 **Abnahme:** Menübilder mit x=17/18/19/20/22 und Zeilenhöhen 9/10 prüfen, direkte Klickabläufe auch mit x=19 und Zeilenhöhe 10 ausführen, Pfeilvarianten und unverändert blockierte mehrdeutige Bilder prüfen. Bei unbekanntem Bild muss ein manueller Displayklick genau Drücken und Loslassen übertragen. PNG-Export muss 160 × 64 Pixel haben; Verbindungsabbruch und Schließen müssen Export und Bedienung sperren. Die echten LCD-Daten und die gelben Klickflächen am Regler sind noch zu prüfen.
+
+## F-04: Verschwindende Auswahlmarkierung entfernt Klickflächen zwischen Displayupdates
+
+**Priorität:** Mittel; direkte Displayklicks reagieren unregelmäßig oder fallen vorübergehend auf Enter zurück.
+
+**Fehlerstand:** `1a16e6012e828de9bc35a571f4875f326fe295dd`.
+
+**Nutzerrückmeldung:** Die gelbe Umrandung erscheint nur teilweise. Anschließend sieht die Anzeige gleich aus, die Umrandung fehlt aber und ein Klick wirkt anders. Ein Mitschnitt der tatsächlichen Reglerbilder liegt weiterhin nicht vor.
+
+**Lokale Reproduktion:** Dasselbe Menü wird mit sichtbarer Auswahlmarkierung, ohne Markierung und wieder mit Markierung übertragen. Vor der Korrektur ergeben diese Phasen sechs, null und sechs Klickflächen. Der Code erkennt das unveränderte Menü ohne aktuelle Auswahl nicht wieder und ersetzt die Klickfläche vollständig. Ein zwischen Maustaste drücken und loslassen eintreffendes Bild kann dadurch den ursprünglichen Button entfernen. Der Enter-Ersatzbetrieb ändert zusätzlich die Bedeutung desselben Displayklicks.
+
+**Status: lokal korrigiert, Prüfung am Gerät offen.** Bei identischer Überschrift und identischen Zeilenmustern bleiben bekannte Flächen über die Blinkphase bestehen. Ohne bestätigte Auswahl wird kein Bedienbefehl gesendet; der gewünschte Klick wartet begrenzt auf die nächste erkennbare Markierung. Ein stabiler Container fängt Mausdrücken und Loslassen ab und prüft beim Loslassen Ziel, Position und Menüstruktur erneut. Ein anderes Menü, ein manuelles Bedienereignis, Ziehen aus der Fläche, Verbindungsabbruch und Schließen verwerfen den vorgemerkten Klick. Nach Enter zählt ein Cursorblinken nicht mehr als abgeschlossener Ansichtswechsel.
+
+**Abnahme:** Wechselbilder mit und ohne Markierung ergeben gleichbleibende Menü-/Symbolflächen. Während einer gedrückt gehaltenen Maustaste bleibt die Fläche erhalten; Loslassen ohne Markierung sendet noch keinen Befehl. Nach bestätigter Auswahl wird das vorgemerkte Ziel genau einmal geöffnet. Zusätzliche Blinkbilder zwischen Navigationsschritten dürfen weder Abbruch noch doppelte Befehle auslösen. Eine neue Menüüberschrift während des Klicks und Loslassen außerhalb der Fläche dürfen nichts öffnen. Blinkbilder nach Enter dürfen keine erneute Bestätigung freigeben. Diese Fälle bestehen lokal mit simuliertem WebSocket bei 1200 und 390 Pixel Breite; 964 PHP-Regressionprüfungen bleiben erfolgreich. Die Übereinstimmung mit der tatsächlichen Blinkdarstellung des Reglers ist noch zu bestätigen.
 
 ## Prüfstatus und Quellen für F-01/F-02
 

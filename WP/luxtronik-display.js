@@ -102,8 +102,9 @@ class LuxtronikDisplay {
             }
         }
         const inverse = Array.from(rectangles.values());
+        const context = signature({x: 0, y: 0, w: 160, h: 8})?.id || '';
         let grid = inverse.length === 1 ? {x: inverse[0].x, w: inverse[0].w, y: inverse[0].start, pitch: inverse[0].length} : null;
-        if (!grid && previous?.kind === 'menu' && arrows.some(arrow => arrow.selected)) grid = previous.grid;
+        if (!grid && previous?.kind === 'menu' && previous.context === context) grid = previous.grid;
         if (grid) {
             const rows = [];
             for (let y = grid.y % grid.pitch; y + grid.pitch <= 64; y += grid.pitch) {
@@ -119,7 +120,8 @@ class LuxtronikDisplay {
             const oldRows = previous?.targets.filter(target => target.kind === 'row').map(target => target.id).sort().join('|');
             const sameRows = rows.map(target => target.id).sort().join('|') === oldRows;
             if (rows.length >= 2 && (inverse.length === 1 || sameRows)) {
-                return this.model('menu', targets, {grid});
+                return this.model('menu', targets, {grid, context,
+                    allowUnselected: sameRows && previous?.context === context});
             }
         }
 
@@ -151,18 +153,19 @@ class LuxtronikDisplay {
                 return glyph && {...box, selected, kind: 'icon', id: 'icon:' + glyph.id, label: 'Menüsymbol ' + (index + 1)};
             });
             if (icons.some(icon => !icon)) continue;
-            return this.model('icons', [...arrows.filter(arrow => arrow.direction === 'left'), ...icons]);
+            return this.model('icons', [...arrows.filter(arrow => arrow.direction === 'left'), ...icons], {allowUnselected: true});
         }
-        return this.model('arrows', arrows);
+        return this.model('arrows', arrows, {allowUnselected: true});
     }
 
     static model(kind, targets, extra = {}) {
         const selected = targets.filter(target => target.selected);
         const ids = targets.map(target => target.id);
         // Ambiguous geometry or duplicate labels cannot drive a click transaction.
-        const valid = selected.length === 1 && new Set(ids).size === ids.length;
-        return {kind, targets: valid ? targets : [], selected: valid ? selected[0].id : null,
-            layout: kind + ':' + ids.join('|'), ...extra};
+        const valid = (selected.length === 1 || (extra.allowUnselected && selected.length === 0))
+            && new Set(ids).size === ids.length;
+        return {kind, targets: valid ? targets : [], selected: valid && selected.length === 1 ? selected[0].id : null,
+            layout: kind + ':' + (extra.context || '') + ':' + ids.join('|'), ...extra};
     }
 }
 
@@ -196,13 +199,16 @@ class LuxtronikClickNavigation {
         if (!this.pending) { this.render(model, false); return; }
         const pending = this.pending;
         if (pending.opened) {
-            if (bytes !== pending.frame) this.cancel();
+            // A blinking cursor is not proof that the requested screen has opened.
+            if (model.layout !== pending.layout) this.cancel();
             return;
         }
-        if (model.layout !== pending.layout || !model.selected) {
+        if (model.layout !== pending.layout) {
             this.cancel('Die Anzeige hat sich geändert. Bitte das gewünschte Ziel erneut anklicken.');
             return;
         }
+        if (!model.selected) return; // Keep the requested target through a cursor blink.
+        if (pending.waiting) { this.advance(); return; }
         if (model.selected === pending.before) return; // Wait for a confirmed step.
         if (model.selected !== pending.expected) {
             this.cancel('Die Auswahl wurde nicht eindeutig bestätigt. Bitte die Pfeiltasten verwenden.');
@@ -212,7 +218,7 @@ class LuxtronikClickNavigation {
     }
 
     activate(id) {
-        if (this.pending || !this.model.selected || !this.model.targets.some(target => target.id === id)) return;
+        if (this.pending || !this.model.targets.some(target => target.id === id)) return;
         this.pending = {id, layout: this.model.layout, steps: 0};
         this.advance();
     }
@@ -222,6 +228,13 @@ class LuxtronikClickNavigation {
         if (!pending) return;
         clearTimeout(this.timer);
         this.render(this.model, true);
+        if (!this.model.selected) {
+            pending.waiting = true;
+            this.status('Warte auf die Auswahlmarkierung des Reglers …');
+            this.timer = setTimeout(() => this.cancel('Die Auswahlmarkierung wurde nicht bestätigt. Bitte die Pfeiltasten verwenden.'), 3000);
+            return;
+        }
+        pending.waiting = false;
         if (this.model.selected === pending.id) {
             pending.opened = true;
             pending.frame = this.frame;

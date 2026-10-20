@@ -44,9 +44,9 @@ class LCD:
             for row in range(8) for column in range(160))).decode()
 
 
-def menu_frame(selected=0, duplicate=False, pitch=9, origin_x=18):
+def menu_frame(selected=0, duplicate=False, pitch=9, origin_x=18, heading='SERVICE'):
     lcd = LCD()
-    lcd.text('SERVICE', 20, 0)
+    lcd.text(heading, 20, 0)
     lcd.rect(15, 9, 1, 36)
     lcd.arrow('left', selected == -1)
     labels = ['INFO','SETTINGS','LANGUAGE','DATE','PROGRAM','CONFIG']
@@ -81,13 +81,14 @@ def icons_frame(selected=0):
 
 
 def check_click_navigation(browser, base_url, fixture_type, width):
-    def menu(selected=0):
-        return menu_frame(selected,pitch=10,origin_x=19)
+    def menu(selected=0, heading='SERVICE'):
+        return menu_frame(selected,pitch=10,origin_x=19,heading=heading)
 
     page = browser.new_page(viewport={'width': width, 'height': 850})
     peer = fixture_type()
     peer.image = menu()
-    state = {'mode': 'menu', 'selected': 0, 'opened': [], 'ignore': False, 'wrong': False}
+    state = {'mode': 'menu', 'selected': 0, 'opened': [], 'ignore': False, 'wrong': False,
+             'blink_steps': False, 'defer_open': False}
 
     def move(message, route, connection):
         value = int(message.split(';')[1])
@@ -102,13 +103,16 @@ def check_click_navigation(browser, base_url, fixture_type, width):
         elif value == 2:
             state['opened'].append(state['selected'])
             # Opening changes the display; it must never activate the next screen too.
-            blank = LCD()
-            blank.text('OPEN', 30, 20)
-            peer.image = blank.packed()
+            if not state['defer_open']:
+                blank = LCD()
+                blank.text('OPEN', 30, 20)
+                peer.image = blank.packed()
             return
         elif value == 6:
             return
         peer.image = menu(state['selected']) if state['mode'] == 'menu' else icons_frame(state['selected'])
+        if state['blink_steps'] and state['mode']=='menu':
+            route.send(f'<Values><item id="{connection["lcd"]}"><value>{menu(-2)}</value></item></Values>')
 
     peer.on_move = move
     page.route_web_socket(re.compile(r'^ws://127\.0\.0\.1:8214/$'), peer.connect)
@@ -154,6 +158,87 @@ def check_click_navigation(browser, base_url, fixture_type, width):
     edited.text('MMMMMM',18,10)
     edited.rect(90,9,69,9)
     assert not model(edited.packed())['targets']
+
+    # Hiding a cursor must retain the same menu geometry and DOM targets.
+    phases=page.evaluate('''images=>{
+        let previous=null;
+        return images.map(image=>{
+            previous=LuxtronikDisplay.analyze(atob(image),previous);
+            return {count:previous.targets.length,layout:previous.layout,selected:previous.selected};
+        });
+    }''',[menu(),menu(-2),menu(),menu(-2),menu()])
+    assert all(phase['count']==6 for phase in phases),phases
+    assert len({phase['layout'] for phase in phases})==1,phases
+    assert phases[0]['selected'] and phases[1]['selected'] is None,phases
+    for frames in [[icons_frame(),icons_frame(-1),icons_frame()],
+                   [menu(),menu(-2,heading='OTHER')]]:
+        result=page.evaluate('''images=>{
+            let previous=null;
+            return images.map(image=>{
+                previous=LuxtronikDisplay.analyze(atob(image),previous);
+                return {count:previous.targets.length,layout:previous.layout,selected:previous.selected};
+            });
+        }''',frames)
+        if len(frames)==3:
+            assert all(frame['count']==5 for frame in result),result
+            assert len({frame['layout'] for frame in result})==1,result
+        else:
+            assert not result[-1]['selected'] and result[0]['layout']!=result[-1]['layout'],result
+
+    # Hold the mouse through an incoming blink frame, then release during that phase.
+    target=page.get_by_role('button',name='Menüzeile 3 öffnen',exact=True)
+    target.hover()
+    target.evaluate("button=>button.dataset.identity='retained'")
+    page.mouse.down()
+    push(menu(-2))
+    assert target.get_attribute('data-identity')=='retained'
+    assert target.get_attribute('data-pointer-held')==''
+    assert page.locator('#wp-luxtronik-targets button').count()==6
+    page.mouse.up()
+    page.wait_for_timeout(50)
+    assert not any(message.startswith('MOVE;') for message in peer.commands),peer.commands
+    assert 'Auswahlmarkierung' in page.locator('#wp-luxtronik-help').text_content()
+    state['blink_steps']=True
+    push(menu())
+    page.wait_for_function('!document.querySelector("#wp-luxtronik-targets button")')
+    assert state['opened']==[2],state
+    state.update(selected=0,blink_steps=False)
+    state['opened'].clear()
+    peer.commands.clear()
+    push(menu())
+
+    # Neither a real heading change nor dragging outside may activate a captured target.
+    for changed in [True,False]:
+        target=page.get_by_role('button',name='Menüzeile 2 öffnen',exact=True)
+        target.hover()
+        page.mouse.down()
+        if changed:
+            push(menu(heading='OTHER'))
+        else:
+            page.mouse.move(0,0)
+        page.mouse.up()
+        page.wait_for_timeout(50)
+        assert not any(message.startswith('MOVE;') for message in peer.commands),peer.commands
+        push(menu())
+
+    # A cursor blink after Enter is not a screen change or permission to repeat Enter.
+    state['defer_open']=True
+    target=page.get_by_role('button',name='Menüzeile 1 öffnen',exact=True)
+    bounds=target.bounding_box()
+    target.click()
+    push(menu(-2))
+    push(menu())
+    assert page.locator('#wp-luxtronik-targets button:disabled').count()==6
+    page.mouse.click(bounds['x']+bounds['width']/2,bounds['y']+bounds['height']/2)
+    page.wait_for_timeout(50)
+    assert state['opened']==[0],state
+    blank=LCD()
+    blank.text('OPEN',30,20)
+    push(blank.packed())
+    state.update(defer_open=False,selected=0)
+    state['opened'].clear()
+    peer.commands.clear()
+    push(menu())
 
     # A double click on the current row opens it once, without confirming the next screen.
     page.get_by_role('button',name='Menüzeile 1 öffnen',exact=True).dblclick()

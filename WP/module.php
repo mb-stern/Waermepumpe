@@ -1373,7 +1373,7 @@ class Waermepumpe extends IPSModuleStrict
     #wp-luxtronik-screen { position: relative; }
     #wp-luxtronik-targets { position: absolute; inset: 8px; pointer-events: none; }
     #wp-luxtronik-targets button { position: absolute; margin: 0; padding: 0; border: 0; border-radius: 1px; background: transparent; pointer-events: auto; cursor: pointer; }
-    #wp-luxtronik-targets button:hover, #wp-luxtronik-targets button:focus-visible { outline: 2px solid #ffd45c; outline-offset: -2px; background: rgba(255, 212, 92, .12); }
+    #wp-luxtronik-targets button:hover, #wp-luxtronik-targets button:focus-visible, #wp-luxtronik-targets button[data-pointer-held] { outline: 2px solid #ffd45c; outline-offset: -2px; background: rgba(255, 212, 92, .12); }
     #wp-luxtronik-targets button:disabled { pointer-events: none; }
     #wp-luxtronik-display { display: block; width: 100%; height: auto; background: #0000ff; image-rendering: pixelated; border: 8px solid #252a30; border-radius: 5px; box-sizing: border-box; cursor: pointer; touch-action: manipulation; }
     #wp-luxtronik-controls { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 14px; border: 0; margin: 22px 0 0; padding: 0; }
@@ -6657,13 +6657,28 @@ window.SymconHeatPump = {
             }
         };
         const sendLuxtronikMove = (direction, automatic = false) => {
-            if (!automatic) luxtronikNavigation.cancel();
+            if (!automatic) {
+                cancelLuxtronikPointer();
+                luxtronikNavigation.cancel();
+            }
             if (luxtronikReady && luxtronikSocket && luxtronikSocket.readyState === WebSocket.OPEN) {
                 if (automatic && direction === 2) luxtronikLastDirectActivation = performance.now();
                 luxtronikSocket.send('MOVE;' + direction);
             }
         };
         const luxtronikTargets = document.getElementById('wp-luxtronik-targets');
+        let luxtronikPointer = null;
+        const cancelLuxtronikPointer = () => {
+            const gesture = luxtronikPointer;
+            luxtronikPointer = null;
+            luxtronikTargets.querySelectorAll('[data-pointer-held]').forEach(button => button.removeAttribute('data-pointer-held'));
+            if (gesture && luxtronikTargets.hasPointerCapture(gesture.pointerId)) luxtronikTargets.releasePointerCapture(gesture.pointerId);
+        };
+        const activateLuxtronikTarget = id => {
+            releaseLuxtronikButton();
+            luxtronikCanvas.focus({preventScroll: true});
+            luxtronikNavigation.activate(id);
+        };
         const luxtronikRecognition = document.getElementById('wp-luxtronik-recognition');
         const luxtronikSave = document.getElementById('wp-luxtronik-save');
         const luxtronikNavigation = new LuxtronikClickNavigation({
@@ -6684,10 +6699,9 @@ window.SymconHeatPump = {
                         const button = document.createElement('button');
                         button.type = 'button';
                         button.dataset.target = target.id;
-                        button.addEventListener('click', () => {
-                            releaseLuxtronikButton();
-                            luxtronikCanvas.focus({preventScroll: true});
-                            luxtronikNavigation.activate(target.id);
+                        // Pointer clicks are completed on the stable overlay container below.
+                        button.addEventListener('click', event => {
+                            if (event.detail === 0 && luxtronikReady && !button.disabled) activateLuxtronikTarget(target.id);
                         });
                         return button;
                     }));
@@ -6705,11 +6719,39 @@ window.SymconHeatPump = {
                 });
             }
         });
+        luxtronikTargets.addEventListener('pointerdown', event => {
+            const button = event.target.closest('button[data-target]');
+            if (event.button !== 0 || !luxtronikReady || !button || button.disabled || luxtronikPointer) return;
+            event.preventDefault();
+            releaseLuxtronikButton();
+            luxtronikPointer = {pointerId: event.pointerId, id: button.dataset.target, layout: luxtronikNavigation.model.layout};
+            button.setAttribute('data-pointer-held', '');
+            luxtronikTargets.setPointerCapture(event.pointerId);
+        });
+        luxtronikTargets.addEventListener('pointerup', event => {
+            const gesture = luxtronikPointer;
+            if (!gesture || gesture.pointerId !== event.pointerId) return;
+            cancelLuxtronikPointer();
+            if (!luxtronikReady || luxtronikNavigation.pending || luxtronikNavigation.model.layout !== gesture.layout) return;
+            const button = Array.from(luxtronikTargets.children).find(child => child.dataset.target === gesture.id);
+            if (!button || button.disabled) return;
+            const bounds = button.getBoundingClientRect();
+            if (event.clientX >= bounds.left && event.clientX < bounds.right && event.clientY >= bounds.top && event.clientY < bounds.bottom) {
+                activateLuxtronikTarget(gesture.id);
+            }
+        });
+        luxtronikTargets.addEventListener('pointercancel', event => {
+            if (luxtronikPointer?.pointerId === event.pointerId) cancelLuxtronikPointer();
+        });
+        luxtronikTargets.addEventListener('lostpointercapture', event => {
+            if (luxtronikPointer?.pointerId === event.pointerId && !luxtronikTargets.hasPointerCapture(event.pointerId)) cancelLuxtronikPointer();
+        });
         const releaseLuxtronikButton = () => {
             if (luxtronikPressed) sendLuxtronikMove(6);
             luxtronikPressed = false;
         };
         const stopLuxtronik = () => {
+            cancelLuxtronikPointer();
             releaseLuxtronikButton();
             luxtronikNavigation.reset();
             clearInterval(luxtronikRefresh);
@@ -6924,6 +6966,7 @@ window.SymconHeatPump = {
             });
             window.addEventListener('pagehide', stopLuxtronik);
             window.addEventListener('blur', releaseLuxtronikButton);
+            window.addEventListener('blur', cancelLuxtronikPointer);
             document.addEventListener('visibilitychange', () => {
                 if (!document.hidden && luxtronikDialog.open && luxtronikReconnectOnVisible) connectLuxtronik(true);
             });
