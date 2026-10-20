@@ -406,6 +406,23 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                 assert not errors,errors
                 print(json.dumps({'viewport':width,**result,'updates':'PASS'}))
                 page.close()
+            # Integration of PHP's direct Ident resolver and actual VM_UPDATE payload.
+            live_update=json.loads(Path(artifacts,'live-ident-update.json').read_text())
+            for width in [1200,390]:
+                live_page=browser.new_page(viewport={'width':width,'height':850})
+                live_errors=[]
+                live_page.on('pageerror',lambda e: live_errors.append(str(e)))
+                live_page.goto(f'http://127.0.0.1:{server.server_port}/live-ident.html')
+                assert live_page.locator('#textCompressorSpeedValue').text_content()=='3000 rpm'
+                assert live_page.locator('#textCondenserTemperature').text_content()=='42.5 °C'
+                assert live_page.locator('#pathCompressor').evaluate('e=>parseFloat(getComputedStyle(e).animationDuration)')==1.0
+                live_page.evaluate('(p)=>window.handleMessage(p)',live_update)
+                assert live_page.locator('#textCompressorSpeedValue').text_content()=='1500 rpm'
+                assert live_page.locator('#pathCompressor').evaluate('e=>parseFloat(getComputedStyle(e).animationDuration)')==2.0
+                assert not live_errors,live_errors
+                live_page.close()
+            print(json.dumps({'direct_ident':'PASS','ident_variable_updates':'PASS'}))
+
             # Exercise inactivity and retry limits without waiting for real timeouts.
             liveness=browser.new_page()
             liveness.clock.install()

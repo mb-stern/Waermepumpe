@@ -1,8 +1,8 @@
 # Dokumentierte Fehler
 
-Stand: 19.10.2026 · Branch: `development` · ursprünglicher Fehlerstand: `7808018eeb6c61658862d23219b135ea09475d94`.
+Stand: 20.10.2026 · Branch: `development` · ursprünglicher Fehlerstand: `7808018eeb6c61658862d23219b135ea09475d94`.
 
-Die folgenden zwei Befunde wurden auf dem genannten Stand reproduziert und inzwischen auf `development` korrigiert. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
+F-01 und F-02 wurden auf dem genannten ursprünglichen Stand reproduziert und inzwischen auf `development` korrigiert. F-03 wurde auf dem späteren Stand `21a623d` ergänzt. Sie betreffen Randfälle der Sollwerteingabe und bedeuten nicht, dass der normale Betrieb grundsätzlich gestört ist. Die ursprünglichen Fundstellen und Reproduktionen bleiben zur Nachvollziehbarkeit erhalten. Eine vollständige Modulprüfung ist damit noch nicht abgeschlossen.
 
 ## F-01: Fehlende Validierung numerischer Steuerungswerte im PHP-Modul
 
@@ -49,6 +49,20 @@ Die folgenden zwei Befunde wurden auf dem genannten Stand reproduziert und inzwi
 **Status: korrigiert.** Das Minimum ist jetzt ausdrücklich der Rasterursprung, entsprechend dem `min`-Attribut des Eingabefelds. Die Rundung wählt einen Rasterpunkt innerhalb des zulässigen Bereichs und sichert die Grenzen abschließend gegen Gleitkommaabweichungen ab. Nicht zum Raster passende Obergrenzen ergeben den höchsten zulässigen Rasterpunkt. Das ursprüngliche Beispiel liefert nun `80` statt `80,1`; bei Minimum `20,1`, Maximum `80` und Schrittweite `0,3` wird `79,8` gewählt. Leere Eingaben führen beim Übernehmen zu keinem Aktionsaufruf. Die serverseitige Validierung aus F-01 gilt zusätzlich; direkte API-Aufrufe werden auf Typ und Bereich geprüft, ohne sie stillschweigend auf das Bedienraster zu runden.
 
 **Abnahme:** Nicht am Raster liegende Unter- und Obergrenzen sowie negative Bereiche prüfen. Kein Ergebnis darf Minimum oder Maximum verletzen; das vereinbarte Schrittraster muss eingehalten werden. Bestehende Standardprofile müssen weiterhin funktionieren.
+
+## F-03: Gefundene Luxtronik-Idents werden bei leeren gespeicherten Feldern nicht direkt genutzt
+
+**Stand:** `21a623d`, gemeldet nach Modulupdate und erneutem Zuordnen/Übernehmen.
+
+**Auslöser:** Eine gültige Luxtronik-Quelle und andere Variablenzuordnungen sind gespeichert. `CompressorValue`, `CondenserTemperature` oder `OutdoorTemperature` stehen weiterhin auf null, obwohl die passenden Idents unter der gewählten Quelle existieren.
+
+**Ursache im Datenpfad:** `AddVariableData()` und `DataKey()` lesen ausschließlich die gespeicherte Variablen-ID. Die Ident-Suche läuft bisher nur für Formularvorschläge und den Zuordnungsbutton. Eine vorhandene Luxtronik-Variable allein genügt dadurch nicht für die Anzeige. Warum die Formularübernahme auf der gemeldeten echten Installation leere Felder hinterließ, ist mit dem lokalen Symcon-Ersatz nicht nachgewiesen.
+
+**Reproduktion:** Im Regressionstest werden eine Luxtronik-Instanz mit `Verdichterdrehzahl`, `Kondensationstemperatur` und `Aussentemperatur`, eine gespeicherte Quelle und weitere korrekte Zuordnungen angelegt. Die drei Messwert-Eigenschaften bleiben null. Vor der Korrektur fehlen ihre Daten in der Visualisierung; der neue Test schlägt fehl. Es werden keine echten Geräte angesprochen.
+
+**Korrektur:** Im Automatikmodus werden diese drei Messwerte direkt per Ident aus der ausgewählten bzw. eindeutig erkannten Quelle aufgelöst. Visualisierungsdaten, Konfigurationsschlüssel, Update-Abonnements und Zuordnungsübersicht verwenden die passende Quelle. Das Formular zeigt die verwendete Variable als schreibgeschützte Beschriftung statt eines leeren Pickers. Gespeicherte manuelle Zuordnungen bleiben unverändert; im manuellen Modus werden sie wieder verwendet. Instanz- und Variablen-IDs sind nicht fest eingebaut.
+
+**Prüfung:** Regressionen prüfen leere gespeicherte Felder, unveränderte Eigenschaften, manuelle Konfiguration, mehrdeutige oder fehlende Quellen, einen Quellenwechsel und neu angelegte Variablen mit gleichem Ident. Browserprüfungen verwenden zusätzlich aus PHP erzeugte Live-Daten und eine echte `MessageSink()`-Nachricht im lokalen Symcon-Ersatz. Die Prüfung auf der echten IP-Symcon-Installation steht aus.
 
 ## Prüfstatus und Quellen
 

@@ -305,6 +305,50 @@ $explicit->AssignLuxtronik(61001, '{}');
 check($explicit->formUpdates['OutdoorTemperature']['value'] === 62050, 'Explicit instance ignored');
 check(!isset($explicit->formUpdates['OperatingStatusVariable']['value']), 'Variables leaked from another instance');
 
+// Reproduce an existing instance: source and other links saved, these fields still zero.
+$liveIdentProperties = ['LuxtronikInstanceID' => 61000, 'OperatingStatusVariable' => 62000];
+$liveIdentModule = createModule($liveIdentProperties);
+$before = [$writes, $actions, $liveIdentModule->properties];
+$liveIdentModule->ApplyChanges();
+$liveIdentData = callPrivate($liveIdentModule, 'BuildVisualizationData');
+foreach (['outdoorTemperature' => 62004, 'compressorValue' => 62012, 'condenserTemperature' => 62013] as $key => $variableID) {
+    check(($liveIdentData[$key]['variableId'] ?? 0) === $variableID, 'Empty saved field not resolved directly by Ident: ' . $key);
+    check(isset($liveIdentModule->messages[$variableID]), 'Live Ident variable not subscribed: ' . $key);
+    check(callPrivate($liveIdentModule, 'BuildCardConfig')[$key] === $key, 'Live Ident missing from card config: ' . $key);
+}
+check([$writes, $actions, $liveIdentModule->properties] === $before, 'Live Ident resolution modified stored assignments or operated a device');
+$manualLive = createModule($liveIdentProperties + ['ManualConfiguration' => true]);
+$manualData = callPrivate($manualLive, 'BuildVisualizationData');
+check(!isset($manualData['compressorValue'], $manualData['condenserTemperature'], $manualData['outdoorTemperature']), 'Manual mode resolved unassigned Idents');
+$ambiguousLive = createModule();
+check(!isset(callPrivate($ambiguousLive, 'BuildVisualizationData')['compressorValue']), 'Live Ident chose an arbitrary source');
+$otherLive = createModule(['LuxtronikInstanceID' => 61001]);
+$otherData = callPrivate($otherLive, 'BuildVisualizationData');
+check($otherData['outdoorTemperature']['variableId'] === 62050 && !isset($otherData['compressorValue'], $otherData['condenserTemperature']), 'Live Ident leaked from a different source');
+$missingLive = createModule(['LuxtronikInstanceID' => 61999]);
+check(!isset(callPrivate($missingLive, 'BuildVisualizationData')['compressorValue']), 'Live Ident ignored an unavailable selected source');
+
+$instances[61234] = $luxtronikID;
+$objectIdents[61234] = ['Verdichterdrehzahl' => 62070, 'Kondensationstemperatur' => 62071];
+$variables[62070] = 1500;
+$variables[62071] = -3.0;
+$liveIdentModule->properties['LuxtronikInstanceID'] = 61234;
+$liveIdentModule->ApplyChanges();
+$liveIdentData = callPrivate($liveIdentModule, 'BuildVisualizationData');
+check($liveIdentData['compressorValue']['value'] === 1500 && $liveIdentData['condenserTemperature']['value'] === -3.0, 'Live binding did not follow the selected instance');
+check(isset($liveIdentModule->messages[62070], $liveIdentModule->messages[62071]) && !isset($liveIdentModule->messages[62012], $liveIdentModule->messages[62013]), 'Source switch retained old subscriptions');
+$objectIdents[61234]['Verdichterdrehzahl'] = 62072;
+$variables[62072] = 2100;
+$liveIdentModule->ApplyChanges();
+check(callPrivate($liveIdentModule, 'BuildVisualizationData')['compressorValue']['variableId'] === 62072 && isset($liveIdentModule->messages[62072]) && !isset($liveIdentModule->messages[62070]), 'Recreated Ident did not resolve to its new ID');
+$liveIdentModule->properties['ManualConfiguration'] = true;
+$liveIdentModule->properties['CompressorValue'] = 62012;
+$liveIdentModule->properties['CondenserTemperature'] = 62013;
+$liveIdentModule->ApplyChanges();
+$manualLiveData = callPrivate($liveIdentModule, 'BuildVisualizationData');
+check($manualLiveData['compressorValue']['variableId'] === 62012 && $manualLiveData['condenserTemperature']['variableId'] === 62013, 'Manual mode ignored explicitly selected variables');
+unset($instances[61234], $objectIdents[61234]);
+
 // Refresh incorrect Luxtronik links and switch units while retaining external modules.
 $objectIdents[61002] = ['ExternalRoomSensor' => 62060];
 $variables[62060] = 22.0;
@@ -481,7 +525,8 @@ $statusProperties = [
     'OperatingStatusVariable' => 62000,
     'HeatingControlVariable' => 62008,
     'SupplyTemperature' => 62002, // A different Luxtronik Ident.
-    'OutdoorTemperature' => 62060, // External module.
+    'OutdoorTemperature' => 62060, // Live Ident takes precedence in automatic mode.
+    'AmbientTemperatureActual' => 62060, // External module without a live override.
     'CompressorRunning' => 62050, // Other Luxtronik instance.
     'ReturnTemperatureSetpointVariable' => 62998, // Deleted variable.
     'AdditionalValue000' => 62060, // Manual field without an automatic mapping.
@@ -494,17 +539,38 @@ check(count($overview['values']) === count($selectors), 'Assignment report does 
 check($overview['add'] === false && $overview['delete'] === false && $overview['loadValuesFromConfiguration'] === false, 'Report may edit or load persisted configuration');
 foreach ($overview['columns'] as $column) check($column['save'] === false, 'Report column persists derived status');
 check(!isset($assignmentModule->registered['AssignmentOverview']), 'Derived report registered as configuration');
+// The form must display the resolved source, rather than a disabled picker saying None.
+$liveFormModule = createModule(['LuxtronikInstanceID' => 61000]);
+$liveForm = namedFormItems(json_decode($liveFormModule->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR)['elements']);
+foreach (['OutdoorTemperature' => ['Außentemperatur', 62004],
+          'CompressorValue' => ['Verdichterdrehzahl', 62012],
+          'CondenserTemperature' => ['Kondensationstemperatur', 62013]] as $property => [$caption, $variableID]) {
+    check($liveForm[$property]['visible'] === false && $liveForm[$property]['enabled'] === false, 'Live Ident still shown as an empty picker: ' . $property);
+    check($liveForm['Automatic' . $property]['visible'] === true && str_contains($liveForm['Automatic' . $property]['caption'], '#' . $variableID), 'Resolved source missing from form: ' . $property);
+    check(reportRow($liveForm['AssignmentOverview']['values'], $caption)['status'] === 'Per Ident zugeordnet', 'Empty saved field incorrectly reported unassigned: ' . $property);
+    check($liveFormModule->properties[$property] === 0 && !isset($liveFormModule->registered['Automatic' . $property]), 'Form overwrote saved configuration for derived source');
+}
+$liveFormModule->RefreshAssignmentStatus(61000, '{}', true);
+foreach (['OutdoorTemperature', 'CompressorValue', 'CondenserTemperature'] as $property) {
+    check($liveFormModule->formUpdates[$property]['visible'] === true && $liveFormModule->formUpdates[$property]['enabled'] === true, 'Manual toggle did not restore original picker');
+    check($liveFormModule->formUpdates['Automatic' . $property]['visible'] === false, 'Manual toggle retained automatic source label');
+}
+$liveFormModule->RefreshAssignmentStatus(61001, '{}');
+check($liveFormModule->formUpdates['CompressorValue']['visible'] === true && $liveFormModule->formUpdates['AutomaticCompressorValue']['visible'] === false, 'Source without speed Ident retained previous live display');
+check(str_contains($liveFormModule->formUpdates['AutomaticOutdoorTemperature']['caption'], '#62050'), 'Unsaved source selection did not update live source display');
+
 $statusRow = reportRow($overview['values'], 'Betriebsstatus');
 check($statusRow['status'] === 'Per Ident zugeordnet' && $statusRow['ident'] === 'Betriebszustand' && $statusRow['rowColor'] === '#eeeeee', 'Correct Ident not highlighted');
 check(str_contains($statusRow['variable'], '#62000'), 'Variable ID missing from report');
-check(reportRow($overview['values'], 'Außentemperatur')['status'] === 'Externe / manuelle Quelle', 'External source not distinguished');
+check(reportRow($overview['values'], 'Außentemperatur')['status'] === 'Per Ident zugeordnet', 'Live outdoor Ident not reflected in report');
+check(reportRow($overview['values'], 'Raumtemperatur Ist (Fallback)')['status'] === 'Externe / manuelle Quelle', 'External source not distinguished');
 check(reportRow($overview['values'], 'WP Vorlauf')['status'] === 'Luxtronik, manuell', 'Wrong Luxtronik Ident reported as automatic');
 check(reportRow($overview['values'], 'Verdichter aktiv')['status'] === 'Andere Luxtronik-Instanz', 'Other source reported as automatic');
 check(reportRow($overview['values'], 'Rücklauf Soll')['status'] === 'Ungültige Variablen-ID', 'Deleted assignment not distinguished');
 $missingRow = reportRow($overview['values'], 'Niederdruck');
 check($missingRow['status'] === 'Datenpunkt fehlt' && $missingRow['ident'] === 'Niederdruck', 'Missing Ident not named');
 check($statusItems['OperatingStatusVariable']['enabled'] === false && $statusItems['HeatingControlVariable']['enabled'] === false, 'Correct Ident picker not locked');
-foreach (['OutdoorTemperature', 'SupplyTemperature', 'CompressorRunning', 'ReturnTemperatureSetpointVariable', 'HeaterRod1'] as $property) {
+foreach (['AmbientTemperatureActual', 'SupplyTemperature', 'CompressorRunning', 'ReturnTemperatureSetpointVariable', 'HeaterRod1'] as $property) {
     check($statusItems[$property]['enabled'] === true, 'Non-automatic picker locked: ' . $property);
 }
 check($statusItems['OperatingStatusVariable']['caption'] === 'Betriebsstatus', 'Technical integer wording retained');
@@ -589,6 +655,26 @@ if ($artifactDir !== false && $artifactDir !== '') {
     $formattedValues[$actualId] = '28.9 °C';
     $formattedValues[$targetId] = '30.0 °C';
     file_put_contents($artifactDir . '/configured.html', '<meta charset="utf-8">' . createModule($configured)->GetVisualizationTile());
+    // A saved source with empty measurement properties must work without import.
+    $instances = [61000 => $luxtronikID];
+    $objectIdents[61000] = ['Aussentemperatur' => 62004, 'Verdichterdrehzahl' => 62012, 'Kondensationstemperatur' => 62013];
+    $variables[62004] = 10.0;
+    $variables[62012] = 3000;
+    $variables[62013] = 42.5;
+    $liveConfigured = $configured;
+    $liveConfigured['LuxtronikInstanceID'] = 61000;
+    foreach (['OutdoorTemperature', 'CompressorValue', 'CondenserTemperature'] as $property) $liveConfigured[$property] = 0;
+    $formattedValues[62012] = '3000 rpm';
+    $formattedValues[62013] = '42.5 °C';
+    $liveModule = createModule($liveConfigured);
+    $liveModule->ApplyChanges();
+    file_put_contents($artifactDir . '/live-ident.html', '<meta charset="utf-8">' . $liveModule->GetVisualizationTile());
+    $variables[62012] = 1500;
+    $formattedValues[62012] = '1500 rpm';
+    $liveModule->MessageSink(time(), 62012, VM_UPDATE, []);
+    file_put_contents($artifactDir . '/live-ident-update.json', json_encode(end($liveModule->updates), JSON_THROW_ON_ERROR));
+    $variables[62012] = 3000;
+    $formattedValues[62012] = '3000 rpm';
     preg_match_all('~<script[^>]*>(.*?)</script>~s', $html, $scripts);
     foreach ($scripts[1] as $index => $js) file_put_contents($artifactDir . '/script-' . $index . '.js', $js);
 }
