@@ -260,6 +260,28 @@ with tempfile.TemporaryDirectory(prefix="wp-browser-") as artifacts:
                                 assert reading['y']==positions[suffix],reading
                             else:
                                 assert reading['text']=='' and reading['display']=='none',reading
+                # Boiler loading must not synthesize temperatures from the heating circuit.
+                boiler=json.loads(json.dumps(payload))
+                boiler['config']['heatingCircuitType1']='underfloor'
+                boiler['config']['heatingCircuitType2']='off'
+                boiler['config']['heatingCircuitType3']='off'
+                boiler['config']['singleCircuitHotWaterTemperatureSwitch']=True
+                boiler['config']['wwHeatingValve']='testBoilerValve'
+                boiler['data']['testBoilerValve']={'value':True,'formatted':'On'}
+                for suffix in ['Up','Middle','Down']:
+                    boiler['config']['tankTempWW'+suffix]=''
+                update_tanks(boiler)
+                for suffix in ['Up','Middle','Down']:
+                    assert tank_readings()['textTankTempWW'+suffix]['text']==''
+                assert page.locator('#symconBoilerSupplyTemperature,#symconBoilerRefluxTemperature').count()==0
+                boiler['config']['tankTempWWMiddle']='testDHWActual'
+                boiler['data']['testDHWActual']={'value':48.5,'formatted':'48.5 °C'}
+                update_tanks(boiler)
+                readings=tank_readings()
+                assert '48.5' in readings['textTankTempWWMiddle']['text']
+                assert readings['textTankTempWWMiddle']['y']==162
+                assert readings['textTankTempWWUp']['text']==readings['textTankTempWWDown']['text']==''
+                assert page.locator('#symconBoilerSupplyTemperature,#symconBoilerRefluxTemperature').count()==0
                 # A selected sensor may subsequently lose its data or yield no value.
                 for missing_value in ['missing',None,'','   ']:
                     changed=json.loads(json.dumps(payload))

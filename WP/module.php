@@ -33,7 +33,8 @@ class Waermepumpe extends IPSModuleStrict
         'RefluxTemperatureHeating1' => ['Ruecklauftemperatur_Heizkreis'],
         'HeatingCircuitPumpRunning1' => ['Ausgang_Heizungsumwaelzpumpe'],
         'HeatingCircuitPumpValue1' => ['Steuersignal_Umwaelzpumpe'],
-        'TankTempWWUp' => ['Temperatur_Brauchwasser_Oben', 'Warmwasser_Ist_Temperatur'],
+        'TankTempWWUp' => ['Temperatur_Brauchwasser_Oben'],
+        'TankTempWWMiddle' => ['Warmwasser_Ist_Temperatur'],
         'WWHeatingValve' => ['Ausgang_Brauchwasserpumpe_Umstellventil'],
         'StorageChargingPumpRunning' => ['Ausgang_Brauchwasserpumpe_Umstellventil'],
         'CirculatingPumpRunning' => ['Ausgang_Zirkulationspumpe'],
@@ -416,7 +417,7 @@ class Waermepumpe extends IPSModuleStrict
                     ['type' => 'Label', 'caption' => 'Warmwasserspeicher'],
                     $this->VariableGrid([
                         ['caption' => 'Temperatur oben', 'name' => 'TankTempWWUp'],
-                        ['caption' => 'Temperatur Mitte', 'name' => 'TankTempWWMiddle'],
+                        ['caption' => 'Brauchwasser Mitte', 'name' => 'TankTempWWMiddle'],
                         ['caption' => 'Temperatur unten', 'name' => 'TankTempWWDown']
                     ]),
                     ['type' => 'Label', 'caption' => 'Pumpen und Umschaltventil'],
@@ -5575,99 +5576,10 @@ window.SymconHeatPump = {
             }
 
 
-            /*
-             * Zwei zusätzliche Temperaturwerte neben der Boiler-Wendel.
-             */
-            const ensureText = (id, y) => {
-                let element = svg.querySelector('#' + id);
+            // Only configured storage sensors belong on the boiler. Heating
+            // circuit supply/return readings are not boiler sensor readings.
+            removeBoilerTexts();
 
-                if (!element) {
-                    element = document.createElementNS(
-                        'http://www.w3.org/2000/svg',
-                        'text'
-                    );
-                    element.setAttribute('id', id);
-                    element.setAttribute('x', '590');
-                    element.setAttribute('y', String(y));
-                    element.setAttribute('text-anchor', 'end');
-                    element.setAttribute('xml:space', 'preserve');
-                    element.style.setProperty('font-size', '14px', 'important');
-                    element.style.setProperty(
-                        'fill',
-                        'var(--primary-text-color)',
-                        'important'
-                    );
-
-                    tankGroup.appendChild(element);
-                }
-
-                return element;
-            };
-
-            const boilerSupplyText = ensureText(
-                'symconBoilerSupplyTemperature',
-                438
-            );
-            const boilerRefluxText = ensureText(
-                'symconBoilerRefluxTemperature',
-                548
-            );
-
-            if (boilerActive) {
-                /*
-                 * Boiler wird geladen:
-                 * Die beiden Zusatzwerte zeigen ausschließlich während dieser
-                 * Phase die aktuell anliegenden Vorlauf-/Rücklauftemperaturen.
-                 *
-                 * Gleichzeitig bleiben die Temperaturwerte am einzigen Heizkreis
-                 * auf den zuletzt im Heizbetrieb gespeicherten Werten eingefroren.
-                 * Maßgebend ist ausschließlich die Stellung des
-                 * Umschaltventils Warmwasser/Heizung.
-                 */
-                boilerSupplyText.textContent =
-                    formatTemperature(supplyTemperature);
-                boilerRefluxText.textContent =
-                    formatTemperature(refluxTemperature);
-
-                boilerSupplyText.style.setProperty(
-                    'display',
-                    'inline',
-                    'important'
-                );
-                boilerRefluxText.style.setProperty(
-                    'display',
-                    'inline',
-                    'important'
-                );
-            } else {
-                /*
-                 * Keine Boilerladung:
-                 * Die zusätzlichen Vorlauf-/Rücklaufwerte am Boiler vollständig
-                 * ausblenden. Die normale Boilertemperatur im Speicher bleibt
-                 * selbstverständlich erhalten.
-                 */
-                boilerSupplyText.textContent = '';
-                boilerRefluxText.textContent = '';
-
-                boilerSupplyText.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
-                boilerRefluxText.style.setProperty(
-                    'display',
-                    'none',
-                    'important'
-                );
-            }
-
-            /*
-             * Ohne konfiguriertes Ventil gibt es keine eindeutige Boilerphase.
-             * Deshalb werden die zusätzlichen Werte ebenfalls nicht angezeigt.
-             */
-            if (!valveConfigured) {
-                removeBoilerTexts();
-            }
         };
 
         const applyTerminology = (card) => {

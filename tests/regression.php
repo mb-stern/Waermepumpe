@@ -320,7 +320,7 @@ $sourceModule->ApplyChanges();
 $data = callPrivate($sourceModule, 'BuildVisualizationData');
 foreach (['operatingStatus' => 62000, 'supplyTemperature' => 62001,
           'refluxTemperatureHeating' => 62002, 'returnTemperatureSetpoint' => 62003,
-          'outdoorTemperature' => 62004, 'tankTempWWUp' => 62005,
+          'outdoorTemperature' => 62004, 'tankTempWWMiddle' => 62005,
           'fanSpeed' => 62007, 'compressorRunning' => 62011,
           'compressorValue' => 62012, 'condenserTemperature' => 62013] as $key => $expected) {
     check($data[$key]['variableId'] === $expected, 'Ident resolution mismatch: ' . $key);
@@ -342,6 +342,17 @@ foreach (['AmbientTemperatureActual', 'AdditionalValue000', 'HeaterRod1'] as $pr
 check([$writes, $actions, $sourceModule->properties] === $before, 'Opening form changed saved assignments or operated device');
 $sourceModule->RequestAction('SetNumericControl', ['function' => 'warmWaterSetpoint', 'value' => 52.0]);
 check(end($actions) === [62009, 52.0], 'Control does not use displayed source');
+
+// Boiler sensors keep their physical level; DHW actual belongs in the middle.
+check(!isset($data['tankTempWWUp'], $data['tankTempWWDown']), 'DHW actual duplicated at another boiler level');
+check($liveFields['AutomaticTankTempWWMiddle']['value'] === 62005
+    && $liveFields['AutomaticTankTempWWMiddle']['visible'] === true, 'DHW actual not shown in middle picker');
+$objectIdents[61000]['Temperatur_Brauchwasser_Oben'] = 62006;
+$variables[62006] = 49.0;
+$boilerData = callPrivate(createModule(['LuxtronikInstanceID' => 61000]), 'BuildVisualizationData');
+check($boilerData['tankTempWWUp']['variableId'] === 62006
+    && $boilerData['tankTempWWMiddle']['variableId'] === 62005, 'Upper and middle boiler sensors conflated');
+unset($objectIdents[61000]['Temperatur_Brauchwasser_Oben']);
 
 // Execute the actual source picker's onChange with unsaved manual values.
 function WP_RefreshAssignmentStatus(int $id, int $source, string $values): void {
