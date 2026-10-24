@@ -696,3 +696,5 @@ Die Animation bleibt bei Datenaktualisierungen stabil. Die Betriebssystemoption
 für reduzierte Bewegung unterdrückt die animierten Flusspunkte und Rotoren.
 
 Die Boileranzeige zeigt ausschließlich zugeordnete Speicherfühler. Heizkreis-Vor- und Rücklauf werden dort auch während der Warmwasserbereitung nicht als zusätzliche Temperaturen eingeblendet.
+
+Fehlt ein passender Luxtronik-Ident, wird eine manuell konfigurierte Variable weiterhin angezeigt – auch wenn sie aus einer Luxtronik-Instanz stammt oder zusätzlich an einer anderen Speicherposition verwendet wird. Nur unbelegte Temperaturfelder bleiben ausgeblendet.

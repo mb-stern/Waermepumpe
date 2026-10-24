@@ -648,11 +648,9 @@ class Waermepumpe extends IPSModuleStrict
         if ($variableID !== 0) {
             return $variableID;
         }
-        // A missing Ident must not leave a different Luxtronik data point/unit active.
-        // External sources and unresolved saved IDs remain available for manual use.
-        $instances = IPS_GetInstanceListByModuleID(self::LUXTRONIK_MODULE_ID);
-        return $configuredID > 0 && IPS_VariableExists($configuredID)
-            && in_array(IPS_GetParent($configuredID), $instances, true) ? 0 : $configuredID;
+        // An explicit assignment remains valid when the optional Ident is absent,
+        // including variables belonging to this or another Luxtronik instance.
+        return $configuredID;
     }
 
     private function GetVisualizationVariableID(string $property): int

@@ -354,6 +354,28 @@ check($boilerData['tankTempWWUp']['variableId'] === 62006
     && $boilerData['tankTempWWMiddle']['variableId'] === 62005, 'Upper and middle boiler sensors conflated');
 unset($objectIdents[61000]['Temperatur_Brauchwasser_Oben']);
 
+// Reproduce the screenshot: the upper picker explicitly uses the same DHW
+// variable that Luxtronik automatically supplies for the middle sensor.
+$explicitBoiler = createModule(['LuxtronikInstanceID' => 61000, 'TankTempWWUp' => 62005]);
+$before = [$writes, $actions, $explicitBoiler->properties];
+$explicitBoiler->ApplyChanges();
+$boilerData = callPrivate($explicitBoiler, 'BuildVisualizationData');
+$boilerConfig = callPrivate($explicitBoiler, 'BuildCardConfig');
+check($boilerData['tankTempWWUp']['variableId'] === 62005
+    && $boilerData['tankTempWWMiddle']['variableId'] === 62005, 'Configured upper boiler sensor hidden');
+check($boilerConfig['tankTempWWUp'] === 'tankTempWWUp'
+    && $boilerConfig['tankTempWWMiddle'] === 'tankTempWWMiddle'
+    && $boilerConfig['tankTempWWDown'] === '', 'Configured/unconfigured boiler visibility incorrect');
+check(isset($explicitBoiler->messages[62005]), 'Configured boiler sensor not subscribed');
+$boilerFields = namedFormItems(json_decode($explicitBoiler->GetConfigurationForm(), true, 512, JSON_THROW_ON_ERROR)['elements']);
+check($boilerFields['TankTempWWUp']['visible'] === true
+    && $boilerFields['TankTempWWUp']['enabled'] === true, 'Manual boiler picker hidden or locked');
+check([$writes, $actions, $explicitBoiler->properties] === $before, 'Boiler fallback changed configuration or operated device');
+// Missing automatic Idents must preserve explicit assignments from any source.
+$otherBoiler = createModule(['LuxtronikInstanceID' => 61001, 'TankTempWWUp' => 62005]);
+check(callPrivate($otherBoiler, 'BuildVisualizationData')['tankTempWWUp']['variableId'] === 62005,
+    'Explicit sensor discarded because it belongs to another source');
+
 // Execute the actual source picker's onChange with unsaved manual values.
 function WP_RefreshAssignmentStatus(int $id, int $source, string $values): void {
     check($id === $GLOBALS['assignmentModule']->InstanceID, 'Wrong source-change target');
