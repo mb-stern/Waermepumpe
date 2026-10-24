@@ -53,7 +53,7 @@ Die folgende Zuordnung wurde gegen `mb-stern/Luxtronik`, Branch `development`, C
 | Hochdruck / Kondensationstemperatur | `Hochdruck` / `Kondensationstemperatur`, alternativ `Liquefaction_Temperature` |
 | Heizkreis 1 Pumpe / Pumpenwert | `Ausgang_Heizungsumwaelzpumpe` / `Steuersignal_Umwaelzpumpe` |
 | Warmwasserspeicher oben | `Temperatur_Brauchwasser_Oben` |
-| Brauchwasser Mitte | `Warmwasser_Ist_Temperatur` |
+| Warmwasserspeicher – Temperatur Mitte | `Warmwasser_Ist_Temperatur` |
 | Warmwasser-Umschaltventil und Speicherladepumpe | `Ausgang_Brauchwasserpumpe_Umstellventil` |
 | Zirkulationspumpe | `Ausgang_Zirkulationspumpe` |
 | Solar-Kollektortemperatur | `Fuehler_Solarkollektor` |

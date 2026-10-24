@@ -417,7 +417,7 @@ class Waermepumpe extends IPSModuleStrict
                     ['type' => 'Label', 'caption' => 'Warmwasserspeicher'],
                     $this->VariableGrid([
                         ['caption' => 'Temperatur oben', 'name' => 'TankTempWWUp'],
-                        ['caption' => 'Brauchwasser Mitte', 'name' => 'TankTempWWMiddle'],
+                        ['caption' => 'Temperatur Mitte', 'name' => 'TankTempWWMiddle'],
                         ['caption' => 'Temperatur unten', 'name' => 'TankTempWWDown']
                     ]),
                     ['type' => 'Label', 'caption' => 'Pumpen und Umschaltventil'],
